@@ -25,11 +25,12 @@ Application id: `in.stepq.app` (permanent once on Play). Code package: `com.step
 | A01 | Splash | done (PR 1) |
 | A02 | Log in (email) | done (PR 1); Google/Apple buttons say "coming soon" |
 | A03–A04 | Forgot password, reset link sent | done (PR 1) |
-| A05–A07 | Sign up: account, name + username, about you (gender, birthdate) | PR 2 |
-| A08 | Avatar builder (skin, hair, outfit, headband) | PR 2 |
-| A09 | Daily step goal (5k/8k/10k/12k or custom) | PR 2 |
-| A10 | Connect steps (Health Connect permissions) | PR 2 |
-| A11, A11a, A11b | All set; first 10K progress and milestones; 10K unlocked | PR 3 |
+| A05–A07 | Sign up: account, name + username, about you (gender, birthdate) | done (PR 1) |
+| A08 | Avatar builder (skin, hair, outfit, headband) | done (PR 1) |
+| A09 | Daily step goal (5k/8k/10k/12k or ±500) | done (PR 1) |
+| A10 | Connect steps (Health Connect permissions) | done (PR 1) |
+| A11 | All set | done (PR 1) |
+| A11a, A11b | First 10K progress and milestones; 10K unlocked | PR 3 |
 | A12, A12b, A12c | Home: ring, streak, StepQ score, week bars, friends today; goal reached; evening | PR 3 |
 | A13–A14 | Friends leaderboard, water reminder (5 a day on free) | PR 4 |
 | A15–A17 | Groups, create group, group leaderboard | PR 4 |
@@ -58,8 +59,8 @@ All tables have RLS on. "Me" means `auth.uid()`.
 Leaderboards (friends, groups, weekly/monthly challenges, StepQ score) are Postgres views or
 `security invoker` functions, so RLS still applies.
 
-Schema SQL will live in `supabase/migrations/` here. Applying it to the live project is a
-separate, explicit step.
+Schema SQL is in `supabase/migrations/`, with RLS tests in `supabase/tests/`. Applying it to
+the live project is a separate, explicit step: see `supabase/README.md`.
 
 ## Server-side pieces
 
@@ -70,9 +71,8 @@ separate, explicit step.
 
 ## Settings that need the owner
 
-1. Supabase → Authentication: sign-ups are **off** today (admin-only login). The app needs them
-   **on**. Admin data stays safe because the dashboard only shows rows to users in `stepq.admins`.
-2. Supabase → Data API: add `app` to the exposed schemas (keep `stepq` out).
+1–2. Run the schema, expose `app`, and turn sign-ups on: step by step in `supabase/README.md`
+   (decided: same Supabase project, sign-ups on).
 3. Google sign-in: an Android OAuth client (package + SHA-1) and a web client in Google Cloud,
    then enable the Google provider in Supabase. Apple sign-in: Services ID and key from Apple.
 4. Firebase project with an Android app for `in.stepq.app`; `google-services.json` as a CI secret.

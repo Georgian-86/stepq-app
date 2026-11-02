@@ -34,3 +34,19 @@ jobs:
             app/build/outputs/roborazzi/
             app/build/reports/
           retention-days: 14
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrations and RLS checks
+        run: ./supabase/tests/run.sh

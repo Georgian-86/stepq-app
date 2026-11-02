@@ -14,7 +14,7 @@ class NotConfiguredException : IllegalStateException(
     "This build has no Supabase key. Add SUPABASE_ANON_KEY to local.properties.",
 )
 
-/** Email + password sign-in through Supabase Auth. Google and Apple come with the sign-up PR. */
+/** Email + password accounts through Supabase Auth. Google and Apple need OAuth set up first. */
 class AuthRepository(private val client: SupabaseClient?) {
 
     val state: Flow<AuthState> = client?.auth?.sessionStatus?.map {
@@ -31,6 +31,20 @@ class AuthRepository(private val client: SupabaseClient?) {
             this.email = email.trim()
             this.password = password
         }
+    }
+
+    /**
+     * A05: creates the Supabase account. Returns true when the user is signed in straight away,
+     * false when Supabase wants the email confirmed first (then they log in after confirming
+     * and onboarding picks up where it left off).
+     */
+    suspend fun signUp(email: String, password: String): Result<Boolean> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.auth.signUpWith(Email) {
+            this.email = email.trim()
+            this.password = password
+        }
+        c.auth.currentSessionOrNull() != null
     }
 
     suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {

@@ -34,6 +34,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the screens, data model and the order of wo
 ```sh
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ./gradlew recordRoborazziDebug   # screenshots of each screen → app/build/outputs/roborazzi/
+./supabase/tests/run.sh          # schema + row-level security checks (needs local Postgres)
 ```
 
 CI runs the same on every pull request and uploads the screenshots.

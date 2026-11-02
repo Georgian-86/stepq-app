@@ -4,15 +4,19 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import com.stepq.app.data.AuthRepository
+import com.stepq.app.data.ProfileRepository
 import com.stepq.app.data.Supabase
 
 class StepqApplication : Application() {
     lateinit var auth: AuthRepository
         private set
+    lateinit var profiles: ProfileRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
         auth = AuthRepository(Supabase.client)
+        profiles = ProfileRepository(Supabase.client)
         createNotificationChannel()
     }
 

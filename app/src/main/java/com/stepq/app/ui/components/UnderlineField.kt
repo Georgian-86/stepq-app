@@ -35,6 +35,8 @@ fun UnderlineField(
     modifier: Modifier = Modifier,
     password: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation? = null,
+    placeholder: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     Column(modifier.fillMaxWidth()) {
@@ -46,12 +48,19 @@ fun UnderlineField(
             singleLine = true,
             textStyle = StepqType.Body.copy(color = StepqColors.Ink),
             cursorBrush = SolidColor(StepqColors.Deep),
-            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+            visualTransformation = visualTransformation
+                ?: if (password) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
                 .onFocusChanged { focused = it.isFocused },
+            decorationBox = { inner ->
+                if (value.isEmpty() && placeholder != null) {
+                    Text(placeholder, style = StepqType.Body, color = StepqColors.Muted.copy(alpha = 0.6f))
+                }
+                inner()
+            },
         )
         HorizontalDivider(
             thickness = if (focused) 2.dp else 1.dp,

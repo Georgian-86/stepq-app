@@ -13,9 +13,9 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val auth = (application as StepqApplication).auth
+        val app = application as StepqApplication
         setContent {
-            StepqTheme { StepqNavHost(auth) }
+            StepqTheme { StepqNavHost(app.auth, app.profiles) }
         }
     }
 }
