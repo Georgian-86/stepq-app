@@ -46,7 +46,12 @@ object GoogleSignIn {
         } catch (e: GetCredentialCancellationException) {
             throw GoogleSignInCancelled()
         } catch (e: NoCredentialException) {
-            throw IllegalStateException("No Google account on this phone. Add one in Settings → Accounts.", e)
+            throw IllegalStateException(
+                "Google found no account it can use for StepQ. Add a Google account in Settings, " +
+                    "or this build's signing key isn't registered with Google yet." +
+                    if (BuildConfig.DEBUG) "\n(${e.type}: ${e.errorMessage})" else "",
+                e,
+            )
         }
         val credential = response.credential
         if (credential !is CustomCredential || credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {

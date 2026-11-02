@@ -18,6 +18,7 @@ class StepqApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Supabase.init(this)
         auth = AuthRepository(Supabase.client)
         profiles = ProfileRepository(Supabase.client)
         home = HomeRepository(Supabase.client, profiles)

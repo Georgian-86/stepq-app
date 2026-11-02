@@ -11,8 +11,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.stepq.app.data.AuthRepository
 import com.stepq.app.data.GoogleSignIn
 import com.stepq.app.data.GoogleSignInCancelled
-import com.stepq.app.data.GoogleSignInNotConfigured
 import com.stepq.app.data.NotConfiguredException
+import com.stepq.app.data.authErrorMessage
 import kotlinx.coroutines.launch
 
 /**
@@ -37,9 +37,8 @@ fun GoogleSignInButton(auth: AuthRepository?, onError: (String?) -> Unit, modifi
                 onError(
                     when (it) {
                         is GoogleSignInCancelled -> null
-                        is GoogleSignInNotConfigured, is NotConfiguredException -> it.message
                         is IllegalStateException -> it.message
-                        else -> "Couldn't sign in with Google. Try again, or use your email."
+                        else -> authErrorMessage(it, "Couldn't sign in with Google. Try again, or use your email.")
                     },
                 )
             }

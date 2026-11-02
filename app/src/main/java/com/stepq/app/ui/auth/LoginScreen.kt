@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.stepq.app.data.AuthRepository
 import com.stepq.app.data.NotConfiguredException
+import com.stepq.app.data.authErrorMessage
 import com.stepq.app.data.isValidEmail
 import com.stepq.app.ui.components.GoogleSignInButton
 import com.stepq.app.ui.components.StepqButton
@@ -73,10 +74,7 @@ fun LoginScreen(
             busy = false
             // On success the auth state flips to SignedIn and navigation moves on by itself.
             result.onFailure {
-                error = when (it) {
-                    is NotConfiguredException -> it.message
-                    else -> "That email and password don't match. Try again or reset your password."
-                }
+                error = authErrorMessage(it, "Couldn't log you in. Try again in a minute.")
             }
         }
     }
