@@ -13,6 +13,12 @@ class ProfileRepository(private val client: SupabaseClient?) {
 
     fun currentUserId(): String? = client?.auth?.currentUserOrNull()?.id
 
+    /** The name Google gave us, to prefill A06 for people who signed up with Google. */
+    fun currentUserFullName(): String? = client?.auth?.currentUserOrNull()?.userMetadata
+        ?.let { it["full_name"] ?: it["name"] }
+        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        ?.takeIf { it.isNotBlank() }
+
     suspend fun mine(): Result<Profile?> = runCatching {
         val c = requireClient()
         val id = currentUserId() ?: return@runCatching null

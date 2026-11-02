@@ -28,6 +28,7 @@ jobs:
           # Without them the APK still builds; log-in then says it isn't configured.
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: ./gradlew assembleDebug testDebugUnitTest lintDebug --console=plain
       - name: Preview APK
         uses: actions/upload-artifact@v4

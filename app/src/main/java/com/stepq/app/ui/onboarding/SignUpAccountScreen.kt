@@ -26,6 +26,7 @@ import com.stepq.app.data.isValidEmail
 import com.stepq.app.data.isValidPassword
 import com.stepq.app.ui.components.FieldHint
 import com.stepq.app.ui.components.OnboardingFrame
+import com.stepq.app.ui.components.GoogleSignInButton
 import com.stepq.app.ui.components.StepqButton
 import com.stepq.app.ui.components.StepqButtonStyle
 import com.stepq.app.ui.components.StepqTextLink
@@ -90,8 +91,8 @@ fun SignUpAccountScreen(
             StepqTextLink("Already have an account? Log in", onLogIn)
         },
     ) {
-        val soon = { error = "Google and Apple sign-in are coming soon. Use your email for now." }
-        StepqButton("Continue with Google", soon, style = StepqButtonStyle.Outline)
+        val soon = { error = "Apple sign-in is coming soon. Use Google or your email for now." }
+        GoogleSignInButton(auth, onError = { error = it })
         Spacer(Modifier.height(12.dp))
         StepqButton("Continue with Apple", soon, style = StepqButtonStyle.Dark)
         Spacer(Modifier.height(20.dp))

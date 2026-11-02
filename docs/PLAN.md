@@ -23,7 +23,7 @@ Application id: `in.stepq.app` (permanent once on Play). Code package: `com.step
 | # | Screen | Status |
 | --- | --- | --- |
 | A01 | Splash | done (PR 1) |
-| A02 | Log in (email) | done (PR 1); Google/Apple buttons say "coming soon" |
+| A02 | Log in (email, Google) | done; Google in PR 2, Apple still "coming soon" |
 | A03–A04 | Forgot password, reset link sent | done (PR 1) |
 | A05–A07 | Sign up: account, name + username, about you (gender, birthdate) | done (PR 1) |
 | A08 | Avatar builder (skin, hair, outfit, headband) | done (PR 1) |
@@ -79,7 +79,6 @@ the live project is a separate, explicit step: see `supabase/README.md`.
 
 1–2. Run the schema, expose `app`, and turn sign-ups on: step by step in `supabase/README.md`
    (decided: same Supabase project, sign-ups on).
-3. Google sign-in: an Android OAuth client (package + SHA-1) and a web client in Google Cloud,
-   then enable the Google provider in Supabase. Apple sign-in: Services ID and key from Apple.
+3. Google sign-in: steps in `docs/GOOGLE_SIGN_IN.md`. Apple sign-in: Services ID and key from Apple.
 4. Firebase project with an Android app for `in.stepq.app`; `google-services.json` as a CI secret.
 5. Health Connect: Play Console health-permissions declaration before release.
