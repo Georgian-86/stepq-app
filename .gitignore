@@ -1,0 +1,12 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.kotlin/
+# Firebase config is per environment; add it locally or as a CI secret.
+app/google-services.json
+*.jks
+*.keystore

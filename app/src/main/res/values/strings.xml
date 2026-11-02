@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">StepQ</string>
+    <string name="notification_channel_default">reminders</string>
+    <string name="notification_channel_default_name">Reminders and nudges</string>
+</resources>
