@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val app = application as StepqApplication
         setContent {
-            StepqTheme { StepqNavHost(app.auth, app.profiles) }
+            StepqTheme { StepqNavHost(app.auth, app.profiles, app.home) }
         }
     }
 }

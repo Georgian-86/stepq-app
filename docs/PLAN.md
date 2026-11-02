@@ -31,7 +31,7 @@ Application id: `in.stepq.app` (permanent once on Play). Code package: `com.step
 | A10 | Connect steps (Health Connect permissions) | done (PR 1) |
 | A11 | All set | done (PR 1) |
 | A11a, A11b | First 10K progress and milestones; 10K unlocked | PR 3 |
-| A12, A12b, A12c | Home: ring, streak, StepQ score, week bars, friends today; goal reached; evening | PR 3 |
+| A12, A12b, A12c | Home: ring, streak, StepQ score, week bars, friends today; goal reached; evening | done (PR 2) |
 | A13–A14 | Friends leaderboard, water reminder (5 a day on free) | PR 4 |
 | A15–A17 | Groups, create group, group leaderboard | PR 4 |
 | A18–A21 | QRun list, post a QRun, join disclaimer, event planner | PR 5 |
@@ -61,6 +61,12 @@ Leaderboards (friends, groups, weekly/monthly challenges, StepQ score) are Postg
 
 Schema SQL is in `supabase/migrations/`, with RLS tests in `supabase/tests/`. Applying it to
 the live project is a separate, explicit step: see `supabase/README.md`.
+
+## Open questions
+
+- **StepQ score.** Home shows a provisional score: percent of today's goal, capped at 100.
+  The Figma shows 78 at 6,240/8,000 (matches) but 81 and 84 after the goal, so the real
+  formula (streak? week?) needs deciding.
 
 ## Server-side pieces
 

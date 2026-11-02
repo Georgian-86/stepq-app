@@ -46,9 +46,9 @@ enum class Tab(val label: String, val icon: ImageVector) {
     Profile("Profile", Icons.Outlined.Person),
 }
 
-/** The four-tab shell from A12/A13/A22/A26. Each tab's real screen lands in its own PR. */
+/** The four-tab shell from A12/A13/A22/A26. Friends, Challenges and Profile land in later PRs. */
 @Composable
-fun MainShell(auth: AuthRepository?) {
+fun MainShell(auth: AuthRepository?, home: com.stepq.app.data.HomeRepository?) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
     Scaffold(
@@ -78,7 +78,11 @@ fun MainShell(auth: AuthRepository?) {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
-                Tab.Home -> ComingSoon("Home", "Your steps, streak and friends today.")
+                Tab.Home -> if (home != null) {
+                    com.stepq.app.ui.home.HomeRoute(home, onSeeAllFriends = { tab = Tab.Friends })
+                } else {
+                    ComingSoon("Home", "Your steps, streak and friends today.")
+                }
                 Tab.Friends -> ComingSoon("Friends", "Friends, groups and QRuns.")
                 Tab.Challenges -> ComingSoon("Challenges", "Weekly and monthly leaderboards.")
                 Tab.Profile -> ComingSoon("Profile", "Your goal, connected apps and settings.") {

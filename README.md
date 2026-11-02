@@ -39,6 +39,17 @@ See [docs/PLAN.md](docs/PLAN.md) for the screens, data model and the order of wo
 
 CI runs the same on every pull request and uploads the screenshots.
 
+## Preview builds
+
+Every CI run uploads an installable debug APK as the `stepq-preview-apk` artifact (Actions →
+the run → Artifacts). For it to talk to Supabase, set in GitHub → Settings → Secrets and
+variables → Actions:
+
+- secret `SUPABASE_ANON_KEY`: the project's anon / publishable key (never the service key);
+- variable `SUPABASE_URL` (optional): defaults to `https://koagkmedvsplbgmltehk.supabase.co`.
+
+Install it on an Android 9+ phone by opening the APK and allowing installs from that source.
+
 ## Credits
 
 Fredoka and Nunito are bundled from Google Fonts under the SIL Open Font License 1.1.

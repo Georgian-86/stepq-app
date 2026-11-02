@@ -24,7 +24,7 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 fun config(name: String, default: String = ""): String =
-    localProps.getProperty(name) ?: System.getenv(name) ?: default
+    localProps.getProperty(name) ?: System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
 
 android {
     namespace = "com.stepq.app"
