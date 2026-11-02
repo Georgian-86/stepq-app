@@ -30,3 +30,19 @@ with it (`signInWith(IDToken)`, with a nonce). Three things must line up: a Goog
 The Web client ID is public. Set it as `GOOGLE_WEB_CLIENT_ID` in `local.properties` locally, and
 as a repo **variable** `GOOGLE_WEB_CLIENT_ID` (Settings → Secrets and variables → Actions →
 Variables) for CI preview APKs. Never put the client secret in the app.
+
+## Email confirmation links
+
+Sign-up confirmation emails redirect to `stepq://auth-callback`, which opens the app and
+signs the user in. In Supabase → Authentication → URL Configuration, add
+`stepq://auth-callback` under **Redirect URLs**. Without it Supabase falls back to the
+Site URL (by default `http://localhost:3000`), which shows "site can't be reached" on a
+phone. The email still counts as confirmed in that case, so the user can log in.
+
+## "No credentials available" on Google sign-in
+
+The app first tries the quick account sheet and then the full "Sign in with Google" screen.
+If both report no credentials, check in Google Cloud (same project as the Web client):
+
+- An **Android** OAuth client exists with package `in.stepq.app` and the signing key's SHA-1.
+- Under **Audience**, the app is published, or your Google account is listed as a test user.

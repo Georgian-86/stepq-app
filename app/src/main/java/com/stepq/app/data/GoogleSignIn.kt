@@ -1,12 +1,14 @@
 package com.stepq.app.data
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.stepq.app.BuildConfig
 import java.security.MessageDigest
@@ -32,17 +34,25 @@ object GoogleSignIn {
         val hashedNonce = MessageDigest.getInstance("SHA-256").digest(rawNonce.toByteArray())
             .joinToString("") { "%02x".format(it) }
 
-        val option = GetGoogleIdOption.Builder()
+        val manager = CredentialManager.create(context)
+        // First the quick bottom sheet. Some phones answer it with "no credentials" even with a
+        // Google account signed in, so fall back to the full "Sign in with Google" screen.
+        val quick = GetGoogleIdOption.Builder()
             .setServerClientId(clientId)
             .setFilterByAuthorizedAccounts(false)
             .setAutoSelectEnabled(false)
             .setNonce(hashedNonce)
             .build()
+        val full = GetSignInWithGoogleOption.Builder(clientId)
+            .setNonce(hashedNonce)
+            .build()
         val response = try {
-            CredentialManager.create(context).getCredential(
-                context,
-                GetCredentialRequest.Builder().addCredentialOption(option).build(),
-            )
+            try {
+                manager.getCredential(context, GetCredentialRequest.Builder().addCredentialOption(quick).build())
+            } catch (e: NoCredentialException) {
+                Log.i("StepqAuth", "No quick Google credential, trying the full sign-in screen", e)
+                manager.getCredential(context, GetCredentialRequest.Builder().addCredentialOption(full).build())
+            }
         } catch (e: GetCredentialCancellationException) {
             throw GoogleSignInCancelled()
         } catch (e: NoCredentialException) {

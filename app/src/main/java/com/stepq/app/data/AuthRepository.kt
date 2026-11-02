@@ -42,7 +42,7 @@ class AuthRepository(private val client: SupabaseClient?) {
      */
     suspend fun signUp(email: String, password: String): Result<Boolean> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.signUpWith(Email) {
+        c.auth.signUpWith(Email, redirectUrl = Supabase.AUTH_REDIRECT_URL) {
             this.email = email.trim()
             this.password = password
         }

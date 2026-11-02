@@ -37,6 +37,9 @@ object Supabase {
                 )
                 sessionManager = SettingsSessionManager(settings)
                 codeVerifierCache = SettingsCodeVerifierCache(settings)
+                // Email confirmation links come back into the app (see AndroidManifest).
+                scheme = DEEPLINK_SCHEME
+                host = DEEPLINK_HOST
             }
             install(Postgrest) {
                 // App tables live in their own schema, separate from the website's private
@@ -47,4 +50,9 @@ object Supabase {
     }
 
     const val APP_SCHEMA = "app"
+    const val DEEPLINK_SCHEME = "stepq"
+    const val DEEPLINK_HOST = "auth-callback"
+
+    /** Must be listed under Authentication → URL Configuration → Redirect URLs in Supabase. */
+    const val AUTH_REDIRECT_URL = "$DEEPLINK_SCHEME://$DEEPLINK_HOST"
 }
