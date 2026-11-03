@@ -57,12 +57,19 @@ fun ConnectStepsScreen(onBack: (() -> Unit)?, onDone: () -> Unit) {
 
     fun connect() {
         when (HealthConnect.availability(context)) {
-            HealthConnect.Availability.Available -> launcher.launch(HealthConnect.permissions)
-            HealthConnect.Availability.NeedsInstallOrUpdate -> context.startActivity(
-                Intent(Intent.ACTION_VIEW, "market://details?id=com.google.android.apps.healthdata&url=healthconnect%3A%2F%2Fonboarding".toUri())
-                    .setPackage("com.android.vending")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
+            HealthConnect.Availability.Available -> runCatching { launcher.launch(HealthConnect.permissions) }
+                .onFailure { note = "Health Connect didn't open. Open the Health Connect app once, then try again." }
+            HealthConnect.Availability.NeedsInstallOrUpdate -> {
+                // Before Android 14, Health Connect is a separate free app from Google.
+                note = "Your phone needs Google's free Health Connect app to share steps. Install or update it, then come back and tap Connect."
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, "market://details?id=com.google.android.apps.healthdata&url=healthconnect%3A%2F%2Fonboarding".toUri())
+                            .setPackage("com.android.vending")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
             HealthConnect.Availability.Unsupported ->
                 note = "This phone doesn't support Health Connect yet, so steps can't be read here."
         }

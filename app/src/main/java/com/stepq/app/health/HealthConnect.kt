@@ -20,15 +20,26 @@ object HealthConnect {
     enum class Availability { Available, NeedsInstallOrUpdate, Unsupported }
 
     fun availability(context: Context): Availability =
-        when (HealthConnectClient.getSdkStatus(context)) {
+        when (runCatching { HealthConnectClient.getSdkStatus(context) }.getOrNull()) {
             HealthConnectClient.SDK_AVAILABLE -> Availability.Available
             HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> Availability.NeedsInstallOrUpdate
             else -> Availability.Unsupported
         }
 
+    /**
+     * False when Health Connect is missing, not set up yet, or refuses the call: a freshly
+     * installed Health Connect can throw here until it has been opened once.
+     */
     suspend fun hasAllPermissions(context: Context): Boolean {
         if (availability(context) != Availability.Available) return false
-        val granted = HealthConnectClient.getOrCreate(context).permissionController.getGrantedPermissions()
-        return granted.containsAll(permissions)
+        return try {
+            HealthConnectClient.getOrCreate(context).permissionController.getGrantedPermissions()
+                .containsAll(permissions)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("StepqHealth", "Couldn't read Health Connect permissions", e)
+            false
+        }
     }
 }

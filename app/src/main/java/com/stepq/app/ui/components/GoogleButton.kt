@@ -8,6 +8,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.stepq.app.BuildConfig
 import com.stepq.app.data.AuthRepository
 import com.stepq.app.data.GoogleSignIn
 import com.stepq.app.data.GoogleSignInCancelled
@@ -36,7 +37,13 @@ fun GoogleSignInButton(auth: AuthRepository?, onError: (String?) -> Unit, modifi
             result.onFailure {
                 onError(
                     when (it) {
-                        is GoogleSignInCancelled -> null
+                        // A real "back" press stays silent; debug builds show what Google said,
+                        // because a set-up mismatch also arrives as a cancellation.
+                        is GoogleSignInCancelled -> if (BuildConfig.DEBUG && it.detail != null) {
+                            "Google sign-in was cancelled.\n(${it.detail})"
+                        } else {
+                            null
+                        }
                         is IllegalStateException -> it.message
                         else -> authErrorMessage(it, "Couldn't sign in with Google. Try again, or use your email.")
                     },

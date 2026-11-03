@@ -55,7 +55,9 @@ class HomeViewModel(
             val first = repo.load(today)
             val me = first.getOrNull()?.me
             if (connected && me != null) {
-                runCatching { reader.readDays(me.id, today) }.getOrNull()?.let { repo.saveDays(it) }
+                runCatching { reader.readDays(me.id, today) }
+                    .onFailure { android.util.Log.w("StepqHealth", "Couldn't read steps", it) }
+                    .getOrNull()?.let { repo.saveDays(it) }
             }
             val result = if (connected && me != null) repo.load(today) else first
             result

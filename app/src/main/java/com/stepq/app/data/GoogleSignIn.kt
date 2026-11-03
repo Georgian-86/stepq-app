@@ -18,7 +18,7 @@ import java.util.Base64
 /** Google's ID token plus the raw nonce whose SHA-256 was sent to Google. */
 data class GoogleIdToken(val idToken: String, val rawNonce: String, val displayName: String?)
 
-class GoogleSignInCancelled : Exception("Cancelled")
+class GoogleSignInCancelled(val detail: String? = null) : Exception(detail ?: "Cancelled")
 class GoogleSignInNotConfigured : Exception("Google sign-in isn't set up in this build yet.")
 
 /**
@@ -54,7 +54,9 @@ object GoogleSignIn {
                 manager.getCredential(context, GetCredentialRequest.Builder().addCredentialOption(full).build())
             }
         } catch (e: GetCredentialCancellationException) {
-            throw GoogleSignInCancelled()
+            // Also what Google returns when the OAuth set-up doesn't match the app (often
+            // "[16] Account reauth failed"), so debug builds say so instead of staying silent.
+            throw GoogleSignInCancelled(e.errorMessage?.toString())
         } catch (e: NoCredentialException) {
             throw IllegalStateException(
                 "Google found no account it can use for StepQ. Add a Google account in Settings, " +

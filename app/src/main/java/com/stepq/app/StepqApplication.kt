@@ -18,6 +18,7 @@ class StepqApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.stepq.app.debug.CrashLog.install(this)
         Supabase.init(this)
         auth = AuthRepository(Supabase.client)
         profiles = ProfileRepository(Supabase.client)
