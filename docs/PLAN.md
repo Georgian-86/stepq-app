@@ -82,3 +82,19 @@ the live project is a separate, explicit step: see `supabase/README.md`.
 3. Google sign-in: steps in `docs/GOOGLE_SIGN_IN.md`. Apple sign-in: Services ID and key from Apple.
 4. Firebase project with an Android app for `in.stepq.app`; `google-services.json` as a CI secret.
 5. Health Connect: Play Console health-permissions declaration before release.
+
+## Step counting
+
+Default source is the phone's built-in step counter (`Sensor.TYPE_STEP_COUNTER`, permission
+`ACTIVITY_RECOGNITION`), so no extra app is needed. Health Connect is optional and wins when
+connected, because it merges watches and other apps and has history.
+
+Trade-offs of the phone counter (see `health/StepLedger.kt`):
+- It is a running total since boot. StepQ credits the steps since its last reading to the day
+  of the new reading, so steps walked late one day show up on the next day if StepQ wasn't
+  opened in between.
+- Steps from the last reading until a reboot are lost.
+- No history from before the first reading, and no watch or other-app steps.
+- Distance and calories are estimates from steps; active minutes stay 0.
+
+A foreground service or a daily snapshot could close the day-boundary gap later.

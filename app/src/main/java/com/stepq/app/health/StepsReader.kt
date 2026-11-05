@@ -9,18 +9,47 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.stepq.app.data.DailySteps
+import com.stepq.app.data.stepsToKm
 import java.time.LocalDate
 import java.time.Period
 
 /**
- * Reads per-day totals from Health Connect for the last [days] days, today included.
- * Health Connect merges every source (the phone's own counter, watches, Google Fit), and its
- * aggregate removes duplicates between them.
+ * Where Home gets steps from. Health Connect when the user connected it (it merges watches and
+ * other apps and has history); otherwise the phone's own step counter, which needs no extra app.
  */
 class StepsReader(private val context: Context) {
+    val phone = PhoneStepCounter(context)
 
-    suspend fun readDays(userId: String, today: LocalDate, days: Int = 7): List<DailySteps> {
-        if (!HealthConnect.hasAllPermissions(context)) return emptyList()
+    enum class Source { HealthConnect, Phone, None }
+
+    suspend fun source(): Source = when {
+        HealthConnect.hasAllPermissions(context) -> Source.HealthConnect
+        phone.isReady -> Source.Phone
+        else -> Source.None
+    }
+
+    suspend fun readDays(userId: String, today: LocalDate, days: Int = 7): List<DailySteps> =
+        when (source()) {
+            Source.HealthConnect -> readHealthConnect(userId, today, days)
+            Source.Phone -> readPhone(userId, today, days)
+            Source.None -> emptyList()
+        }
+
+    private suspend fun readPhone(userId: String, today: LocalDate, days: Int): List<DailySteps> {
+        val first = today.minusDays((days - 1).toLong()).toString()
+        return phone.sync(today).filterKeys { it >= first }.map { (day, steps) ->
+            DailySteps(
+                userId = userId,
+                day = day,
+                steps = steps.coerceIn(0, 200_000),
+                distanceM = (stepsToKm(steps) * 1000).toInt(),
+                // Rough walking estimate; Health Connect gives real numbers when connected.
+                calories = (steps * KCAL_PER_STEP).toInt(),
+            )
+        }
+    }
+
+    private suspend fun readHealthConnect(userId: String, today: LocalDate, days: Int): List<DailySteps> {
         val client = HealthConnectClient.getOrCreate(context)
         val start = today.minusDays((days - 1).toLong()).atStartOfDay()
         val end = today.plusDays(1).atStartOfDay()
@@ -47,5 +76,9 @@ class StepsReader(private val context: Context) {
                     .toInt().coerceIn(0, 1440),
             )
         }
+    }
+
+    private companion object {
+        const val KCAL_PER_STEP = 0.04
     }
 }

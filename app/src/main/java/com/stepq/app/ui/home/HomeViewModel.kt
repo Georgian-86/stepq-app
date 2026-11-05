@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.stepq.app.data.HomeRepository
-import com.stepq.app.health.HealthConnect
 import com.stepq.app.health.StepsReader
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +50,7 @@ class HomeViewModel(
     fun refresh() {
         viewModelScope.launch {
             val today = LocalDate.now()
-            val connected = HealthConnect.hasAllPermissions(appContext)
+            val connected = reader.source() != StepsReader.Source.None
             val first = repo.load(today)
             val me = first.getOrNull()?.me
             if (connected && me != null) {

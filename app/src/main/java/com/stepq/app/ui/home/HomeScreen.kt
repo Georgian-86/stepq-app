@@ -195,7 +195,7 @@ private fun ConnectCard(onConnect: () -> Unit) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(StepqDimens.RadiusM)).background(StepqColors.Mint).padding(16.dp),
     ) {
         Text("Piko can't see your steps yet", style = StepqType.BodyStrong, color = StepqColors.Ink)
-        Text("Connect Health Connect so your walks count.", style = StepqType.Small, color = StepqColors.Muted)
+        Text("Allow step counting so your walks count.", style = StepqType.Small, color = StepqColors.Muted)
         Spacer(Modifier.height(12.dp))
         StepqButton("Connect steps", onConnect)
     }
