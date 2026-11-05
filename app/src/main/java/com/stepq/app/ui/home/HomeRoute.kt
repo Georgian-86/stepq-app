@@ -23,7 +23,7 @@ fun HomeRoute(repo: HomeRepository, onSeeAllFriends: () -> Unit) {
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
-        onPauseOrDispose { }
+        onPauseOrDispose { vm.stopLive() }
     }
 
     if (connecting) {

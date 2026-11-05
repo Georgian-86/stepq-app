@@ -21,14 +21,15 @@ data class StepLedger(
     /**
      * Adds a reading. [counter] is the sensor's total since boot, [bootTimeMs] is when this
      * boot started (wall clock minus uptime). The first reading only sets the baseline, since
-     * the total may include steps from earlier days.
+     * the total may include steps from earlier days, unless [bootedToday].
      */
-    fun record(counter: Long, bootTimeMs: Long, today: LocalDate): StepLedger {
+    fun record(counter: Long, bootTimeMs: Long, today: LocalDate, bootedToday: Boolean = false): StepLedger {
         val previous = lastValue
         val rebooted = previous != null &&
             (counter < previous || kotlin.math.abs(bootTimeMs - this.bootTimeMs) > BOOT_TOLERANCE_MS)
         val delta = when {
-            previous == null -> 0L
+            // First reading: the total is all today's if the phone was switched on today.
+            previous == null -> if (bootedToday) counter else 0L
             // After a reboot the counter starts again at 0, so everything it shows is new.
             rebooted -> counter
             else -> counter - previous

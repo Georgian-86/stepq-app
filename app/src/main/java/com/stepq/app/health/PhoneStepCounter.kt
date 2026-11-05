@@ -11,10 +11,15 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.coroutines.resume
 
 /**
@@ -38,16 +43,38 @@ class PhoneStepCounter(context: Context) {
 
     /** Takes a reading and returns steps per day for the days kept so far. */
     suspend fun sync(today: LocalDate): Map<String, Int> {
-        var ledger = load()
-        if (isReady) {
-            val counter = readCounter()
-            if (counter != null) {
-                val bootTime = System.currentTimeMillis() - SystemClock.elapsedRealtime()
-                ledger = ledger.record(counter, bootTime, today)
-                save(ledger)
-            }
-        }
+        if (!isReady) return load().days
+        val counter = readCounter() ?: return load().days
+        return record(counter, today)
+    }
+
+    /** Adds one counter value to the stored ledger and returns steps per day. */
+    @Synchronized
+    fun record(counter: Long, today: LocalDate): Map<String, Int> {
+        val bootTime = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+        val bootedToday = Instant.ofEpochMilli(bootTime).atZone(ZoneId.systemDefault()).toLocalDate() == today
+        val ledger = load().record(counter, bootTime, today, bootedToday)
+        save(ledger)
         return ledger.days
+    }
+
+    /** Every new counter value while collected (a few per second while walking). */
+    fun counterUpdates(): Flow<Long> = callbackFlow {
+        val sensor = sensors?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        if (sensor == null || !hasPermission) {
+            close()
+            return@callbackFlow
+        }
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                trySend(event.values[0].toLong())
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+        val ok = runCatching { sensors.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
+            .getOrDefault(false)
+        if (!ok) close()
+        awaitClose { sensors.unregisterListener(listener) }
     }
 
     /** The counter's current total. The sensor sends its value soon after a listener joins. */

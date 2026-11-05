@@ -37,7 +37,12 @@ class StepsReader(private val context: Context) {
 
     private suspend fun readPhone(userId: String, today: LocalDate, days: Int): List<DailySteps> {
         val first = today.minusDays((days - 1).toLong()).toString()
-        return phone.sync(today).filterKeys { it >= first }.map { (day, steps) ->
+        return phoneRows(userId, phone.sync(today).filterKeys { it >= first })
+    }
+
+    /** Rows for days counted by the phone's step counter. */
+    fun phoneRows(userId: String, days: Map<String, Int>): List<DailySteps> =
+        days.map { (day, steps) ->
             DailySteps(
                 userId = userId,
                 day = day,
@@ -47,7 +52,6 @@ class StepsReader(private val context: Context) {
                 calories = (steps * KCAL_PER_STEP).toInt(),
             )
         }
-    }
 
     private suspend fun readHealthConnect(userId: String, today: LocalDate, days: Int): List<DailySteps> {
         val client = HealthConnectClient.getOrCreate(context)
