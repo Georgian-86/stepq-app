@@ -1,8 +1,12 @@
 package com.stepq.app.data
 
 import com.stepq.app.BuildConfig
+import android.content.Context
+import com.russhwolf.settings.SharedPreferencesSettings
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.SettingsCodeVerifierCache
+import io.github.jan.supabase.auth.SettingsSessionManager
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 
@@ -14,10 +18,29 @@ import io.github.jan.supabase.postgrest.Postgrest
  * opens and the log-in screen can say so instead of crashing.
  */
 object Supabase {
+    private lateinit var appContext: Context
+
+    /** Called once from StepqApplication, before anything touches [client]. */
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
     val client: SupabaseClient? by lazy {
         if (BuildConfig.SUPABASE_ANON_KEY.isBlank()) return@lazy null
         createSupabaseClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY) {
-            install(Auth)
+            install(Auth) {
+                // Keep the session in our own SharedPreferences instead of relying on the
+                // library finding a Context by itself, which fails on some setups and then
+                // breaks every sign-in.
+                val settings = SharedPreferencesSettings(
+                    appContext.getSharedPreferences("supabase_auth", Context.MODE_PRIVATE),
+                )
+                sessionManager = SettingsSessionManager(settings)
+                codeVerifierCache = SettingsCodeVerifierCache(settings)
+                // Email confirmation links come back into the app (see AndroidManifest).
+                scheme = DEEPLINK_SCHEME
+                host = DEEPLINK_HOST
+            }
             install(Postgrest) {
                 // App tables live in their own schema, separate from the website's private
                 // `stepq` schema. See docs/PLAN.md.
@@ -27,4 +50,9 @@ object Supabase {
     }
 
     const val APP_SCHEMA = "app"
+    const val DEEPLINK_SCHEME = "stepq"
+    const val DEEPLINK_HOST = "auth-callback"
+
+    /** Must be listed under Authentication → URL Configuration → Redirect URLs in Supabase. */
+    const val AUTH_REDIRECT_URL = "$DEEPLINK_SCHEME://$DEEPLINK_HOST"
 }

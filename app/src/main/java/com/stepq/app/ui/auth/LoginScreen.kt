@@ -35,7 +35,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.stepq.app.data.AuthRepository
 import com.stepq.app.data.NotConfiguredException
+import com.stepq.app.data.authErrorMessage
 import com.stepq.app.data.isValidEmail
+import com.stepq.app.ui.components.GoogleSignInButton
 import com.stepq.app.ui.components.StepqButton
 import com.stepq.app.ui.components.StepqButtonStyle
 import com.stepq.app.ui.components.StepqTextLink
@@ -46,8 +48,8 @@ import com.stepq.app.ui.theme.StepqType
 import kotlinx.coroutines.launch
 
 /**
- * A02 Log in. Email + password works now. Google and Apple are shown as in the design but
- * arrive with the sign-up PR, as they need OAuth set up in Supabase and Google Cloud.
+ * A02 Log in: email + password or Google. Apple is shown as in the design but still needs
+ * an Apple Services ID before it can work.
  */
 @Composable
 fun LoginScreen(
@@ -72,10 +74,7 @@ fun LoginScreen(
             busy = false
             // On success the auth state flips to SignedIn and navigation moves on by itself.
             result.onFailure {
-                error = when (it) {
-                    is NotConfiguredException -> it.message
-                    else -> "That email and password don't match. Try again or reset your password."
-                }
+                error = authErrorMessage(it, "Couldn't log you in. Try again in a minute.")
             }
         }
     }
@@ -116,8 +115,8 @@ fun LoginScreen(
             Spacer(Modifier.height(16.dp))
             OrDivider()
             Spacer(Modifier.height(16.dp))
-            val soon = { error = "Google and Apple sign-in are coming soon. Use your email for now." }
-            StepqButton("Continue with Google", soon, style = StepqButtonStyle.Outline)
+            val soon = { error = "Apple sign-in is coming soon. Use Google or your email for now." }
+            GoogleSignInButton(auth, onError = { error = it })
             Spacer(Modifier.height(12.dp))
             StepqButton("Continue with Apple", soon, style = StepqButtonStyle.Dark)
             Spacer(Modifier.height(24.dp))

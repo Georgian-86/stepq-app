@@ -23,7 +23,7 @@ Application id: `in.stepq.app` (permanent once on Play). Code package: `com.step
 | # | Screen | Status |
 | --- | --- | --- |
 | A01 | Splash | done (PR 1) |
-| A02 | Log in (email) | done (PR 1); Google/Apple buttons say "coming soon" |
+| A02 | Log in (email, Google) | done; Google in PR 2, Apple still "coming soon" |
 | A03–A04 | Forgot password, reset link sent | done (PR 1) |
 | A05–A07 | Sign up: account, name + username, about you (gender, birthdate) | done (PR 1) |
 | A08 | Avatar builder (skin, hair, outfit, headband) | done (PR 1) |
@@ -31,7 +31,7 @@ Application id: `in.stepq.app` (permanent once on Play). Code package: `com.step
 | A10 | Connect steps (Health Connect permissions) | done (PR 1) |
 | A11 | All set | done (PR 1) |
 | A11a, A11b | First 10K progress and milestones; 10K unlocked | PR 3 |
-| A12, A12b, A12c | Home: ring, streak, StepQ score, week bars, friends today; goal reached; evening | PR 3 |
+| A12, A12b, A12c | Home: ring, streak, StepQ score, week bars, friends today; goal reached; evening | done (PR 2) |
 | A13–A14 | Friends leaderboard, water reminder (5 a day on free) | PR 4 |
 | A15–A17 | Groups, create group, group leaderboard | PR 4 |
 | A18–A21 | QRun list, post a QRun, join disclaimer, event planner | PR 5 |
@@ -62,6 +62,12 @@ Leaderboards (friends, groups, weekly/monthly challenges, StepQ score) are Postg
 Schema SQL is in `supabase/migrations/`, with RLS tests in `supabase/tests/`. Applying it to
 the live project is a separate, explicit step: see `supabase/README.md`.
 
+## Open questions
+
+- **StepQ score.** Home shows a provisional score: percent of today's goal, capped at 100.
+  The Figma shows 78 at 6,240/8,000 (matches) but 81 and 84 after the goal, so the real
+  formula (streak? week?) needs deciding.
+
 ## Server-side pieces
 
 - **Push sending**: a Supabase Edge Function (or a stepq.in API route) holds the Firebase service
@@ -73,7 +79,22 @@ the live project is a separate, explicit step: see `supabase/README.md`.
 
 1–2. Run the schema, expose `app`, and turn sign-ups on: step by step in `supabase/README.md`
    (decided: same Supabase project, sign-ups on).
-3. Google sign-in: an Android OAuth client (package + SHA-1) and a web client in Google Cloud,
-   then enable the Google provider in Supabase. Apple sign-in: Services ID and key from Apple.
+3. Google sign-in: steps in `docs/GOOGLE_SIGN_IN.md`. Apple sign-in: Services ID and key from Apple.
 4. Firebase project with an Android app for `in.stepq.app`; `google-services.json` as a CI secret.
 5. Health Connect: Play Console health-permissions declaration before release.
+
+## Step counting
+
+Default source is the phone's built-in step counter (`Sensor.TYPE_STEP_COUNTER`, permission
+`ACTIVITY_RECOGNITION`), so no extra app is needed. Health Connect is optional and wins when
+connected, because it merges watches and other apps and has history.
+
+Trade-offs of the phone counter (see `health/StepLedger.kt`):
+- It is a running total since boot. StepQ credits the steps since its last reading to the day
+  of the new reading, so steps walked late one day show up on the next day if StepQ wasn't
+  opened in between.
+- Steps from the last reading until a reboot are lost.
+- No history from before the first reading, and no watch or other-app steps.
+- Distance and calories are estimates from steps; active minutes stay 0.
+
+A foreground service or a daily snapshot could close the day-boundary gap later.

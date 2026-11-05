@@ -23,7 +23,19 @@ jobs:
       - name: Install Android 37 platform
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" > /dev/null
       - name: Build, unit tests, lint
+        env:
+          # Public anon key and project URL, from repo Settings → Secrets / Variables → Actions.
+          # Without them the APK still builds; log-in then says it isn't configured.
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: ./gradlew assembleDebug testDebugUnitTest lintDebug --console=plain
+      - name: Preview APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: stepq-preview-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
       - name: Screenshots
         run: ./gradlew recordRoborazziDebug --console=plain
       - uses: actions/upload-artifact@v4

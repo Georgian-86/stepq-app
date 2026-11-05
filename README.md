@@ -21,6 +21,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the screens, data model and the order of wo
    sdk.dir=/path/to/Android/sdk
    SUPABASE_URL=https://koagkmedvsplbgmltehk.supabase.co
    SUPABASE_ANON_KEY=<Supabase → Project Settings → API Keys → anon / publishable key>
+   GOOGLE_WEB_CLIENT_ID=<Google Cloud Web OAuth client ID, see docs/GOOGLE_SIGN_IN.md>
    ```
 
    Never put the `service_role` / secret key here: it would ship inside the APK.
@@ -38,6 +39,21 @@ See [docs/PLAN.md](docs/PLAN.md) for the screens, data model and the order of wo
 ```
 
 CI runs the same on every pull request and uploads the screenshots.
+
+## Preview builds
+
+Every CI run uploads an installable debug APK as the `stepq-preview-apk` artifact (Actions →
+the run → Artifacts). For it to talk to Supabase, set in GitHub → Settings → Secrets and
+variables → Actions:
+
+- secret `SUPABASE_ANON_KEY`: the project's anon / publishable key (never the service key);
+- variable `SUPABASE_URL` (optional): defaults to `https://koagkmedvsplbgmltehk.supabase.co`;
+- variable `GOOGLE_WEB_CLIENT_ID`: turns on Google sign-in (see docs/GOOGLE_SIGN_IN.md).
+
+All debug builds are signed with the shared `app/keystore/debug.keystore`, so Google sign-in
+works on any of them once its SHA-1 is registered.
+
+Install it on an Android 9+ phone by opening the APK and allowing installs from that source.
 
 ## Credits
 

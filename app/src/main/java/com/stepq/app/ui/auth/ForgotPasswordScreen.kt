@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.stepq.app.R
 import com.stepq.app.data.AuthRepository
 import com.stepq.app.data.NotConfiguredException
+import com.stepq.app.data.authErrorMessage
 import com.stepq.app.data.isValidEmail
 import com.stepq.app.ui.components.StepqButton
 import com.stepq.app.ui.components.StepqTextLink
@@ -59,7 +60,7 @@ fun ForgotPasswordScreen(auth: AuthRepository?, onBack: () -> Unit) {
             busy = false
             result
                 .onSuccess { sentTo = email.trim() }
-                .onFailure { error = (it as? NotConfiguredException)?.message ?: "Couldn't send the link. Try again in a minute." }
+                .onFailure { error = authErrorMessage(it, "Couldn't send the link. Try again in a minute.") }
         }
     }
 
