@@ -50,4 +50,9 @@ class HomeMathTest {
         assertEquals("Good afternoon", greeting(LocalTime.of(13, 0)))
         assertEquals("Good evening", greeting(LocalTime.of(21, 0)))
     }
+
+    @Test fun distanceUsesMetresUnderOneKm() {
+        org.junit.Assert.assertEquals("38" to "m", com.stepq.app.ui.home.distanceLabel(0.0381))
+        org.junit.Assert.assertEquals("1.2" to "km", com.stepq.app.ui.home.distanceLabel(1.24))
+    }
 }

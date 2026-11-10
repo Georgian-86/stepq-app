@@ -69,3 +69,8 @@ fun friendsToday(
     if (top.any { it.isMe }) return top
     return all.take(size - 1) + all.first { it.isMe }
 }
+
+/** Metres under 1 km (so a short walk doesn't read "0.0 km"), then km with one decimal. */
+fun distanceLabel(km: Double): Pair<String, String> =
+    if (km < 1.0) "${(km * 1000).roundToInt()}" to "m"
+    else String.format(java.util.Locale.US, "%.1f", km) to "km"

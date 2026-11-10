@@ -50,6 +50,8 @@ class StepsReader(private val context: Context) {
                 distanceM = (stepsToKm(steps) * 1000).toInt(),
                 // Rough walking estimate; Health Connect gives real numbers when connected.
                 calories = (steps * KCAL_PER_STEP).toInt(),
+                // Estimate at a brisk walking pace; Health Connect gives measured minutes.
+                activeMinutes = (steps / STEPS_PER_ACTIVE_MINUTE).coerceIn(0, 1440),
             )
         }
 
@@ -84,5 +86,6 @@ class StepsReader(private val context: Context) {
 
     private companion object {
         const val KCAL_PER_STEP = 0.04
+        const val STEPS_PER_ACTIVE_MINUTE = 100
     }
 }

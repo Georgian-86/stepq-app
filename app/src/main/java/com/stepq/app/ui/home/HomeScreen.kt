@@ -88,7 +88,8 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard(Icons.Outlined.Route, "%.1f".format(Locale.US, state.km), "km", Modifier.weight(1f))
+                val (distance, unit) = distanceLabel(state.km)
+                StatCard(Icons.Outlined.Route, distance, unit, Modifier.weight(1f))
                 StatCard(Icons.Outlined.LocalFireDepartment, state.kcal.toString(), "kcal", Modifier.weight(1f))
                 StatCard(Icons.Outlined.Schedule, state.activeMinutes.toString(), "active min", Modifier.weight(1f))
             }
