@@ -2,7 +2,9 @@ package com.stepq.app.data
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -14,7 +16,7 @@ class NotConfiguredException : IllegalStateException(
     "This build has no Supabase key. Add SUPABASE_ANON_KEY to local.properties.",
 )
 
-/** Email + password accounts through Supabase Auth. Google and Apple need OAuth set up first. */
+/** Accounts through Supabase Auth: email + password, and Google. Apple needs OAuth set up first. */
 class AuthRepository(private val client: SupabaseClient?) {
 
     val state: Flow<AuthState> = client?.auth?.sessionStatus?.map {
@@ -40,11 +42,21 @@ class AuthRepository(private val client: SupabaseClient?) {
      */
     suspend fun signUp(email: String, password: String): Result<Boolean> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.signUpWith(Email) {
+        c.auth.signUpWith(Email, redirectUrl = Supabase.AUTH_REDIRECT_URL) {
             this.email = email.trim()
             this.password = password
         }
         c.auth.currentSessionOrNull() != null
+    }
+
+    /** Signs in (or up) with a Google ID token. New users then go through onboarding. */
+    suspend fun logInWithGoogle(token: GoogleIdToken): Result<Unit> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.auth.signInWith(IDToken) {
+            idToken = token.idToken
+            provider = Google
+            nonce = token.rawNonce
+        }
     }
 
     suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {

@@ -35,6 +35,11 @@ private enum class UsernameStatus { Empty, Invalid, Checking, Available, Taken, 
 fun NameScreen(state: OnboardingViewModel, profiles: ProfileRepository?, onBack: () -> Unit, onContinue: () -> Unit) {
     var status by remember { mutableStateOf(UsernameStatus.Empty) }
 
+    // People who signed up with Google already have a name; start from it.
+    LaunchedEffect(Unit) {
+        if (state.fullName.isBlank()) profiles?.currentUserFullName()?.let { state.fullName = it.take(40) }
+    }
+
     LaunchedEffect(state.username) {
         val name = state.username
         status = when {

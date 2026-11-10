@@ -24,7 +24,7 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 fun config(name: String, default: String = ""): String =
-    localProps.getProperty(name) ?: System.getenv(name) ?: default
+    localProps.getProperty(name) ?: System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
 
 android {
     namespace = "com.stepq.app"
@@ -36,10 +36,24 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${config("SUPABASE_URL", "https://koagkmedvsplbgmltehk.supabase.co")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${config("SUPABASE_ANON_KEY")}\"")
         buildConfigField("boolean", "FIREBASE_ENABLED", hasFirebaseConfig.toString())
+        // Google sign-in: the *Web* OAuth client ID from Google Cloud (public, not a secret).
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${config("GOOGLE_WEB_CLIENT_ID")}\"")
+    }
+
+    signingConfigs {
+        // One shared debug key for every machine and CI, so its SHA-1 can be registered with
+        // Google sign-in once. Debug keys are not secret; release builds use their own key.
+        getByName("debug") {
+            storeFile = file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
@@ -91,6 +105,9 @@ dependencies {
     implementation(libs.firebase.crashlytics)
 
     implementation(libs.health.connect)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
@@ -98,6 +115,11 @@ dependencies {
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 // Robolectric downloads Android jars from Maven Central at test time. Set ROBOLECTRIC_REPO_URL

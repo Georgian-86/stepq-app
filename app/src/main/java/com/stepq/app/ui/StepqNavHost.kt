@@ -62,6 +62,7 @@ private enum class Landing { Loading, SignedOut, Onboarding, Main }
 fun StepqNavHost(
     auth: AuthRepository,
     profiles: ProfileRepository,
+    home: com.stepq.app.data.HomeRepository,
     nav: NavHostController = rememberNavController(),
 ) {
     val authState by auth.state.collectAsState(initial = AuthState.Loading)
@@ -163,6 +164,6 @@ fun StepqNavHost(
                 nav.navigate(Routes.MAIN) { popUpTo(0) { inclusive = true } }
             }
         }
-        composable(Routes.MAIN) { MainShell(auth) }
+        composable(Routes.MAIN) { MainShell(auth, home) }
     }
 }

@@ -39,6 +39,11 @@ select pg_temp.expect_error($$insert into app.profiles (id, display_name, userna
 select pg_temp.expect_error($$update app.profiles set plan = 'pro' where id = auth.uid()$$, 'upgrading own plan to pro');
 select pg_temp.expect_error($$update app.profiles set birthdate = '1990-01-01' where id = auth.uid()$$, 'changing birthdate');
 insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date, 6240);
+-- What the app's upsert sends: the same row again with new numbers.
+insert into app.daily_steps (user_id, day, steps, distance_m) values (auth.uid(), current_date, 6240, 4800)
+  on conflict (user_id, day) do update set user_id = excluded.user_id, day = excluded.day,
+  steps = excluded.steps, distance_m = excluded.distance_m;
+select pg_temp.expect((select distance_m from app.daily_steps where user_id = auth.uid()) = 4800, 'upserting own steps');
 reset role;
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
@@ -58,6 +63,7 @@ update app.friendships set status = 'accepted' where addressee = auth.uid();
 select pg_temp.expect((select count(*) from app.profiles) = 2, 'friends: sees both profiles');
 select pg_temp.expect((select count(*) from app.daily_steps) = 2, 'friends: sees both step rows');
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date - 1, 99999)$$, 'writing a friend''s steps');
+select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date, 99999) on conflict (user_id, day) do update set steps = excluded.steps$$, 'upserting over a friend''s steps');
 insert into app.water_reminders (from_user, to_user)
   select auth.uid(), '00000000-0000-0000-0000-00000000000b' from generate_series(1, 5);
 select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_user) values (auth.uid(), '00000000-0000-0000-0000-00000000000b')$$, '6th water reminder on free plan');
