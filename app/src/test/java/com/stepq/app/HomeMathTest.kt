@@ -55,4 +55,20 @@ class HomeMathTest {
         org.junit.Assert.assertEquals("38" to "m", com.stepq.app.ui.home.distanceLabel(0.0381))
         org.junit.Assert.assertEquals("1.2" to "km", com.stepq.app.ui.home.distanceLabel(1.24))
     }
+
+    @Test fun phoneDaysWinOverStaleServerCopy() {
+        val server = listOf(DailySteps("u", "2026-11-10", steps = 29), DailySteps("u", "2026-11-09", steps = 50))
+        val local = listOf(DailySteps("u", "2026-11-10", steps = 412))
+        val merged = com.stepq.app.ui.home.overlayDays(server, local)
+        assertEquals(listOf("2026-11-10" to 412, "2026-11-09" to 50), merged.map { it.day to it.steps })
+    }
+
+    @Test fun activeMinutesCountAnyWalking() {
+        val f = { s: Int -> com.stepq.app.ui.home.estimatedActiveMinutes(s) }
+        assertEquals(0, f(0))
+        assertEquals(1, f(29))
+        assertEquals(1, f(100))
+        assertEquals(2, f(101))
+        assertEquals(80, f(8000))
+    }
 }

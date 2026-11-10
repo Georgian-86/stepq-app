@@ -62,14 +62,18 @@ class HomeViewModel(
             connected = source != StepsReader.Source.None
             val first = repo.load(today)
             val me = first.getOrNull()?.me
+            var local: List<DailySteps> = emptyList()
             if (connected && me != null) {
-                runCatching { reader.readDays(me.id, today) }
+                local = runCatching { reader.readDays(me.id, today) }
                     .onFailure { android.util.Log.w("StepqHealth", "Couldn't read steps", it) }
-                    .getOrNull()?.let { repo.saveDays(it) }
+                    .getOrDefault(emptyList())
+                repo.saveDays(local).onFailure { android.util.Log.w("StepqHealth", "Couldn't save steps", it) }
             }
             val result = if (connected && me != null) repo.load(today) else first
             result
-                .onSuccess { loaded ->
+                .onSuccess { fetched ->
+                    // Show what the phone counted even if the server copy is behind.
+                    val loaded = fetched?.let { it.copy(myDays = overlayDays(it.myDays, local)) }
                     if (loaded != null) {
                         data = loaded
                         _state.value = build(loaded, today, connected)
@@ -93,10 +97,7 @@ class HomeViewModel(
                 val current = data ?: return@collect
                 val today = LocalDate.now()
                 val rows = reader.phoneRows(current.me.id, reader.phone.record(counter, today))
-                val merged = current.copy(
-                    myDays = (rows + current.myDays.filter { d -> rows.none { it.day == d.day } })
-                        .sortedByDescending { it.day },
-                )
+                val merged = current.copy(myDays = overlayDays(current.myDays, rows))
                 data = merged
                 _state.value = build(merged, today, connected)
                 unsaved = rows.filter { it.day == today.toString() }
@@ -117,7 +118,9 @@ class HomeViewModel(
         if (rows.isEmpty()) return
         unsaved = emptyList()
         lastUpload = System.currentTimeMillis()
-        viewModelScope.launch { repo.saveDays(rows) }
+        viewModelScope.launch {
+            repo.saveDays(rows).onFailure { android.util.Log.w("StepqHealth", "Couldn't save steps", it) }
+        }
     }
 
     private fun build(data: com.stepq.app.data.HomeData, today: LocalDate, connected: Boolean): HomeUiState {

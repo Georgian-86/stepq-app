@@ -51,6 +51,26 @@ class HomeRepository(private val client: SupabaseClient?, private val profiles: 
     suspend fun saveDays(days: List<DailySteps>): Result<Unit> = runCatching {
         if (days.isEmpty()) return@runCatching
         val c = client ?: throw NotConfiguredException()
-        c.postgrest["daily_steps"].upsert(days) { onConflict = "user_id,day" }
+        val table = c.postgrest["daily_steps"]
+        val upserted = runCatching { table.upsert(days) { onConflict = "user_id,day" } }
+        if (upserted.isSuccess) return@runCatching
+        // The upsert needs UPDATE on the key columns (migration 20261102010000). Until that is
+        // applied, update each existing day and insert the new ones, which the base grants allow.
+        android.util.Log.w("StepqHealth", "Upsert failed, saving day by day", upserted.exceptionOrNull())
+        for (d in days) {
+            val updated = table.update({
+                set("steps", d.steps)
+                set("distance_m", d.distanceM)
+                set("active_minutes", d.activeMinutes)
+                set("calories", d.calories)
+            }) {
+                select()
+                filter {
+                    eq("user_id", d.userId)
+                    eq("day", d.day)
+                }
+            }.decodeList<DailySteps>()
+            if (updated.isEmpty()) table.insert(d)
+        }
     }
 }

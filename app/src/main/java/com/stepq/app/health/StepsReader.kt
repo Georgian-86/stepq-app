@@ -10,6 +10,7 @@ import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.stepq.app.data.DailySteps
 import com.stepq.app.data.stepsToKm
+import com.stepq.app.ui.home.estimatedActiveMinutes
 import java.time.LocalDate
 import java.time.Period
 
@@ -50,8 +51,8 @@ class StepsReader(private val context: Context) {
                 distanceM = (stepsToKm(steps) * 1000).toInt(),
                 // Rough walking estimate; Health Connect gives real numbers when connected.
                 calories = (steps * KCAL_PER_STEP).toInt(),
-                // Estimate at a brisk walking pace; Health Connect gives measured minutes.
-                activeMinutes = (steps / STEPS_PER_ACTIVE_MINUTE).coerceIn(0, 1440),
+                // Estimate at a walking pace; Health Connect gives measured minutes.
+                activeMinutes = estimatedActiveMinutes(steps),
             )
         }
 
@@ -86,6 +87,5 @@ class StepsReader(private val context: Context) {
 
     private companion object {
         const val KCAL_PER_STEP = 0.04
-        const val STEPS_PER_ACTIVE_MINUTE = 100
     }
 }

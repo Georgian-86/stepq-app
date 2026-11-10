@@ -74,3 +74,16 @@ fun friendsToday(
 fun distanceLabel(km: Double): Pair<String, String> =
     if (km < 1.0) "${(km * 1000).roundToInt()}" to "m"
     else String.format(java.util.Locale.US, "%.1f", km) to "km"
+
+/**
+ * [days] with each day in [local] replaced by the local row. The phone's own counter is the
+ * truth for its days; the server copy can lag if a save failed or hasn't happened yet.
+ */
+fun overlayDays(days: List<DailySteps>, local: List<DailySteps>): List<DailySteps> =
+    (local + days.filter { d -> local.none { it.day == d.day } }).sortedByDescending { it.day }
+
+/** Minutes of walking for a step count, at about 100 steps a minute; any walking counts as 1. */
+fun estimatedActiveMinutes(steps: Int): Int =
+    if (steps <= 0) 0 else ((steps + STEPS_PER_ACTIVE_MINUTE - 1) / STEPS_PER_ACTIVE_MINUTE).coerceAtMost(1440)
+
+private const val STEPS_PER_ACTIVE_MINUTE = 100
