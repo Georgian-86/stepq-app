@@ -1,5 +1,6 @@
 package com.stepq.app
 
+import android.util.Log
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -32,8 +33,14 @@ class SmokeTest {
 
         val email = args.getString("email").orEmpty()
         val password = args.getString("password").orEmpty()
-        if (email.isEmpty() || password.isEmpty()) return
-        if (rule.onAllNodesWithText("This week").fetchSemanticsNodes().isNotEmpty()) return
+        if (email.isEmpty() || password.isEmpty()) {
+            Log.i(TAG, "No test account given: checked the start screen only")
+            return
+        }
+        if (rule.onAllNodesWithText("This week").fetchSemanticsNodes().isNotEmpty()) {
+            Log.i(TAG, "Already signed in: reached Home")
+            return
+        }
 
         rule.onAllNodesWithText("Log in").onFirst().performClick()
         rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
@@ -50,5 +57,11 @@ class SmokeTest {
         // Let Home load, sync and draw for a while: a crash here fails the run.
         Thread.sleep(10_000)
         rule.waitUntilAtLeastOneExists(hasText("This week") or hasText("What should Piko call you?"), 5_000)
+        val home = rule.onAllNodesWithText("This week").fetchSemanticsNodes().isNotEmpty()
+        Log.i(TAG, if (home) "Logged in: reached Home" else "Logged in: reached onboarding (name step)")
+    }
+
+    private companion object {
+        const val TAG = "StepqSmoke"
     }
 }
