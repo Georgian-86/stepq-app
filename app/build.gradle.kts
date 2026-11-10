@@ -36,6 +36,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${config("SUPABASE_URL", "https://koagkmedvsplbgmltehk.supabase.co")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${config("SUPABASE_ANON_KEY")}\"")
@@ -114,6 +115,11 @@ dependencies {
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 // Robolectric downloads Android jars from Maven Central at test time. Set ROBOLECTRIC_REPO_URL
