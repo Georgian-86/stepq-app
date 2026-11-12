@@ -65,6 +65,7 @@ class ScreenshotTest {
     @Test fun a08Avatar() = snap("A08-avatar") { AvatarScreen(riya, {}, {}) }
     @Test fun a09Goal() = snap("A09-daily-goal") { GoalScreen(riya, null, {}, {}) }
     @Test fun a10Connect() = snap("A10-connect-steps") { ConnectStepsScreen(onBack = {}) {} }
+    @Test fun a26ConnectedApps() = snap("A26-connected-apps") { ConnectStepsScreen(onBack = {}, fromSettings = true) {} }
     @Test fun a11AllSet() = snap("A11-all-set") { AllSetScreen("Riya", 8000) {} }
     private fun home(steps: Int, mood: PikoMood, greeting: String = "Good morning") = HomeUiState(
         loading = false, dateLabel = "Saturday, 17 Oct", greeting = greeting, firstName = "Riya", streak = 12,

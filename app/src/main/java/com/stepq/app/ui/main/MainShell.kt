@@ -3,6 +3,7 @@ package com.stepq.app.ui.main
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -84,7 +85,8 @@ fun MainShell(
             }
         },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        // Pages inside a tab pad for the status bar themselves; consuming the shell's padding stops it being added twice.
+        Column(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
             when (tab) {
                 Tab.Home -> if (home != null) {
                     com.stepq.app.ui.home.HomeRoute(home, onSeeAllFriends = { tab = Tab.Friends })

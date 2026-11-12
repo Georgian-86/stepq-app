@@ -52,7 +52,7 @@ private val dataTypes = listOf("Steps", "Distance", "Calories burned")
  * who also want watch and other app data.
  */
 @Composable
-fun ConnectStepsScreen(onBack: (() -> Unit)?, onDone: () -> Unit) {
+fun ConnectStepsScreen(onBack: (() -> Unit)?, fromSettings: Boolean = false, onDone: () -> Unit) {
     val context = LocalContext.current
     val phone = remember { PhoneStepCounter(context) }
     var note by remember { mutableStateOf<String?>(null) }
@@ -96,7 +96,8 @@ fun ConnectStepsScreen(onBack: (() -> Unit)?, onDone: () -> Unit) {
     }
 
     OnboardingFrame(
-        step = 6,
+        // From Profile → Connected apps it's a settings page, not a sign-up step.
+        step = if (fromSettings) null else 6,
         title = "Let Piko count your steps",
         subtitle = "Your phone already counts your steps. Piko reads that count, so there's nothing else to install.",
         onBack = onBack,
@@ -110,7 +111,7 @@ fun ConnectStepsScreen(onBack: (() -> Unit)?, onDone: () -> Unit) {
         bottom = {
             StepqButton("Allow step counting", ::connect)
             if (phone.isAvailable) StepqTextLink("Use Health Connect instead", ::connectHealth)
-            StepqTextLink("Not now", onDone)
+            StepqTextLink(if (fromSettings) "Cancel" else "Not now", onDone)
         },
     ) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(StepqDimens.RadiusM)).background(StepqColors.Mint).padding(horizontal = 16.dp)) {

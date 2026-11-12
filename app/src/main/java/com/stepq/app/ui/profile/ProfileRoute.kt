@@ -68,7 +68,7 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     Box(Modifier.fillMaxSize()) {
         when (page) {
             "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
-            "connect" -> ConnectStepsScreen(onBack = { page = null }) { page = null }
+            "connect" -> ConnectStepsScreen(onBack = { page = null }, fromSettings = true) { page = null }
             else -> ProfileScreen(state, source) { action ->
                 when (action) {
                     ProfileAction.Goal -> page = "goal"
