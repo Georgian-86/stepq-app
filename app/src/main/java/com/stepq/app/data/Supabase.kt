@@ -32,8 +32,12 @@ object Supabase {
                 // Keep the session in our own SharedPreferences instead of relying on the
                 // library finding a Context by itself, which fails on some setups and then
                 // breaks every sign-in.
+                // commit = true writes each refreshed session to disk before going on. With the
+                // default (apply) a process killed right after a refresh could start next time
+                // with the old refresh token, which Supabase treats as reuse and revokes.
                 val settings = SharedPreferencesSettings(
                     appContext.getSharedPreferences("supabase_auth", Context.MODE_PRIVATE),
+                    commit = true,
                 )
                 sessionManager = SettingsSessionManager(settings)
                 codeVerifierCache = SettingsCodeVerifierCache(settings)
