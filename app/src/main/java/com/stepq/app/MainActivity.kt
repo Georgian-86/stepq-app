@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                         crash = null
                     }
                 } else {
-                    StepqNavHost(app.auth, app.profiles, app.home)
+                    StepqNavHost(app.auth, app.profiles, app.home, app.friends)
                 }
             }
         }

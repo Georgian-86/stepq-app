@@ -48,7 +48,11 @@ enum class Tab(val label: String, val icon: ImageVector) {
 
 /** The four-tab shell from A12/A13/A22/A26. Friends, Challenges and Profile land in later PRs. */
 @Composable
-fun MainShell(auth: AuthRepository?, home: com.stepq.app.data.HomeRepository?) {
+fun MainShell(
+    auth: AuthRepository?,
+    home: com.stepq.app.data.HomeRepository?,
+    friends: com.stepq.app.data.FriendsRepository? = null,
+) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
     Scaffold(
@@ -83,7 +87,11 @@ fun MainShell(auth: AuthRepository?, home: com.stepq.app.data.HomeRepository?) {
                 } else {
                     ComingSoon("Home", "Your steps, streak and friends today.")
                 }
-                Tab.Friends -> ComingSoon("Friends", "Friends, groups and QRuns.")
+                Tab.Friends -> if (friends != null) {
+                    com.stepq.app.ui.friends.FriendsRoute(friends)
+                } else {
+                    ComingSoon("Friends", "Friends, groups and QRuns.")
+                }
                 Tab.Challenges -> ComingSoon("Challenges", "Weekly and monthly leaderboards.")
                 Tab.Profile -> ComingSoon("Profile", "Your goal, connected apps and settings.") {
                     StepqButton("Log out", { scope.launch { auth?.logOut() } }, style = StepqButtonStyle.Outline)

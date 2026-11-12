@@ -1,6 +1,10 @@
 package com.stepq.app.screens
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -79,5 +83,71 @@ class ScreenshotTest {
     @Test fun a12cRestOfDay() = snap("A12c-home-rest-of-day") { HomeScreen(home(9450, PikoMood.Happy, "Good evening"), {}, {}, {}) }
     @Test fun a12NotConnected() = snap("A12-home-not-connected") {
         HomeScreen(home(0, PikoMood.Nudge).copy(healthConnected = false, friends = emptyList(), hasFriends = false), {}, {}, {})
+    }
+
+    private val friendsData = run {
+        fun p(id: String, name: String, user: String, skin: Int, hair: Int, outfit: Int) =
+            com.stepq.app.data.PersonSummary(id, name, user, AvatarConfig(skin = skin, hair = hair, outfit = outfit))
+        val me = com.stepq.app.data.Profile(id = "me", displayName = "Riya Sharma", username = "riya.walks")
+        val board = listOf(
+            Triple(p("a", "Arjun", "arjun.m", 4, 1, 1), 9120, 7000),
+            Triple(p("b", "Meera", "meera_walks", 1, 2, 2), 7480, 5700),
+            Triple(p("me", "Riya Sharma", "riya.walks", 2, 0, 0), 6240, 4800),
+            Triple(p("c", "Kabir", "kabir.k", 3, 1, 3), 5910, 4500),
+            Triple(p("d", "Sana", "sana.s", 1, 3, 4), 4300, 3300),
+            Triple(p("e", "Dev", "dev_on_foot", 5, 1, 0), 3050, 2300),
+        ).map { (person, steps, m) -> com.stepq.app.data.FriendToday(person, steps, m, isMe = person.id == "me") }
+        com.stepq.app.data.FriendsData(me, board, emptyList(), emptySet(), emptySet(), remindersLeft = 5)
+    }
+
+    @Composable
+    private fun friends(state: com.stepq.app.ui.friends.FriendsUiState) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            androidx.compose.foundation.layout.Column {
+                com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Friends, {}, {})
+                com.stepq.app.ui.friends.FriendsList(state, {}, {}, {}, {}, {})
+            }
+            state.toast?.let {
+                com.stepq.app.ui.friends.Toast(
+                    it,
+                    Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(20.dp),
+                )
+            }
+        }
+    }
+
+    @Test fun a13Friends() = snap("A13-friends") {
+        friends(com.stepq.app.ui.friends.FriendsUiState(loading = false, data = friendsData))
+    }
+
+    @Test fun a14ReminderSent() = snap("A14-reminder-sent") {
+        friends(
+            com.stepq.app.ui.friends.FriendsUiState(
+                loading = false,
+                data = friendsData.copy(remindedToday = setOf("b"), remindersLeft = 4),
+                toast = com.stepq.app.ui.friends.reminderSentMessage("Meera", 4),
+            ),
+        )
+    }
+
+    @Test fun a13Requests() = snap("A13-friend-requests") {
+        val asking = com.stepq.app.data.PersonSummary("z", "Zoya Khan", "zoya.k", AvatarConfig(skin = 3, hair = 2, outfit = 1))
+        friends(
+            com.stepq.app.ui.friends.FriendsUiState(
+                loading = false,
+                data = friendsData.copy(board = friendsData.board.filter { it.isMe }, requests = listOf(asking)),
+            ),
+        )
+    }
+
+    @Test fun a13AddFriend() = snap("A13-add-friend") {
+        com.stepq.app.ui.friends.AddFriendScreen(
+            myUsername = "riya.walks",
+            result = com.stepq.app.ui.friends.SearchResult.Found(
+                com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 4, hair = 1, outfit = 1)),
+                com.stepq.app.ui.friends.Relation.None,
+            ),
+            onSearch = {}, onTyping = {}, onRequest = {}, onAccept = {}, onBack = {},
+        )
     }
 }

@@ -15,6 +15,8 @@ class StepqApplication : Application() {
         private set
     lateinit var home: HomeRepository
         private set
+    lateinit var friends: com.stepq.app.data.FriendsRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -23,6 +25,7 @@ class StepqApplication : Application() {
         auth = AuthRepository(Supabase.client)
         profiles = ProfileRepository(Supabase.client)
         home = HomeRepository(Supabase.client, profiles)
+        friends = com.stepq.app.data.FriendsRepository(Supabase.client, profiles)
         createNotificationChannel()
     }
 

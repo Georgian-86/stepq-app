@@ -59,7 +59,9 @@ select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_use
 reset role;
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select username from app.friend_requests()) = 'arjun', 'sees who sent a pending request');
 update app.friendships set status = 'accepted' where addressee = auth.uid();
+select pg_temp.expect((select count(*) from app.friend_requests()) = 0, 'accepted request leaves the list');
 select pg_temp.expect((select count(*) from app.profiles) = 2, 'friends: sees both profiles');
 select pg_temp.expect((select count(*) from app.daily_steps) = 2, 'friends: sees both step rows');
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date - 1, 99999)$$, 'writing a friend''s steps');
@@ -79,6 +81,7 @@ select pg_temp.expect((select count(*) from app.profiles) = 1, 'stranger: sees o
 select pg_temp.expect((select count(*) from app.daily_steps) = 0, 'stranger: sees no steps');
 select pg_temp.expect((select count(*) from app.groups) = 0, 'stranger: sees no groups');
 select pg_temp.expect((select count(*) from app.water_reminders) = 0, 'stranger: sees no reminders');
+select pg_temp.expect((select count(*) from app.friend_requests()) = 0, 'stranger: no requests to see');
 reset role;
 select set_config('test.group', (select id::text from app.groups limit 1), false);
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
