@@ -71,7 +71,10 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
             FriendToday(it, d?.steps ?: 0, d?.distanceM ?: 0, isMe = it.id == me.id)
         }.sortedWith(compareByDescending<FriendToday> { it.steps }.thenBy { it.person.displayName })
 
-        val requests = db.rpc("friend_requests").decodeList<PersonSummary>()
+        // Needs migration 20261112000000; until it's applied the rest of the tab still works.
+        val requests = runCatching { db.rpc("friend_requests").decodeList<PersonSummary>() }
+            .onFailure { android.util.Log.w("StepqFriends", "friend_requests unavailable", it) }
+            .getOrDefault(emptyList())
 
         val startOfDay = today.atStartOfDay(IST).toInstant().toString()
         val reminded = db["water_reminders"].select(io.github.jan.supabase.postgrest.query.Columns.list("to_user")) {
