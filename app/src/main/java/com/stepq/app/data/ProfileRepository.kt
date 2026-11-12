@@ -34,4 +34,34 @@ class ProfileRepository(private val client: SupabaseClient?) {
     suspend fun create(profile: NewProfile): Result<Unit> = runCatching {
         requireClient().postgrest["profiles"].insert(profile)
     }
+
+    /** A26: change the daily goal. The check constraint keeps it between 1,000 and 100,000. */
+    suspend fun updateGoal(goal: Int): Result<Unit> = runCatching {
+        val id = currentUserId() ?: throw NotConfiguredException()
+        requireClient().postgrest["profiles"].update({ set("daily_goal", goal) }) { filter { eq("id", id) } }
+    }
+
+    /** All my saved days, newest first, for the streak, best day and total distance. */
+    suspend fun myDays(): Result<List<DailySteps>> = runCatching {
+        val id = currentUserId() ?: return@runCatching emptyList()
+        requireClient().postgrest["daily_steps"].select {
+            filter { eq("user_id", id) }
+            order("day", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+        }.decodeList<DailySteps>()
+    }
+
+    /** A27: is the user on the StepQ Pro waitlist? */
+    suspend fun onProWaitlist(): Result<Boolean> = runCatching {
+        val id = currentUserId() ?: return@runCatching false
+        requireClient().postgrest["pro_waitlist"].select { filter { eq("user_id", id) } }
+            .decodeList<kotlinx.serialization.json.JsonObject>().isNotEmpty()
+    }
+
+    suspend fun joinProWaitlist(): Result<Unit> = runCatching {
+        val id = currentUserId() ?: throw NotConfiguredException()
+        requireClient().postgrest["pro_waitlist"].upsert(buildJsonObject { put("user_id", id) }) {
+            onConflict = "user_id"
+            ignoreDuplicates = true
+        }
+    }
 }

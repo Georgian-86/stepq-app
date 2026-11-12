@@ -54,6 +54,7 @@ fun MainShell(
     friends: com.stepq.app.data.FriendsRepository? = null,
     groups: com.stepq.app.data.GroupsRepository? = null,
     challenges: com.stepq.app.data.ChallengesRepository? = null,
+    profiles: com.stepq.app.data.ProfileRepository? = null,
 ) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
@@ -99,8 +100,12 @@ fun MainShell(
                 } else {
                     ComingSoon("Challenges", "Weekly and monthly leaderboards.")
                 }
-                Tab.Profile -> ComingSoon("Profile", "Your goal, connected apps and settings.") {
-                    StepqButton("Log out", { scope.launch { auth?.logOut() } }, style = StepqButtonStyle.Outline)
+                Tab.Profile -> if (profiles != null) {
+                    com.stepq.app.ui.profile.ProfileRoute(profiles, auth)
+                } else {
+                    ComingSoon("Profile", "Your goal, connected apps and settings.") {
+                        StepqButton("Log out", { scope.launch { auth?.logOut() } }, style = StepqButtonStyle.Outline)
+                    }
                 }
             }
         }

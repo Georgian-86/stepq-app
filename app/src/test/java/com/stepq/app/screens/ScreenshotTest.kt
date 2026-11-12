@@ -212,4 +212,24 @@ class ScreenshotTest {
     @Test fun a25Joined() = snap("A25-challenge-joined") {
         com.stepq.app.ui.challenges.ChallengeJoinedScreen(shoes.copy(myJoinedAt = java.time.Instant.now()), onDone = {}, onShare = {})
     }
+
+    private val profileState = com.stepq.app.ui.profile.ProfileUiState(
+        loading = false,
+        profile = friendsData.me.copy(avatar = AvatarConfig(skin = 2)),
+        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186),
+    )
+
+    @Test fun a26Profile() = snap("A26-profile") {
+        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter") {}
+    }
+
+    @Test fun a27Pro() = snap("A27-stepq-pro") {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.profile.ProSheet(onWaitlist = false, onNotify = {}, onDismiss = {})
+        }
+    }
+
+    @Test fun a26Goal() = snap("A26-daily-goal") {
+        com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
+    }
 }

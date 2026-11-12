@@ -167,6 +167,6 @@ fun StepqNavHost(
                 nav.navigate(Routes.MAIN) { popUpTo(0) { inclusive = true } }
             }
         }
-        composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges) }
+        composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges, profiles) }
     }
 }
