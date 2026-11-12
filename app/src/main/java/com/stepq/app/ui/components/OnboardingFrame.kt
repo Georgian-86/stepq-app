@@ -56,7 +56,7 @@ fun StepProgress(step: Int, modifier: Modifier = Modifier) {
  */
 @Composable
 fun OnboardingFrame(
-    step: Int,
+    step: Int?,
     title: String,
     subtitle: String?,
     onBack: (() -> Unit)?,
@@ -75,14 +75,19 @@ fun OnboardingFrame(
                 }
             }
         }
-        StepProgress(step)
+        if (step != null) StepProgress(step)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
             horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
         ) {
             Spacer(Modifier.height(20.dp))
             header?.invoke()
-            Text(title, style = StepqType.Title, color = StepqColors.Ink)
+            Text(
+                title,
+                style = StepqType.Title,
+                color = StepqColors.Ink,
+                textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center else null,
+            )
             if (subtitle != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(
