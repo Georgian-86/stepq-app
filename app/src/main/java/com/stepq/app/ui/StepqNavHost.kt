@@ -66,6 +66,7 @@ fun StepqNavHost(
     friends: com.stepq.app.data.FriendsRepository? = null,
     groups: com.stepq.app.data.GroupsRepository? = null,
     challenges: com.stepq.app.data.ChallengesRepository? = null,
+    qruns: com.stepq.app.data.QRunsRepository? = null,
     nav: NavHostController = rememberNavController(),
 ) {
     val authState by auth.state.collectAsState(initial = AuthState.Loading)
@@ -167,6 +168,6 @@ fun StepqNavHost(
                 nav.navigate(Routes.MAIN) { popUpTo(0) { inclusive = true } }
             }
         }
-        composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges, profiles) }
+        composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges, profiles, qruns) }
     }
 }

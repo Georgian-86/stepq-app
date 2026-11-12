@@ -18,6 +18,7 @@ class StepqApplication : Application() {
     lateinit var friends: com.stepq.app.data.FriendsRepository
         private set
     lateinit var groups: com.stepq.app.data.GroupsRepository
+    lateinit var qruns: com.stepq.app.data.QRunsRepository
         private set
     lateinit var challenges: com.stepq.app.data.ChallengesRepository
         private set
@@ -31,6 +32,7 @@ class StepqApplication : Application() {
         home = HomeRepository(Supabase.client, profiles)
         friends = com.stepq.app.data.FriendsRepository(Supabase.client, profiles)
         groups = com.stepq.app.data.GroupsRepository(Supabase.client, profiles)
+        qruns = com.stepq.app.data.QRunsRepository(Supabase.client)
         challenges = com.stepq.app.data.ChallengesRepository(Supabase.client, profiles)
         createNotificationChannel()
     }

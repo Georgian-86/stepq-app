@@ -213,6 +213,62 @@ class ScreenshotTest {
         com.stepq.app.ui.challenges.ChallengeJoinedScreen(shoes.copy(myJoinedAt = java.time.Instant.now()), onDone = {}, onShare = {})
     }
 
+    private val qrunNow = java.time.Instant.parse("2026-10-17T04:00:00Z")
+    private val ist = java.time.ZoneId.of("Asia/Kolkata")
+    private val morningRun = com.stepq.app.data.QRun(
+        id = "q1", title = "Morning run, easy pace", placeName = "Carter Road Promenade, Bandra West", lat = 19.0700, lng = 72.8220,
+        startsAtRaw = "2026-10-18T01:00:00Z", createdAtRaw = "2026-10-17T02:00:00Z", createdBy = "arjun", hostName = "Arjun Mehta",
+        hostAvatar = AvatarConfig(skin = 4, hair = 1), going = 8,
+    )
+    private val sunsetWalk = com.stepq.app.data.QRun(
+        id = "q2", title = "Sunset walk by the sea", placeName = "Juhu Beach, near Gate 5", lat = 19.0988, lng = 72.8267,
+        startsAtRaw = "2026-10-22T12:30:00Z", createdAtRaw = "2026-10-16T05:00:00Z", createdBy = "sana", hostName = "Sana Khan",
+        hostAvatar = AvatarConfig(skin = 1, hair = 2, headband = 1), going = 3,
+    )
+    private val qrunState = com.stepq.app.ui.qrun.QRunUiState(
+        loading = false,
+        data = com.stepq.app.data.QRunsData("me", listOf(morningRun, sunsetWalk)),
+        here = com.stepq.app.ui.qrun.LatLng(19.0596, 72.8295),
+        areaName = "Bandra West, Mumbai",
+    )
+
+    @Test fun a18QRuns() = snap("A18-qruns") {
+        androidx.compose.foundation.layout.Column {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.QRun, {}, {})
+            com.stepq.app.ui.qrun.QRunList(qrunState, locationAllowed = true, onRefresh = {}, onAllowLocation = {}, onJoin = {}, onOpenPlanner = {}, onPost = {}, now = qrunNow, zone = ist)
+        }
+    }
+
+    @Test fun a19PostQRun() = snap("A19-post-qrun") {
+        com.stepq.app.ui.qrun.PostQRunScreen(
+            places = com.stepq.app.ui.qrun.NoPlaceSearch, here = null, busy = false, error = null,
+            onPost = { _, _, _, _ -> }, onTyping = {}, onPickCustomTime = {}, onClose = {},
+            today = LocalDate.of(2026, 10, 17),
+            initialPlace = "Carter Road",
+            initialSuggestions = listOf(
+                com.stepq.app.data.Place("Carter Road Promenade, Bandra West"),
+                com.stepq.app.data.Place("Carter Road Amphitheatre, Bandra"),
+            ),
+        )
+    }
+
+    @Test fun a20BeforeYouJoin() = snap("A20-before-you-join") {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.qrun.JoinQRunSheet(morningRun, busy = false, onJoin = {}, onCancel = {}, zone = ist)
+        }
+    }
+
+    @Test fun a21Planner() = snap("A21-event-planner") {
+        com.stepq.app.ui.qrun.QRunPlanner(
+            qrunState.copy(
+                data = com.stepq.app.data.QRunsData("me", listOf(morningRun.copy(joined = true, going = 9), sunsetWalk.copy(createdBy = "me", hostName = "Riya Sharma"))),
+                justJoined = "q1",
+            ),
+            notificationsOn = true, onAddToCalendar = {}, onDirections = {}, onLeave = {}, onCancelRun = {}, onBack = {},
+            now = qrunNow, zone = ist,
+        )
+    }
+
     private val profileState = com.stepq.app.ui.profile.ProfileUiState(
         loading = false,
         profile = friendsData.me.copy(avatar = AvatarConfig(skin = 2)),

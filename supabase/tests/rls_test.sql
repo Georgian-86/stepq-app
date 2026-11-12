@@ -104,6 +104,30 @@ select pg_temp.expect_error($$insert into app.challenge_entries (challenge_id, u
 select pg_temp.expect_error($$insert into app.challenges (title, starts_at, ends_at) values ('x', now(), now() + interval '1 day')$$, 'creating a challenge');
 reset role;
 
+-- QRuns: anyone signed in sees the feed with the host's name, but can only post and join as themselves.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Morning run', 'Carter Road', now() + interval '1 day');
+insert into app.qrun_participants (qrun_id, user_id) select id, auth.uid() from app.qruns;
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Past', 'X', now() - interval '1 hour')$$, 'posting a QRun in the past');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values ('00000000-0000-0000-0000-00000000000a', 'Fake', 'X', now() + interval '1 day')$$, 'posting a QRun as someone else');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select count(*) from app.profiles where username = 'stranger') = 0, 'host profile stays hidden from strangers');
+select pg_temp.expect((select host_name from app.qrun_feed()) = 'Stranger', 'feed shows the host''s name');
+select pg_temp.expect((select going from app.qrun_feed()) = 1 and not (select joined from app.qrun_feed()), 'feed counts going, not joined yet');
+select pg_temp.expect_error($$insert into app.qrun_participants (qrun_id, user_id) select id, '00000000-0000-0000-0000-00000000000b' from app.qruns$$, 'joining someone else to a QRun');
+insert into app.qrun_participants (qrun_id, user_id) select id, auth.uid() from app.qruns;
+select pg_temp.expect((select joined from app.qrun_feed()) and (select going from app.qrun_feed()) = 2, 'joined QRun shows as joined');
+with u as (update app.qruns set title = 'Hijacked' returning 1)
+select pg_temp.expect((select count(*) from u) = 0, 'editing someone else''s QRun');
+with d as (delete from app.qruns returning 1)
+select pg_temp.expect((select count(*) from d) = 0, 'deleting someone else''s QRun');
+delete from app.qrun_participants where user_id = auth.uid();
+reset role;
+set role anon;
+select pg_temp.expect_error('select * from app.qrun_feed()', 'anon reading the QRun feed');
+reset role;
+
 -- An admin (listed in stepq.admins) can read every row, for the stepq.in dashboard; can't write.
 insert into auth.users values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');
 insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');

@@ -29,13 +29,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stepq.app.data.FriendsRepository
+import com.stepq.app.ui.qrun.QRunSection
 import com.stepq.app.ui.theme.StepqColors
 import com.stepq.app.ui.theme.StepqType
 import kotlinx.coroutines.delay
 
 /** The Friends tab: Friends leaderboard (A13/A14), Groups and QRun sections. */
 @Composable
-fun FriendsRoute(repo: FriendsRepository, groupsRepo: com.stepq.app.data.GroupsRepository) {
+fun FriendsRoute(
+    repo: FriendsRepository,
+    groupsRepo: com.stepq.app.data.GroupsRepository,
+    qrunsRepo: com.stepq.app.data.QRunsRepository? = null,
+) {
     val vm: FriendsViewModel = viewModel { FriendsViewModel(repo) }
     val state by vm.state.collectAsState()
     val groupsVm: GroupsViewModel = viewModel { GroupsViewModel(groupsRepo) }
@@ -46,6 +51,8 @@ fun FriendsRoute(repo: FriendsRepository, groupsRepo: com.stepq.app.data.GroupsR
     var section by rememberSaveable { mutableStateOf(FriendsSection.Friends) }
     var adding by rememberSaveable { mutableStateOf(false) }
 
+    val qruns = qrunsRepo?.let { QRunSection(it, section == FriendsSection.QRun) }
+
     LifecycleResumeEffect(Unit) {
         vm.refresh()
         groupsVm.refresh()
@@ -54,7 +61,9 @@ fun FriendsRoute(repo: FriendsRepository, groupsRepo: com.stepq.app.data.GroupsR
 
     Box(Modifier.fillMaxSize().background(StepqColors.White)) {
         val openGroup = groups.data?.groups?.firstOrNull { it.group.id == groupPage }
-        if (groupPage == "create") {
+        if (qruns != null && qruns.page != null) {
+            qruns.Page()
+        } else if (groupPage == "create") {
             CreateGroupScreen(
                 friends = groups.data?.friends.orEmpty(),
                 busy = groups.busy,
@@ -116,7 +125,8 @@ fun FriendsRoute(repo: FriendsRepository, groupsRepo: com.stepq.app.data.GroupsR
                         onOpen = { groupPage = it },
                         onInviteApp = { shareText(context, appInviteText(state.data?.me?.username)) },
                     )
-                    FriendsSection.QRun -> SectionComingSoon("QRun", "Plan a walk or run with people near you. Coming soon.")
+                    FriendsSection.QRun -> qruns?.List()
+                        ?: SectionComingSoon("QRun", "Plan a walk or run with people near you. Coming soon.")
                 }
             }
         }
@@ -128,12 +138,17 @@ fun FriendsRoute(repo: FriendsRepository, groupsRepo: com.stepq.app.data.GroupsR
             }
             Toast(message, Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp))
         }
+        qruns?.Overlays(Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp))
     }
 }
 
 /** The dark confirmation bar from A14 ("Water reminder sent to Meera. 4 left today."). */
 @Composable
-fun Toast(message: String, modifier: Modifier = Modifier) {
+fun Toast(
+    message: String,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Outlined.WaterDrop,
+) {
     Row(
         modifier
             .fillMaxWidth()
@@ -142,7 +157,7 @@ fun Toast(message: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.WaterDrop, contentDescription = null, tint = StepqColors.Mango, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = StepqColors.Mango, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(12.dp))
         Text(message, style = StepqType.SmallStrong, color = StepqColors.White)
     }
