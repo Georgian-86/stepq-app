@@ -95,6 +95,12 @@ select pg_temp.expect(app.join_group(current_setting('test.code')) = current_set
 select pg_temp.expect((select count(*) from app.group_members) = 3, 'new member sees the whole group');
 select pg_temp.expect(app.join_group(upper(current_setting('test.code'))) is not null, 'joining twice is harmless');
 delete from app.group_members where user_id = auth.uid();
+reset role;
+insert into app.challenges (title, target_steps, starts_at, ends_at) values ('Walk 50k', 50000, now() - interval '1 day', now() + interval '6 days');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+insert into app.challenge_entries (challenge_id, user_id) select id, auth.uid() from app.challenges;
+select pg_temp.expect((select joined from app.challenge_counts()) = 1, 'challenge count includes my entry');
+select pg_temp.expect_error($$insert into app.challenge_entries (challenge_id, user_id) select id, '00000000-0000-0000-0000-00000000000a' from app.challenges$$, 'joining someone else to a challenge');
 select pg_temp.expect_error($$insert into app.challenges (title, starts_at, ends_at) values ('x', now(), now() + interval '1 day')$$, 'creating a challenge');
 reset role;
 

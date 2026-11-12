@@ -182,4 +182,34 @@ class ScreenshotTest {
             onRemind = {}, onInvite = {}, onLeave = {}, onBack = {},
         )
     }
+
+    private val shoes = com.stepq.app.data.ChallengeCard(
+        challenge = com.stepq.app.data.Challenge(
+            id = "c1", title = "20% off running shoes", partnerName = "Example partner brand",
+            reward = "Everyone who finishes gets a 20% discount code", targetSteps = 50000,
+            startsAt = "2026-11-10T00:00:00Z", endsAt = "2026-11-19T18:29:00Z",
+        ),
+        joined = 1240, myJoinedAt = null, myProgress = 0,
+    )
+    private val challengesData = com.stepq.app.data.ChallengesData(
+        me = friendsData.me,
+        weekly = friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 7, it.isMe) },
+        monthly = friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 12, it.isMe) },
+        challenges = listOf(shoes),
+    )
+
+    @Test fun a22Weekly() = snap("A22-challenges-weekly") {
+        com.stepq.app.ui.challenges.ChallengesScreen(
+            com.stepq.app.ui.challenges.ChallengesUiState(loading = false, data = challengesData),
+            monthly = false, onPeriod = {}, onRefresh = {}, onOpen = {}, today = LocalDate.of(2026, 11, 12),
+        )
+    }
+
+    @Test fun a24Detail() = snap("A24-challenge-detail") {
+        com.stepq.app.ui.challenges.ChallengeDetailScreen(shoes, joining = false, onJoin = {}, onLeave = {}, onBack = {})
+    }
+
+    @Test fun a25Joined() = snap("A25-challenge-joined") {
+        com.stepq.app.ui.challenges.ChallengeJoinedScreen(shoes.copy(myJoinedAt = java.time.Instant.now()), onDone = {}, onShare = {})
+    }
 }

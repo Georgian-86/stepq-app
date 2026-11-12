@@ -53,6 +53,7 @@ fun MainShell(
     home: com.stepq.app.data.HomeRepository?,
     friends: com.stepq.app.data.FriendsRepository? = null,
     groups: com.stepq.app.data.GroupsRepository? = null,
+    challenges: com.stepq.app.data.ChallengesRepository? = null,
 ) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
@@ -93,7 +94,11 @@ fun MainShell(
                 } else {
                     ComingSoon("Friends", "Friends, groups and QRuns.")
                 }
-                Tab.Challenges -> ComingSoon("Challenges", "Weekly and monthly leaderboards.")
+                Tab.Challenges -> if (challenges != null) {
+                    com.stepq.app.ui.challenges.ChallengesRoute(challenges)
+                } else {
+                    ComingSoon("Challenges", "Weekly and monthly leaderboards.")
+                }
                 Tab.Profile -> ComingSoon("Profile", "Your goal, connected apps and settings.") {
                     StepqButton("Log out", { scope.launch { auth?.logOut() } }, style = StepqButtonStyle.Outline)
                 }
