@@ -150,4 +150,36 @@ class ScreenshotTest {
             onSearch = {}, onTyping = {}, onRequest = {}, onAccept = {}, onBack = {},
         )
     }
+
+    private fun group(id: String, name: String, take: Int, extra: Int) = com.stepq.app.data.GroupToday(
+        com.stepq.app.data.GroupRow(id, name, "me", "3f9a1c07b2de"),
+        friendsData.board.take(take).map { it.copy(steps = it.steps + extra) },
+    )
+    private val groupsData = com.stepq.app.data.GroupsData(
+        me = friendsData.me,
+        groups = listOf(group("g1", "Morning walkers", 5, 0), group("g2", "Office step-up", 6, 2000), group("g3", "Family", 4, -1000)),
+        friends = friendsData.board.filterNot { it.isMe }.map { it.person },
+        friendIds = friendsData.board.filterNot { it.isMe }.map { it.person.id }.toSet(),
+    )
+
+    @Test fun a15Groups() = snap("A15-groups") {
+        androidx.compose.foundation.layout.Column {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Groups, {}, {})
+            com.stepq.app.ui.friends.GroupsList(com.stepq.app.ui.friends.GroupsUiState(loading = false, data = groupsData), {}, {}, {}, {}, {})
+        }
+    }
+
+    @Test fun a16CreateGroup() = snap("A16-create-group") {
+        com.stepq.app.ui.friends.CreateGroupScreen(groupsData.friends, busy = false, error = null, onCreate = { _, _ -> }, onTyping = {}, onInvite = {}, onBack = {})
+    }
+
+    @Test fun a17Group() = snap("A17-group") {
+        com.stepq.app.ui.friends.GroupScreen(
+            group = groupsData.groups.first { it.group.id == "g1" },
+            myId = "me",
+            friendIds = groupsData.friendIds,
+            remindedToday = setOf("b"),
+            onRemind = {}, onInvite = {}, onLeave = {}, onBack = {},
+        )
+    }
 }

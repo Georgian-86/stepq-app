@@ -35,19 +35,55 @@ import kotlinx.coroutines.delay
 
 /** The Friends tab: Friends leaderboard (A13/A14), Groups and QRun sections. */
 @Composable
-fun FriendsRoute(repo: FriendsRepository) {
+fun FriendsRoute(repo: FriendsRepository, groupsRepo: com.stepq.app.data.GroupsRepository) {
     val vm: FriendsViewModel = viewModel { FriendsViewModel(repo) }
     val state by vm.state.collectAsState()
+    val groupsVm: GroupsViewModel = viewModel { GroupsViewModel(groupsRepo) }
+    val groups by groupsVm.state.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Which full-screen page of the Groups section is open: null, "create", "join" or a group id.
+    var groupPage by rememberSaveable { mutableStateOf<String?>(null) }
     var section by rememberSaveable { mutableStateOf(FriendsSection.Friends) }
     var adding by rememberSaveable { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
+        groupsVm.refresh()
         onPauseOrDispose { }
     }
 
     Box(Modifier.fillMaxSize().background(StepqColors.White)) {
-        if (adding) {
+        val openGroup = groups.data?.groups?.firstOrNull { it.group.id == groupPage }
+        if (groupPage == "create") {
+            CreateGroupScreen(
+                friends = groups.data?.friends.orEmpty(),
+                busy = groups.busy,
+                error = groups.formError,
+                onCreate = { name, ids -> groupsVm.create(name, ids) { groupPage = it } },
+                onTyping = groupsVm::clearFormError,
+                onInvite = { shareText(context, appInviteText(state.data?.me?.username)) },
+                onBack = { groupPage = null },
+            )
+        } else if (groupPage == "join") {
+            JoinGroupScreen(
+                busy = groups.busy,
+                error = groups.formError,
+                onJoin = { code -> groupsVm.join(code) { groupPage = it } },
+                onTyping = groupsVm::clearFormError,
+                onBack = { groupPage = null },
+            )
+        } else if (openGroup != null) {
+            GroupScreen(
+                group = openGroup,
+                myId = groups.data?.me?.id.orEmpty(),
+                friendIds = groups.data?.friendIds.orEmpty(),
+                remindedToday = state.data?.remindedToday.orEmpty(),
+                onRemind = vm::remind,
+                onInvite = { shareText(context, groupInvite(openGroup)) },
+                onLeave = { groupsVm.leave(openGroup.group.id) { groupPage = null } },
+                onBack = { groupPage = null },
+            )
+        } else if (adding) {
             AddFriendScreen(
                 myUsername = state.data?.me?.username.orEmpty(),
                 result = state.search,
@@ -72,15 +108,23 @@ fun FriendsRoute(repo: FriendsRepository) {
                         onDecline = vm::decline,
                         onAddFriend = { adding = true },
                     )
-                    FriendsSection.Groups -> SectionComingSoon("Groups", "Walk with your office, family or college group. Coming next.")
+                    FriendsSection.Groups -> GroupsList(
+                        groups,
+                        onRefresh = groupsVm::refresh,
+                        onCreate = { groupPage = "create" },
+                        onJoin = { groupPage = "join" },
+                        onOpen = { groupPage = it },
+                        onInviteApp = { shareText(context, appInviteText(state.data?.me?.username)) },
+                    )
                     FriendsSection.QRun -> SectionComingSoon("QRun", "Plan a walk or run with people near you. Coming soon.")
                 }
             }
         }
-        state.toast?.let { message ->
+        (state.toast ?: groups.toast)?.let { message ->
             LaunchedEffect(message) {
                 delay(3_000)
                 vm.toastShown()
+                groupsVm.toastShown()
             }
             Toast(message, Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp))
         }

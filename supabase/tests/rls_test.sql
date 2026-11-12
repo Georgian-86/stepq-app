@@ -86,6 +86,15 @@ reset role;
 select set_config('test.group', (select id::text from app.groups limit 1), false);
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 select pg_temp.expect_error($$insert into app.group_members (group_id, user_id) values (current_setting('test.group')::uuid, '00000000-0000-0000-0000-00000000000a')$$, 'adding someone else to a group');
+select pg_temp.expect_error($$insert into app.group_members (group_id, user_id) values (current_setting('test.group')::uuid, auth.uid())$$, 'joining a group by id without its code');
+select pg_temp.expect(app.join_group('not-a-code') is null, 'wrong invite code joins nothing');
+reset role;
+select set_config('test.code', (select invite_code from app.groups limit 1), false);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect(app.join_group(current_setting('test.code')) = current_setting('test.group')::uuid, 'joins with the invite code');
+select pg_temp.expect((select count(*) from app.group_members) = 3, 'new member sees the whole group');
+select pg_temp.expect(app.join_group(upper(current_setting('test.code'))) is not null, 'joining twice is harmless');
+delete from app.group_members where user_id = auth.uid();
 select pg_temp.expect_error($$insert into app.challenges (title, starts_at, ends_at) values ('x', now(), now() + interval '1 day')$$, 'creating a challenge');
 reset role;
 

@@ -37,4 +37,11 @@ class FriendsLogicTest {
         assertEquals("Water reminder sent to Meera.", reminderSentMessage("Meera", null))
         assertEquals("Water reminders left today: 5 of 5 · Free plan", remindersBanner(5))
     }
+
+    @Test fun groupCopy() {
+        assertEquals("Give your group a name.", com.stepq.app.ui.friends.groupNameProblem("  "))
+        assertEquals(null, com.stepq.app.ui.friends.groupNameProblem("Morning walkers"))
+        assertEquals("5 members · 32,410 steps together today", com.stepq.app.ui.friends.groupSummary(5, 32410))
+        assertEquals("1 member · 0 steps together today", com.stepq.app.ui.friends.groupSummary(1, 0))
+    }
 }
