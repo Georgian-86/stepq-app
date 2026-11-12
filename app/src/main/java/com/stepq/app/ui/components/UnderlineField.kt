@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ fun UnderlineField(
     modifier: Modifier = Modifier,
     password: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation? = null,
     placeholder: String? = null,
 ) {
@@ -51,6 +53,7 @@ fun UnderlineField(
             visualTransformation = visualTransformation
                 ?: if (password) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)

@@ -1,6 +1,10 @@
 package com.stepq.app.screens
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -79,5 +83,209 @@ class ScreenshotTest {
     @Test fun a12cRestOfDay() = snap("A12c-home-rest-of-day") { HomeScreen(home(9450, PikoMood.Happy, "Good evening"), {}, {}, {}) }
     @Test fun a12NotConnected() = snap("A12-home-not-connected") {
         HomeScreen(home(0, PikoMood.Nudge).copy(healthConnected = false, friends = emptyList(), hasFriends = false), {}, {}, {})
+    }
+
+    private val friendsData = run {
+        fun p(id: String, name: String, user: String, skin: Int, hair: Int, outfit: Int) =
+            com.stepq.app.data.PersonSummary(id, name, user, AvatarConfig(skin = skin, hair = hair, outfit = outfit))
+        val me = com.stepq.app.data.Profile(id = "me", displayName = "Riya Sharma", username = "riya.walks")
+        val board = listOf(
+            Triple(p("a", "Arjun", "arjun.m", 4, 1, 1), 9120, 7000),
+            Triple(p("b", "Meera", "meera_walks", 1, 2, 2), 7480, 5700),
+            Triple(p("me", "Riya Sharma", "riya.walks", 2, 0, 0), 6240, 4800),
+            Triple(p("c", "Kabir", "kabir.k", 3, 1, 3), 5910, 4500),
+            Triple(p("d", "Sana", "sana.s", 1, 3, 4), 4300, 3300),
+            Triple(p("e", "Dev", "dev_on_foot", 5, 1, 0), 3050, 2300),
+        ).map { (person, steps, m) -> com.stepq.app.data.FriendToday(person, steps, m, isMe = person.id == "me") }
+        com.stepq.app.data.FriendsData(me, board, emptyList(), emptySet(), emptySet(), remindersLeft = 5)
+    }
+
+    @Composable
+    private fun friends(state: com.stepq.app.ui.friends.FriendsUiState) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            androidx.compose.foundation.layout.Column {
+                com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Friends, {}, {})
+                com.stepq.app.ui.friends.FriendsList(state, {}, {}, {}, {}, {})
+            }
+            state.toast?.let {
+                com.stepq.app.ui.friends.Toast(
+                    it,
+                    Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(20.dp),
+                )
+            }
+        }
+    }
+
+    @Test fun a13Friends() = snap("A13-friends") {
+        friends(com.stepq.app.ui.friends.FriendsUiState(loading = false, data = friendsData))
+    }
+
+    @Test fun a14ReminderSent() = snap("A14-reminder-sent") {
+        friends(
+            com.stepq.app.ui.friends.FriendsUiState(
+                loading = false,
+                data = friendsData.copy(remindedToday = setOf("b"), remindersLeft = 4),
+                toast = com.stepq.app.ui.friends.reminderSentMessage("Meera", 4),
+            ),
+        )
+    }
+
+    @Test fun a13Requests() = snap("A13-friend-requests") {
+        val asking = com.stepq.app.data.PersonSummary("z", "Zoya Khan", "zoya.k", AvatarConfig(skin = 3, hair = 2, outfit = 1))
+        friends(
+            com.stepq.app.ui.friends.FriendsUiState(
+                loading = false,
+                data = friendsData.copy(board = friendsData.board.filter { it.isMe }, requests = listOf(asking)),
+            ),
+        )
+    }
+
+    @Test fun a13AddFriend() = snap("A13-add-friend") {
+        com.stepq.app.ui.friends.AddFriendScreen(
+            myUsername = "riya.walks",
+            result = com.stepq.app.ui.friends.SearchResult.Found(
+                com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 4, hair = 1, outfit = 1)),
+                com.stepq.app.ui.friends.Relation.None,
+            ),
+            onSearch = {}, onTyping = {}, onRequest = {}, onAccept = {}, onBack = {},
+        )
+    }
+
+    private fun group(id: String, name: String, take: Int, extra: Int) = com.stepq.app.data.GroupToday(
+        com.stepq.app.data.GroupRow(id, name, "me", "3f9a1c07b2de"),
+        friendsData.board.take(take).map { it.copy(steps = it.steps + extra) },
+    )
+    private val groupsData = com.stepq.app.data.GroupsData(
+        me = friendsData.me,
+        groups = listOf(group("g1", "Morning walkers", 5, 0), group("g2", "Office step-up", 6, 2000), group("g3", "Family", 4, -1000)),
+        friends = friendsData.board.filterNot { it.isMe }.map { it.person },
+        friendIds = friendsData.board.filterNot { it.isMe }.map { it.person.id }.toSet(),
+    )
+
+    @Test fun a15Groups() = snap("A15-groups") {
+        androidx.compose.foundation.layout.Column {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Groups, {}, {})
+            com.stepq.app.ui.friends.GroupsList(com.stepq.app.ui.friends.GroupsUiState(loading = false, data = groupsData), {}, {}, {}, {}, {})
+        }
+    }
+
+    @Test fun a16CreateGroup() = snap("A16-create-group") {
+        com.stepq.app.ui.friends.CreateGroupScreen(groupsData.friends, busy = false, error = null, onCreate = { _, _ -> }, onTyping = {}, onInvite = {}, onBack = {})
+    }
+
+    @Test fun a17Group() = snap("A17-group") {
+        com.stepq.app.ui.friends.GroupScreen(
+            group = groupsData.groups.first { it.group.id == "g1" },
+            myId = "me",
+            friendIds = groupsData.friendIds,
+            remindedToday = setOf("b"),
+            onRemind = {}, onInvite = {}, onLeave = {}, onBack = {},
+        )
+    }
+
+    private val shoes = com.stepq.app.data.ChallengeCard(
+        challenge = com.stepq.app.data.Challenge(
+            id = "c1", title = "20% off running shoes", partnerName = "Example partner brand",
+            reward = "Everyone who finishes gets a 20% discount code", targetSteps = 50000,
+            startsAt = "2026-11-10T00:00:00Z", endsAt = "2026-11-19T18:29:00Z",
+        ),
+        joined = 1240, myJoinedAt = null, myProgress = 0,
+    )
+    private val challengesData = com.stepq.app.data.ChallengesData(
+        me = friendsData.me,
+        weekly = friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 7, it.isMe) },
+        monthly = friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 12, it.isMe) },
+        challenges = listOf(shoes),
+    )
+
+    @Test fun a22Weekly() = snap("A22-challenges-weekly") {
+        com.stepq.app.ui.challenges.ChallengesScreen(
+            com.stepq.app.ui.challenges.ChallengesUiState(loading = false, data = challengesData),
+            monthly = false, onPeriod = {}, onRefresh = {}, onOpen = {}, today = LocalDate.of(2026, 11, 12),
+        )
+    }
+
+    @Test fun a24Detail() = snap("A24-challenge-detail") {
+        com.stepq.app.ui.challenges.ChallengeDetailScreen(shoes, joining = false, onJoin = {}, onLeave = {}, onBack = {})
+    }
+
+    @Test fun a25Joined() = snap("A25-challenge-joined") {
+        com.stepq.app.ui.challenges.ChallengeJoinedScreen(shoes.copy(myJoinedAt = java.time.Instant.now()), onDone = {}, onShare = {})
+    }
+
+    private val qrunNow = java.time.Instant.parse("2026-10-17T04:00:00Z")
+    private val ist = java.time.ZoneId.of("Asia/Kolkata")
+    private val morningRun = com.stepq.app.data.QRun(
+        id = "q1", title = "Morning run, easy pace", placeName = "Carter Road Promenade, Bandra West", lat = 19.0700, lng = 72.8220,
+        startsAtRaw = "2026-10-18T01:00:00Z", createdAtRaw = "2026-10-17T02:00:00Z", createdBy = "arjun", hostName = "Arjun Mehta",
+        hostAvatar = AvatarConfig(skin = 4, hair = 1), going = 8,
+    )
+    private val sunsetWalk = com.stepq.app.data.QRun(
+        id = "q2", title = "Sunset walk by the sea", placeName = "Juhu Beach, near Gate 5", lat = 19.0988, lng = 72.8267,
+        startsAtRaw = "2026-10-22T12:30:00Z", createdAtRaw = "2026-10-16T05:00:00Z", createdBy = "sana", hostName = "Sana Khan",
+        hostAvatar = AvatarConfig(skin = 1, hair = 2, headband = 1), going = 3,
+    )
+    private val qrunState = com.stepq.app.ui.qrun.QRunUiState(
+        loading = false,
+        data = com.stepq.app.data.QRunsData("me", listOf(morningRun, sunsetWalk)),
+        here = com.stepq.app.ui.qrun.LatLng(19.0596, 72.8295),
+        areaName = "Bandra West, Mumbai",
+    )
+
+    @Test fun a18QRuns() = snap("A18-qruns") {
+        androidx.compose.foundation.layout.Column {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.QRun, {}, {})
+            com.stepq.app.ui.qrun.QRunList(qrunState, locationAllowed = true, onRefresh = {}, onAllowLocation = {}, onJoin = {}, onOpenPlanner = {}, onPost = {}, now = qrunNow, zone = ist)
+        }
+    }
+
+    @Test fun a19PostQRun() = snap("A19-post-qrun") {
+        com.stepq.app.ui.qrun.PostQRunScreen(
+            places = com.stepq.app.ui.qrun.NoPlaceSearch, here = null, busy = false, error = null,
+            onPost = { _, _, _, _ -> }, onTyping = {}, onPickCustomTime = {}, onClose = {},
+            today = LocalDate.of(2026, 10, 17),
+            initialPlace = "Carter Road",
+            initialSuggestions = listOf(
+                com.stepq.app.data.Place("Carter Road Promenade, Bandra West"),
+                com.stepq.app.data.Place("Carter Road Amphitheatre, Bandra"),
+            ),
+        )
+    }
+
+    @Test fun a20BeforeYouJoin() = snap("A20-before-you-join") {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.qrun.JoinQRunSheet(morningRun, busy = false, onJoin = {}, onCancel = {}, zone = ist)
+        }
+    }
+
+    @Test fun a21Planner() = snap("A21-event-planner") {
+        com.stepq.app.ui.qrun.QRunPlanner(
+            qrunState.copy(
+                data = com.stepq.app.data.QRunsData("me", listOf(morningRun.copy(joined = true, going = 9), sunsetWalk.copy(createdBy = "me", hostName = "Riya Sharma"))),
+                justJoined = "q1",
+            ),
+            notificationsOn = true, onAddToCalendar = {}, onDirections = {}, onLeave = {}, onCancelRun = {}, onBack = {},
+            now = qrunNow, zone = ist,
+        )
+    }
+
+    private val profileState = com.stepq.app.ui.profile.ProfileUiState(
+        loading = false,
+        profile = friendsData.me.copy(avatar = AvatarConfig(skin = 2)),
+        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186),
+    )
+
+    @Test fun a26Profile() = snap("A26-profile") {
+        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter") {}
+    }
+
+    @Test fun a27Pro() = snap("A27-stepq-pro") {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.profile.ProSheet(onWaitlist = false, onNotify = {}, onDismiss = {})
+        }
+    }
+
+    @Test fun a26Goal() = snap("A26-daily-goal") {
+        com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
     }
 }

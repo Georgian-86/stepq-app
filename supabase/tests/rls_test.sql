@@ -59,7 +59,9 @@ select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_use
 reset role;
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select username from app.friend_requests()) = 'arjun', 'sees who sent a pending request');
 update app.friendships set status = 'accepted' where addressee = auth.uid();
+select pg_temp.expect((select count(*) from app.friend_requests()) = 0, 'accepted request leaves the list');
 select pg_temp.expect((select count(*) from app.profiles) = 2, 'friends: sees both profiles');
 select pg_temp.expect((select count(*) from app.daily_steps) = 2, 'friends: sees both step rows');
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date - 1, 99999)$$, 'writing a friend''s steps');
@@ -79,11 +81,51 @@ select pg_temp.expect((select count(*) from app.profiles) = 1, 'stranger: sees o
 select pg_temp.expect((select count(*) from app.daily_steps) = 0, 'stranger: sees no steps');
 select pg_temp.expect((select count(*) from app.groups) = 0, 'stranger: sees no groups');
 select pg_temp.expect((select count(*) from app.water_reminders) = 0, 'stranger: sees no reminders');
+select pg_temp.expect((select count(*) from app.friend_requests()) = 0, 'stranger: no requests to see');
 reset role;
 select set_config('test.group', (select id::text from app.groups limit 1), false);
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 select pg_temp.expect_error($$insert into app.group_members (group_id, user_id) values (current_setting('test.group')::uuid, '00000000-0000-0000-0000-00000000000a')$$, 'adding someone else to a group');
+select pg_temp.expect_error($$insert into app.group_members (group_id, user_id) values (current_setting('test.group')::uuid, auth.uid())$$, 'joining a group by id without its code');
+select pg_temp.expect(app.join_group('not-a-code') is null, 'wrong invite code joins nothing');
+reset role;
+select set_config('test.code', (select invite_code from app.groups limit 1), false);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect(app.join_group(current_setting('test.code')) = current_setting('test.group')::uuid, 'joins with the invite code');
+select pg_temp.expect((select count(*) from app.group_members) = 3, 'new member sees the whole group');
+select pg_temp.expect(app.join_group(upper(current_setting('test.code'))) is not null, 'joining twice is harmless');
+delete from app.group_members where user_id = auth.uid();
+reset role;
+insert into app.challenges (title, target_steps, starts_at, ends_at) values ('Walk 50k', 50000, now() - interval '1 day', now() + interval '6 days');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+insert into app.challenge_entries (challenge_id, user_id) select id, auth.uid() from app.challenges;
+select pg_temp.expect((select joined from app.challenge_counts()) = 1, 'challenge count includes my entry');
+select pg_temp.expect_error($$insert into app.challenge_entries (challenge_id, user_id) select id, '00000000-0000-0000-0000-00000000000a' from app.challenges$$, 'joining someone else to a challenge');
 select pg_temp.expect_error($$insert into app.challenges (title, starts_at, ends_at) values ('x', now(), now() + interval '1 day')$$, 'creating a challenge');
+reset role;
+
+-- QRuns: anyone signed in sees the feed with the host's name, but can only post and join as themselves.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Morning run', 'Carter Road', now() + interval '1 day');
+insert into app.qrun_participants (qrun_id, user_id) select id, auth.uid() from app.qruns;
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Past', 'X', now() - interval '1 hour')$$, 'posting a QRun in the past');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values ('00000000-0000-0000-0000-00000000000a', 'Fake', 'X', now() + interval '1 day')$$, 'posting a QRun as someone else');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select count(*) from app.profiles where username = 'stranger') = 0, 'host profile stays hidden from strangers');
+select pg_temp.expect((select host_name from app.qrun_feed()) = 'Stranger', 'feed shows the host''s name');
+select pg_temp.expect((select going from app.qrun_feed()) = 1 and not (select joined from app.qrun_feed()), 'feed counts going, not joined yet');
+select pg_temp.expect_error($$insert into app.qrun_participants (qrun_id, user_id) select id, '00000000-0000-0000-0000-00000000000b' from app.qruns$$, 'joining someone else to a QRun');
+insert into app.qrun_participants (qrun_id, user_id) select id, auth.uid() from app.qruns;
+select pg_temp.expect((select joined from app.qrun_feed()) and (select going from app.qrun_feed()) = 2, 'joined QRun shows as joined');
+with u as (update app.qruns set title = 'Hijacked' returning 1)
+select pg_temp.expect((select count(*) from u) = 0, 'editing someone else''s QRun');
+with d as (delete from app.qruns returning 1)
+select pg_temp.expect((select count(*) from d) = 0, 'deleting someone else''s QRun');
+delete from app.qrun_participants where user_id = auth.uid();
+reset role;
+set role anon;
+select pg_temp.expect_error('select * from app.qrun_feed()', 'anon reading the QRun feed');
 reset role;
 
 -- An admin (listed in stepq.admins) can read every row, for the stepq.in dashboard; can't write.

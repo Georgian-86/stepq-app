@@ -8,7 +8,9 @@ import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.runningFold
 
 enum class AuthState { Loading, SignedOut, SignedIn }
 
@@ -19,13 +21,7 @@ class NotConfiguredException : IllegalStateException(
 /** Accounts through Supabase Auth: email + password, and Google. Apple needs OAuth set up first. */
 class AuthRepository(private val client: SupabaseClient?) {
 
-    val state: Flow<AuthState> = client?.auth?.sessionStatus?.map {
-        when (it) {
-            is SessionStatus.Initializing -> AuthState.Loading
-            is SessionStatus.Authenticated -> AuthState.SignedIn
-            else -> AuthState.SignedOut
-        }
-    } ?: flowOf(AuthState.SignedOut)
+    val state: Flow<AuthState> = client?.auth?.sessionStatus?.let(::authStates) ?: flowOf(AuthState.SignedOut)
 
     suspend fun logIn(email: String, password: String): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
@@ -68,3 +64,26 @@ class AuthRepository(private val client: SupabaseClient?) {
         client?.auth?.signOut()
     }
 }
+
+/**
+ * What the app shows for each Supabase session status. Only a real sign-out (the user tapped
+ * Log out, or the server refused the session) counts as signed out:
+ * - RefreshFailure means the token expired while the phone was offline. The session is still
+ *   stored and Supabase keeps retrying, so the user stays in the app.
+ * - Supabase drops back to Initializing every time the app goes to the background and reloads
+ *   the session when it returns. After the first load that is not a reason to leave the
+ *   current screen, so the last state is kept.
+ */
+fun authStates(statuses: Flow<SessionStatus>): Flow<AuthState> =
+    statuses
+        .map {
+            when (it) {
+                is SessionStatus.Initializing -> AuthState.Loading
+                is SessionStatus.Authenticated, is SessionStatus.RefreshFailure -> AuthState.SignedIn
+                is SessionStatus.NotAuthenticated -> AuthState.SignedOut
+            }
+        }
+        .runningFold(AuthState.Loading) { previous, next ->
+            if (next == AuthState.Loading && previous != AuthState.Loading) previous else next
+        }
+        .distinctUntilChanged()
