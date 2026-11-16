@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A running shoe, for the StepQ score badge on Home. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M2,15.5L2,12.6C2,11.7 2.7,11 3.6,11L6.6,11L8.7,6.9C9,6.3 9.7,6.1 10.3,6.4L12.2,7.4L11.4,8.9L12.9,9.7L13.7,8.2L15.2,9L14.4,10.5C16.1,11.4 18.3,12.3 19.9,12.8C21.2,13.2 22,14.2 22,15.3L22,15.5Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M2,16.7L22,16.7L22,17.6C22,18.4 21.4,19 20.6,19L3.4,19C2.6,19 2,18.4 2,17.6Z" />
+</vector>

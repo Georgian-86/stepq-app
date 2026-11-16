@@ -24,13 +24,13 @@ data class ChallengesUiState(
     val toast: String? = null,
 )
 
-class ChallengesViewModel(private val repo: ChallengesRepository) : ViewModel() {
+class ChallengesViewModel(private val repo: ChallengesRepository, private val country: () -> String? = { null }) : ViewModel() {
     private val _state = MutableStateFlow(ChallengesUiState())
     val state: StateFlow<ChallengesUiState> = _state.asStateFlow()
 
     fun refresh() {
         viewModelScope.launch {
-            repo.load()
+            repo.load(country())
                 .onSuccess { d -> _state.update { it.copy(loading = false, error = null, data = d) } }
                 .onFailure { _state.update { it.copy(loading = false, error = "Couldn't load challenges. Pull to try again.") } }
         }
@@ -121,4 +121,24 @@ fun joinedLabel(n: Long): String = when (n) {
     0L -> "Be the first to join"
     1L -> "1 person has joined"
     else -> "${com.stepq.app.ui.onboarding.formatSteps(n.toInt())} people have joined"
+}
+
+/** Where the phone is from: the SIM's country, then the network's, then the region setting. */
+fun phoneCountry(context: android.content.Context): String? {
+    val tm = context.getSystemService(android.telephony.TelephonyManager::class.java)
+    return listOfNotNull(
+        runCatching { tm?.simCountryIso }.getOrNull(),
+        runCatching { tm?.networkCountryIso }.getOrNull(),
+        Locale.getDefault().country,
+    ).map { it.trim().uppercase(Locale.ROOT) }.firstOrNull { it.matches(Regex("[A-Z]{2}")) }
+}
+
+/** "India" for "IN". */
+fun countryName(code: String?): String? =
+    code?.let { runCatching { Locale.Builder().setRegion(it).build().getDisplayCountry(Locale.ENGLISH) }.getOrNull()?.ifBlank { null } }
+
+/** Under the period card: "Everyone in India · 340 walkers". */
+fun rankingScope(country: String?, count: Int): String {
+    val where = countryName(country)?.let { "Everyone in $it" } ?: "Everyone in your country"
+    return "$where · ${com.stepq.app.ui.onboarding.formatSteps(count)} ${if (count == 1) "walker" else "walkers"}"
 }

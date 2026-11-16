@@ -38,4 +38,16 @@ class ChallengesLogicTest {
         assertEquals(13000, ChallengesRepository.progress(days, joined, ends))
         assertEquals(joined, ChallengesRepository.parseInstant("2026-11-11T03:00:00+00:00"))
     }
+
+    @Test fun tiesSharePlaces() {
+        fun r(name: String, steps: Int) = com.stepq.app.data.Ranked(com.stepq.app.data.PersonSummary(name, name, name), steps, false)
+        val ranked = ChallengesRepository.withRanks(listOf(r("c", 500), r("a", 900), r("b", 900), r("d", 100)))
+        assertEquals(listOf("a" to 1, "b" to 1, "c" to 3, "d" to 4), ranked.map { it.person.id to it.rank })
+    }
+
+    @Test fun countryLabels() {
+        assertEquals("India", com.stepq.app.ui.challenges.countryName("IN"))
+        assertEquals("Everyone in India · 1,240 walkers", com.stepq.app.ui.challenges.rankingScope("IN", 1240))
+        assertEquals("Everyone in your country · 1 walker", com.stepq.app.ui.challenges.rankingScope(null, 1))
+    }
 }

@@ -194,8 +194,11 @@ class ScreenshotTest {
     )
     private val challengesData = com.stepq.app.data.ChallengesData(
         me = friendsData.me,
-        weekly = friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 7, it.isMe) },
-        monthly = friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 12, it.isMe) },
+        weekly = com.stepq.app.data.ChallengesRepository.withRanks(friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 7, it.isMe) }),
+        monthly = com.stepq.app.data.ChallengesRepository.withRanks(friendsData.board.map { com.stepq.app.data.Ranked(it.person, it.steps * 12, it.isMe) }),
+        country = "IN",
+        weeklyCount = 1240,
+        monthlyCount = 2315,
         challenges = listOf(shoes),
     )
 

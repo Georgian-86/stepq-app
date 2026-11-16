@@ -23,7 +23,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun ChallengesRoute(repo: ChallengesRepository) {
-    val vm: ChallengesViewModel = viewModel { ChallengesViewModel(repo) }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val vm: ChallengesViewModel = viewModel { ChallengesViewModel(repo) { phoneCountry(appContext) } }
     val state by vm.state.collectAsState()
     val context = LocalContext.current
     var monthly by rememberSaveable { mutableStateOf(false) }
