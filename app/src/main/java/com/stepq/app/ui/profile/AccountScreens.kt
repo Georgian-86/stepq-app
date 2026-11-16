@@ -328,6 +328,8 @@ fun ChangeEmailScreen(current: String?, busy: Boolean, error: String?, sentTo: S
         },
     ) {
         if (sentTo != null) {
+            com.stepq.app.ui.components.SuccessCheck(88.dp, Modifier.align(Alignment.CenterHorizontally))
+            Spacer(Modifier.height(12.dp))
             Text(
                 "We sent a link to $sentTo. Open it on this phone to finish. Until then you keep signing in with your current email.",
                 style = StepqType.Body,

@@ -82,7 +82,7 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
         val p = state.profile
         if (p == null) {
             if (state.loading) {
-                Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StepqColors.Deep) }
+                ProfileSkeleton()
             } else {
                 Text(state.error ?: "Couldn't load your profile.", style = StepqType.Body, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 16.dp))
             }
@@ -262,3 +262,26 @@ fun ProSheet(onWaitlist: Boolean, onNotify: () -> Unit, onDismiss: () -> Unit) {
 const val GOAL_MIN = 1000
 const val GOAL_MAX = 100000
 const val GOAL_STEP = 500
+
+@Composable
+private fun ProfileSkeleton() {
+    Column(Modifier.padding(top = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stepq.app.ui.components.SkeletonBlock(Modifier.size(84.dp), CircleShape)
+            Column(Modifier.padding(start = 16.dp)) {
+                com.stepq.app.ui.components.SkeletonBlock(Modifier.width(150.dp).height(20.dp))
+                Spacer(Modifier.height(8.dp))
+                com.stepq.app.ui.components.SkeletonBlock(Modifier.width(100.dp).height(14.dp))
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(3) { com.stepq.app.ui.components.SkeletonBlock(Modifier.weight(1f).height(64.dp), RoundedCornerShape(StepqDimens.RadiusM)) }
+        }
+        Spacer(Modifier.height(16.dp))
+        repeat(6) {
+            com.stepq.app.ui.components.SkeletonBlock(Modifier.fillMaxWidth().height(18.dp))
+            Spacer(Modifier.height(22.dp))
+        }
+    }
+}

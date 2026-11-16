@@ -1,5 +1,6 @@
 package com.stepq.app.ui.challenges
 
+import com.stepq.app.ui.components.appear
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -89,9 +90,7 @@ fun ChallengesScreen(
             val data = state.data
             PeriodCard(today, monthly, data?.let { rankingScope(it.country, if (monthly) it.monthlyCount else it.weeklyCount) })
             when {
-                data == null && state.loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = StepqColors.Deep)
-                }
+                data == null && state.loading -> com.stepq.app.ui.components.SkeletonList(rows = 6, modifier = Modifier.padding(top = 16.dp))
                 data == null -> Text(state.error ?: "Couldn't load challenges.", style = StepqType.Body, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 16.dp))
                 else -> {
                     val board = if (monthly) data.monthly else data.weekly
@@ -102,7 +101,7 @@ fun ChallengesScreen(
                         Spacer(Modifier.height(12.dp))
                         RankRow(board[myRank].rank.takeIf { it > 0 } ?: (myRank + 1), board[myRank], highlight = true)
                     }
-                    board.drop(3).forEachIndexed { i, r -> if (!r.isMe) RankRow(r.rank.takeIf { it > 0 } ?: (i + 4), r, highlight = false) }
+                    board.drop(3).forEachIndexed { i, r -> if (!r.isMe) Box(Modifier.appear(i)) { RankRow(r.rank.takeIf { it > 0 } ?: (i + 4), r, highlight = false) } }
                     if (board.size <= 1) {
                         Text(
                             "No one else in ${countryName(data.country) ?: "your country"} has walked this ${if (monthly) "month" else "week"} yet. Invite friends to join you.",
@@ -125,9 +124,9 @@ fun ChallengesScreen(
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
-                    data.challenges.forEach { c ->
+                    data.challenges.forEachIndexed { i, c ->
                         Spacer(Modifier.height(12.dp))
-                        ChallengeRow(c) { onOpen(c.challenge.id) }
+                        Box(Modifier.appear(i)) { ChallengeRow(c) { onOpen(c.challenge.id) } }
                     }
                 }
             }

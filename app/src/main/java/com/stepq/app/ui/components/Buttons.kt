@@ -1,5 +1,6 @@
 package com.stepq.app.ui.components
 
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,10 +46,12 @@ fun StepqButton(
     loading: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
 ) {
+    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        interactionSource = interaction,
+        modifier = modifier.fillMaxWidth().height(52.dp).pressScale(interaction),
         shape = CircleShape,
         border = style.border?.let { BorderStroke(1.5.dp, it) },
         contentPadding = PaddingValues(horizontal = 24.dp),
@@ -59,7 +62,15 @@ fun StepqButton(
             disabledContentColor = style.content.copy(alpha = 0.8f),
         ),
     ) {
-        if (loading) {
+        androidx.compose.animation.AnimatedContent(
+            loading,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.8f)) togetherWith
+                    androidx.compose.animation.fadeOut()
+            },
+            label = "buttonLoading",
+        ) { busy ->
+        if (busy) {
             CircularProgressIndicator(Modifier.size(20.dp), color = style.content, strokeWidth = 2.dp)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
@@ -69,6 +80,7 @@ fun StepqButton(
                 }
                 Text(text, style = StepqType.Button)
             }
+        }
         }
     }
 }

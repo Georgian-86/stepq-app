@@ -1,5 +1,6 @@
 package com.stepq.app.ui.main
 
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -88,7 +89,16 @@ fun MainShell(
     ) { padding ->
         // Pages inside a tab pad for the status bar themselves; consuming the shell's padding stops it being added twice.
         Column(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            when (tab) {
+            androidx.compose.animation.AnimatedContent(
+                tab,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
+                        androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220, delayMillis = 60), initialScale = 0.98f)) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90))
+                },
+                label = "tabs",
+            ) { current ->
+            when (current) {
                 Tab.Home -> if (home != null) {
                     com.stepq.app.ui.home.HomeRoute(home, onSeeAllFriends = { tab = Tab.Friends })
                 } else {
@@ -111,6 +121,7 @@ fun MainShell(
                         StepqButton("Log out", { scope.launch { auth?.logOut() } }, style = StepqButtonStyle.Outline)
                     }
                 }
+            }
             }
         }
     }

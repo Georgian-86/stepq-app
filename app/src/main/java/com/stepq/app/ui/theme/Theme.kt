@@ -62,5 +62,9 @@ private val shapes = Shapes(
 
 @Composable
 fun StepqTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = colors, typography = typography, shapes = shapes, content = content)
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.stepq.app.ui.components.LocalMotionEnabled provides com.stepq.app.ui.components.systemMotionEnabled(),
+    ) {
+        MaterialTheme(colorScheme = colors, typography = typography, shapes = shapes, content = content)
+    }
 }
