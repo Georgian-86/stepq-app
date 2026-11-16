@@ -36,6 +36,17 @@ class ProfileRepository(private val client: SupabaseClient?) {
     }
 
     /** A26: change the daily goal. The check constraint keeps it between 1,000 and 100,000. */
+    /** A26 Edit profile. Birthdate isn't here: it's locked once set. */
+    suspend fun updateProfile(displayName: String, username: String, avatar: AvatarConfig, gender: String?): Result<Unit> = runCatching {
+        val id = currentUserId() ?: throw NotConfiguredException()
+        requireClient().postgrest["profiles"].update({
+            set("display_name", displayName.trim())
+            set("username", username)
+            set("avatar", kotlinx.serialization.json.Json.encodeToJsonElement(AvatarConfig.serializer(), avatar))
+            set("gender", gender)
+        }) { filter { eq("id", id) } }
+    }
+
     suspend fun updateGoal(goal: Int): Result<Unit> = runCatching {
         val id = currentUserId() ?: throw NotConfiguredException()
         requireClient().postgrest["profiles"].update({ set("daily_goal", goal) }) { filter { eq("id", id) } }

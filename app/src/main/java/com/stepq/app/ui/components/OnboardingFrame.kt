@@ -1,5 +1,6 @@
 package com.stepq.app.ui.components
 
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -110,14 +111,18 @@ fun OnboardingFrame(
 /** Pill choice chip: ink when selected, mint otherwise (A06 suggestions, A07 gender, A08 tabs). */
 @Composable
 fun StepqChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val bg by androidx.compose.animation.animateColorAsState(if (selected) StepqColors.Ink else StepqColors.Mint, label = "chipBg")
+    val fg by androidx.compose.animation.animateColorAsState(if (selected) StepqColors.White else StepqColors.Ink, label = "chipFg")
     Box(
         modifier
+            .pressScale(interaction, 0.93f)
             .clip(CircleShape)
-            .background(if (selected) StepqColors.Ink else StepqColors.Mint)
-            .clickable(onClick = onClick)
+            .background(bg)
+            .clickable(interactionSource = interaction, indication = androidx.compose.foundation.LocalIndication.current, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
-        Text(text, style = StepqType.SmallStrong, color = if (selected) StepqColors.White else StepqColors.Ink)
+        Text(text, style = StepqType.SmallStrong, color = fg)
     }
 }
 

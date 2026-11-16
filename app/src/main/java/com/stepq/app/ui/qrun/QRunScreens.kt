@@ -1,5 +1,6 @@
 package com.stepq.app.ui.qrun
 
+import com.stepq.app.ui.components.appear
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -149,16 +150,14 @@ fun QRunList(
                     }
                 }
                 when {
-                    data == null && state.loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = StepqColors.Deep)
-                    }
+                    data == null && state.loading -> com.stepq.app.ui.components.SkeletonList(rows = 3, withCard = false, modifier = Modifier.padding(top = 16.dp))
                     data == null -> Text(state.error ?: "Couldn't load QRuns.", style = StepqType.Body, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 16.dp))
                     else -> {
                         state.error?.let { Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 8.dp)) }
                         val runs = listOrder(data.runs, state.here, now)
-                        runs.forEach { run ->
+                        runs.forEachIndexed { i, run ->
                             Spacer(Modifier.height(14.dp))
-                            QRunCard(run, run.distanceFrom(state.here), hosting = run.createdBy == data.myId, now, zone, { onJoin(run) }, onOpenPlanner)
+                            Box(Modifier.appear(i)) { QRunCard(run, run.distanceFrom(state.here), hosting = run.createdBy == data.myId, now, zone, { onJoin(run) }, onOpenPlanner) }
                         }
                         if (runs.isEmpty()) {
                             Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {

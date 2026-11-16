@@ -113,7 +113,37 @@ fun StepqNavHost(
         else -> Routes.SPLASH
     }
 
-    NavHost(nav, startDestination = start) {
+    // A password reset link signed the user in: ask for the new password before anything else.
+    val recovering by com.stepq.app.data.PasswordRecovery.active.collectAsState()
+    if (recovering && authState == AuthState.SignedIn) {
+        var busy by remember { mutableStateOf(false) }
+        var error by remember { mutableStateOf<String?>(null) }
+        com.stepq.app.ui.profile.NewPasswordScreen(
+            "Set a new password",
+            "Choose a new password for ${auth.email() ?: "your account"}.",
+            busy,
+            error,
+            onSave = { pw ->
+                busy = true
+                error = null
+                scope.launch {
+                    auth.updatePassword(pw).onFailure { error = com.stepq.app.ui.profile.authErrorMessage(it) }
+                    busy = false
+                }
+            },
+            onBack = null,
+        )
+        return
+    }
+
+    NavHost(
+        nav,
+        startDestination = start,
+        enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(300)) { it / 6 } },
+        exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) + androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { -it / 10 } },
+        popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(300)) { -it / 6 } },
+        popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) + androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { it / 10 } },
+    ) {
         composable(Routes.SPLASH) {
             SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) })
         }

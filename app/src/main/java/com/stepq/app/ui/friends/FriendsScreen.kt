@@ -1,5 +1,6 @@
 package com.stepq.app.ui.friends
 
+import com.stepq.app.ui.components.appear
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,9 +122,7 @@ fun FriendsList(
             val data = state.data
             Spacer(Modifier.height(16.dp))
             when {
-                data == null && state.loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = StepqColors.Deep)
-                }
+                data == null && state.loading -> com.stepq.app.ui.components.SkeletonList(rows = 6, modifier = Modifier.padding(top = 16.dp))
                 data == null -> Text(
                     state.error ?: "Couldn't load your friends.",
                     style = StepqType.Body,
@@ -137,13 +136,14 @@ fun FriendsList(
                     if (data.requests.isNotEmpty()) {
                         Spacer(Modifier.height(20.dp))
                         SectionLabel("Friend requests")
-                        data.requests.forEach { RequestRow(it, onAccept, onDecline) }
+                        data.requests.forEachIndexed { i, r -> Box(Modifier.appear(i)) { RequestRow(r, onAccept, onDecline) } }
                     }
                     Spacer(Modifier.height(20.dp))
                     SectionLabel("Today's steps")
                     Spacer(Modifier.height(4.dp))
                     data.board.forEachIndexed { i, row ->
                         BoardRow(
+                            modifier = Modifier.appear(i),
                             rank = i + 1,
                             row = row,
                             reminded = row.person.id in data.remindedToday,
@@ -178,9 +178,9 @@ private fun WaterBanner(text: String) {
 }
 
 @Composable
-private fun BoardRow(rank: Int, row: FriendToday, reminded: Boolean, sending: Boolean, onRemind: () -> Unit) {
+private fun BoardRow(rank: Int, row: FriendToday, reminded: Boolean, sending: Boolean, modifier: Modifier = Modifier, onRemind: () -> Unit) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .padding(top = 4.dp)
             .clip(RoundedCornerShape(StepqDimens.RadiusS))

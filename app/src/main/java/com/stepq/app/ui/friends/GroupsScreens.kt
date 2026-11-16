@@ -1,5 +1,6 @@
 package com.stepq.app.ui.friends
 
+import com.stepq.app.ui.components.appear
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -88,15 +89,13 @@ fun GroupsList(
             StepqButton("Create a group", onCreate)
             val data = state.data
             when {
-                data == null && state.loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = StepqColors.Deep)
-                }
+                data == null && state.loading -> com.stepq.app.ui.components.SkeletonList(rows = 3, withCard = false, modifier = Modifier.padding(top = 16.dp))
                 data == null -> Text(state.error ?: "Couldn't load your groups.", style = StepqType.Body, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 16.dp))
                 else -> {
                     state.error?.let { Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 8.dp)) }
-                    data.groups.forEach { g ->
+                    data.groups.forEachIndexed { i, g ->
                         Spacer(Modifier.height(12.dp))
-                        GroupCard(g) { onOpen(g.group.id) }
+                        Box(Modifier.appear(i)) { GroupCard(g) { onOpen(g.group.id) } }
                     }
                     if (data.groups.isEmpty()) {
                         Text(

@@ -1,5 +1,6 @@
 package com.stepq.app.ui.main
 
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,6 +61,7 @@ fun MainShell(
 ) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
+    AskForNotificationsOnce()
     Scaffold(
         containerColor = StepqColors.White,
         bottomBar = {
@@ -87,7 +89,16 @@ fun MainShell(
     ) { padding ->
         // Pages inside a tab pad for the status bar themselves; consuming the shell's padding stops it being added twice.
         Column(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            when (tab) {
+            androidx.compose.animation.AnimatedContent(
+                tab,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
+                        androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220, delayMillis = 60), initialScale = 0.98f)) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90))
+                },
+                label = "tabs",
+            ) { current ->
+            when (current) {
                 Tab.Home -> if (home != null) {
                     com.stepq.app.ui.home.HomeRoute(home, onSeeAllFriends = { tab = Tab.Friends })
                 } else {
@@ -111,6 +122,7 @@ fun MainShell(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -132,6 +144,25 @@ private fun ComingSoon(title: String, body: String, extra: (@Composable () -> Un
         if (extra != null) {
             Spacer(Modifier.height(32.dp))
             extra()
+        }
+    }
+}
+
+/** Asks once (Android 13+) so water reminders from friends and QRun reminders can be shown. */
+@Composable
+private fun AskForNotificationsOnce() {
+    if (android.os.Build.VERSION.SDK_INT < 33) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("stepq", android.content.Context.MODE_PRIVATE)
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!granted && !prefs.getBoolean("asked_notifications", false)) {
+            prefs.edit().putBoolean("asked_notifications", true).apply()
+            launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }

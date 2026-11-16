@@ -1,5 +1,17 @@
 package com.stepq.app.ui.home
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import com.stepq.app.ui.components.AnimatedSteps
+import com.stepq.app.ui.components.LottieOnce
+import com.stepq.app.ui.components.SkeletonBlock
+import com.stepq.app.ui.components.SkeletonRow
+import com.stepq.app.ui.components.animatedProgress
+import com.stepq.app.ui.components.appear
+import com.stepq.app.ui.components.bob
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -62,7 +74,24 @@ fun HomeScreen(
     onConnectSteps: () -> Unit,
     onSeeAllFriends: () -> Unit,
 ) {
+    val goalReached = !state.loading && state.goal > 0 && state.steps >= state.goal
+    var celebrate by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(goalReached) {
+        // Confetti once a day, the first time Home shows the goal reached.
+        if (!goalReached) return@LaunchedEffect
+        val prefs = context.getSharedPreferences("stepq", android.content.Context.MODE_PRIVATE)
+        val today = java.time.LocalDate.now().toString()
+        if (prefs.getString("celebrated_day", null) != today) {
+            prefs.edit().putString("celebrated_day", today).apply()
+            celebrate = true
+        }
+    }
     PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize().background(StepqColors.White)) {
+        if (state.loading && state.steps == 0) {
+            HomeSkeleton()
+            return@PullToRefreshBox
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -83,7 +112,7 @@ fun HomeScreen(
                 Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 12.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.appear(1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val (distance, unit) = distanceLabel(state.km)
                 StatCard(Icons.Outlined.Route, distance, unit, Modifier.weight(1f))
                 StatCard(Icons.Outlined.LocalFireDepartment, state.kcal.toString(), "kcal", Modifier.weight(1f))
@@ -95,15 +124,53 @@ fun HomeScreen(
                 Text("avg ${formatSteps(state.weekAverage)}", style = StepqType.SmallStrong, color = StepqColors.Muted)
             }
             Spacer(Modifier.height(10.dp))
-            WeekBars(state.week, state.goal)
+            Column(Modifier.appear(2)) { WeekBars(state.week, state.goal) }
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Friends today", style = StepqType.Subheading, color = StepqColors.Ink, modifier = Modifier.weight(1f))
                 StepqTextLink(if (state.hasFriends) "See all" else "Add friends", onSeeAllFriends)
             }
-            state.friends.forEach { FriendLine(it) }
+            state.friends.forEachIndexed { i, f -> Box(Modifier.appear(3 + i)) { FriendLine(f) } }
             Spacer(Modifier.height(16.dp))
         }
+        if (celebrate) {
+            LottieOnce(R.raw.lottie_confetti, Modifier.fillMaxWidth().height(420.dp).align(Alignment.TopCenter)) { celebrate = false }
+        }
+    }
+}
+
+/** What Home looks like while today's steps load. */
+@Composable
+private fun HomeSkeleton() {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp).semantics { contentDescription = "Loading" }) {
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                SkeletonBlock(Modifier.width(110.dp).height(12.dp))
+                Spacer(Modifier.height(8.dp))
+                SkeletonBlock(Modifier.width(200.dp).height(22.dp))
+            }
+            SkeletonBlock(Modifier.width(56.dp).height(32.dp), CircleShape)
+            Spacer(Modifier.width(6.dp))
+            SkeletonBlock(Modifier.width(64.dp).height(32.dp), CircleShape)
+        }
+        Spacer(Modifier.height(26.dp))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            SkeletonBlock(Modifier.size(190.dp), CircleShape)
+            Box(Modifier.size(154.dp).clip(CircleShape).background(StepqColors.White))
+        }
+        Spacer(Modifier.height(30.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(3) { SkeletonBlock(Modifier.weight(1f).height(84.dp), RoundedCornerShape(StepqDimens.RadiusM)) }
+        }
+        Spacer(Modifier.height(24.dp))
+        SkeletonBlock(Modifier.width(100.dp).height(16.dp))
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            listOf(0.5f, 0.8f, 0.4f, 0.9f, 0.7f, 0.6f, 0.3f).forEach { SkeletonBlock(Modifier.weight(1f).fillMaxHeight(it), RoundedCornerShape(6.dp)) }
+        }
+        Spacer(Modifier.height(24.dp))
+        repeat(3) { SkeletonRow() }
     }
 }
 
@@ -139,7 +206,7 @@ private fun Header(state: HomeUiState) {
 
 @Composable
 private fun Ring(state: HomeUiState) {
-    val progress = if (state.goal <= 0) 0f else (state.steps.toFloat() / state.goal).coerceIn(0f, 1f)
+    val progress = animatedProgress(if (state.goal <= 0) 0f else (state.steps.toFloat() / state.goal).coerceIn(0f, 1f), durationMs = 1200)
     Box(
         Modifier.fillMaxWidth().height(210.dp).semantics {
             contentDescription = "${formatSteps(state.steps)} of ${formatSteps(state.goal)} steps"
@@ -154,23 +221,29 @@ private fun Ring(state: HomeUiState) {
             drawArc(StepqColors.Leaf, -90f, 360f * progress, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(formatSteps(state.steps), style = StepqType.NumberL, color = StepqColors.Ink)
+            AnimatedSteps(state.steps, StepqType.NumberL, StepqColors.Ink)
             Text(
                 if (state.steps >= state.goal) "steps today" else "of ${formatSteps(state.goal)} steps",
                 style = StepqType.Small, color = StepqColors.Muted,
             )
         }
-        Image(
-            painterResource(
-                when (state.mood) {
-                    PikoMood.Nudge -> R.drawable.piko_nudge
-                    PikoMood.Cheer -> R.drawable.piko_cheer
-                    PikoMood.Happy -> R.drawable.piko_happy
-                },
-            ),
-            contentDescription = "Piko",
-            modifier = Modifier.size(64.dp).align(Alignment.BottomEnd).offset(x = (-40).dp, y = (-16).dp),
-        )
+        androidx.compose.animation.Crossfade(
+            state.mood,
+            Modifier.size(84.dp).align(Alignment.BottomEnd).offset(x = (-28).dp, y = (-6).dp).bob(),
+            label = "piko",
+        ) { mood ->
+            Image(
+                painterResource(
+                    when (mood) {
+                        PikoMood.Nudge -> R.drawable.piko_nudge
+                        PikoMood.Cheer -> R.drawable.piko_cheer
+                        PikoMood.Happy -> R.drawable.piko_happy
+                    },
+                ),
+                contentDescription = "Piko",
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
@@ -225,7 +298,8 @@ private fun WeekBars(week: List<Int?>, goal: Int) {
     Row(Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
         week.forEachIndexed { i, steps ->
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
-                val fraction = ((steps ?: 0).toFloat() / max).coerceIn(0.06f, 1f)
+                val fraction = animatedProgress(((steps ?: 0).toFloat() / max).coerceIn(0.06f, 1f), durationMs = 700, delayMs = i * 60)
+                    .coerceAtLeast(0.06f)
                 Box(
                     Modifier
                         .fillMaxWidth()

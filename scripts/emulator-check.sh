@@ -19,6 +19,7 @@ echo "::endgroup::"
 
 # Screenshot of whatever the app shows after a fresh launch.
 adb shell pm grant in.stepq.app android.permission.ACTIVITY_RECOGNITION || true
+adb shell pm grant in.stepq.app android.permission.POST_NOTIFICATIONS || true
 adb shell am start -W -n in.stepq.app/com.stepq.app.MainActivity || true
 sleep 20
 adb exec-out screencap -p > emulator-output/app.png || true

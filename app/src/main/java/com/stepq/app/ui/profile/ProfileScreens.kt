@@ -28,7 +28,9 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Shield
@@ -62,7 +64,7 @@ import com.stepq.app.ui.theme.StepqDimens
 import com.stepq.app.ui.theme.StepqType
 
 /** What a Profile row opens. */
-enum class ProfileAction { Goal, ConnectedApps, Notifications, Privacy, Help, LogOut, Pro }
+enum class ProfileAction { EditProfile, Account, Goal, ConnectedApps, Notifications, Privacy, Help, LogOut, Pro }
 
 /** A26 Profile. */
 @Composable
@@ -80,7 +82,7 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
         val p = state.profile
         if (p == null) {
             if (state.loading) {
-                Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StepqColors.Deep) }
+                ProfileSkeleton()
             } else {
                 Text(state.error ?: "Couldn't load your profile.", style = StepqType.Body, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 16.dp))
             }
@@ -129,6 +131,8 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
                 Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
+            Item(Icons.Outlined.Edit, "Edit profile", "Name, username, avatar") { onAction(ProfileAction.EditProfile) }
+            Item(Icons.Outlined.ManageAccounts, "Account", "Email, password, delete account") { onAction(ProfileAction.Account) }
             Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps") { onAction(ProfileAction.Goal) }
             Item(Icons.Outlined.Link, "Connected apps", stepSource) { onAction(ProfileAction.ConnectedApps) }
             Item(Icons.Outlined.NotificationsNone, "Notifications") { onAction(ProfileAction.Notifications) }
@@ -258,3 +262,26 @@ fun ProSheet(onWaitlist: Boolean, onNotify: () -> Unit, onDismiss: () -> Unit) {
 const val GOAL_MIN = 1000
 const val GOAL_MAX = 100000
 const val GOAL_STEP = 500
+
+@Composable
+private fun ProfileSkeleton() {
+    Column(Modifier.padding(top = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stepq.app.ui.components.SkeletonBlock(Modifier.size(84.dp), CircleShape)
+            Column(Modifier.padding(start = 16.dp)) {
+                com.stepq.app.ui.components.SkeletonBlock(Modifier.width(150.dp).height(20.dp))
+                Spacer(Modifier.height(8.dp))
+                com.stepq.app.ui.components.SkeletonBlock(Modifier.width(100.dp).height(14.dp))
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(3) { com.stepq.app.ui.components.SkeletonBlock(Modifier.weight(1f).height(64.dp), RoundedCornerShape(StepqDimens.RadiusM)) }
+        }
+        Spacer(Modifier.height(16.dp))
+        repeat(6) {
+            com.stepq.app.ui.components.SkeletonBlock(Modifier.fillMaxWidth().height(18.dp))
+            Spacer(Modifier.height(22.dp))
+        }
+    }
+}

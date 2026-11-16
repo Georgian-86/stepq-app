@@ -1,5 +1,8 @@
 package com.stepq.app.ui.onboarding
 
+import com.stepq.app.ui.components.appear
+import com.stepq.app.ui.components.bob
+import com.stepq.app.ui.components.popIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -29,15 +32,19 @@ fun AllSetScreen(firstName: String, dailyGoal: Int, onStart: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.weight(1f))
-        Image(painterResource(R.drawable.piko_cheer), contentDescription = "Piko cheering", Modifier.size(150.dp))
+        androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+            Image(painterResource(R.drawable.piko_cheer), contentDescription = "Piko cheering", Modifier.size(150.dp).popIn().bob(8.dp, 1100))
+            com.stepq.app.ui.components.LottieOnce(R.raw.lottie_confetti, Modifier.size(360.dp))
+        }
         Spacer(Modifier.height(20.dp))
-        Text("You're all set, $firstName!", style = StepqType.Title, color = StepqColors.Ink, textAlign = TextAlign.Center)
+        Text("You're all set, $firstName!", style = StepqType.Title, color = StepqColors.Ink, textAlign = TextAlign.Center, modifier = Modifier.appear(2))
         Spacer(Modifier.height(10.dp))
-        Text(
+        Text(modifier = Modifier.appear(3),
+            text = 
             "Your goal is ${formatSteps(dailyGoal)} steps a day. Walk with friends, keep your streak alive and climb the weekly leaderboard.",
             style = StepqType.Body, color = StepqColors.Muted, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.weight(1.4f))
-        StepqButton("Chalo, let's walk", onStart)
+        StepqButton("Chalo, let's walk", onStart, Modifier.appear(4))
     }
 }

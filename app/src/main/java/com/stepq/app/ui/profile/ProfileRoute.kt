@@ -50,6 +50,8 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     var pro by rememberSaveable { mutableStateOf(false) }
     var confirmLogOut by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    fun go(to: String?) { vm.clearForm(); page = to }
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
@@ -69,8 +71,45 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
         when (page) {
             "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
             "connect" -> ConnectStepsScreen(onBack = { page = null }, fromSettings = true) { page = null }
+            "edit" -> state.profile?.let { p ->
+                EditProfileScreen(
+                    p,
+                    state.saving,
+                    state.formError,
+                    checkUsername = { vm.usernameAvailable(it) },
+                    onSave = { name, username, avatar, gender -> vm.saveProfile(name, username, avatar, gender) { go(null) } },
+                    onBack = { go(null) },
+                )
+            } ?: run { page = null }
+            "account" -> AccountScreen(
+                email = auth?.email(),
+                pendingEmail = auth?.pendingEmail(),
+                hasPassword = auth?.hasPassword() ?: false,
+                onChangeEmail = { go("email") },
+                onChangePassword = { go("password") },
+                onDelete = { vm.clearForm(); confirmDelete = true },
+                onBack = { go(null) },
+            )
+            "password" -> NewPasswordScreen(
+                "Change password",
+                "You'll stay logged in on this phone.",
+                state.saving,
+                state.formError,
+                onSave = { pw -> auth?.let { vm.changePassword(it, pw) { go("account") } } },
+                onBack = { go("account") },
+            )
+            "email" -> ChangeEmailScreen(
+                auth?.email(),
+                state.saving,
+                state.formError,
+                state.emailSentTo,
+                onSave = { e -> auth?.let { vm.changeEmail(it, e) } },
+                onBack = { go("account") },
+            )
             else -> ProfileScreen(state, source) { action ->
                 when (action) {
+                    ProfileAction.EditProfile -> go("edit")
+                    ProfileAction.Account -> go("account")
                     ProfileAction.Goal -> page = "goal"
                     ProfileAction.ConnectedApps -> page = "connect"
                     ProfileAction.Notifications -> runCatching {
@@ -114,13 +153,16 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
             containerColor = StepqColors.White,
         )
     }
+    if (confirmDelete && auth != null) {
+        DeleteAccountDialog(state.saving, state.formError, onConfirm = { vm.deleteAccount(auth) }, onDismiss = { confirmDelete = false })
+    }
     if (privacy) {
         AlertDialog(
             onDismissRequest = { privacy = false },
             title = { Text("Privacy and data", style = StepqType.Heading) },
             text = {
                 Text(
-                    "Only you, your friends and your group mates see your steps. Read the full policy, or email us to get a copy of your data or delete your account (done within 30 days).",
+                    "Your name, avatar and step totals appear in your country's rankings and to your friends and group mates. Read the full policy, or email us for a copy of your data. You can delete your account any time under Account.",
                     style = StepqType.Body,
                 )
             },

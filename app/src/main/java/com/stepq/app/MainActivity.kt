@@ -48,11 +48,14 @@ class MainActivity : ComponentActivity() {
         handleAuthLink(intent)
     }
 
-    /** stepq://auth-callback from the confirmation email: Supabase signs the user in. */
+    /** stepq://auth-callback from a confirmation, email-change or password-reset email: Supabase signs the user in. */
     private fun handleAuthLink(intent: Intent?) {
         if (intent?.data?.scheme != Supabase.DEEPLINK_SCHEME) return
-        Supabase.client?.handleDeeplinks(intent, {}, {
-            Log.w("StepqAuth", "Confirmation link failed", it)
+        val url = intent.dataString
+        Supabase.client?.handleDeeplinks(intent, { session ->
+            com.stepq.app.data.PasswordRecovery.linkOpened(url, session.type)
+        }, {
+            Log.w("StepqAuth", "Email link failed", it)
         })
     }
 }

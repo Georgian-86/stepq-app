@@ -35,6 +35,7 @@ class StepqApplication : Application() {
         qruns = com.stepq.app.data.QRunsRepository(Supabase.client)
         challenges = com.stepq.app.data.ChallengesRepository(Supabase.client, profiles)
         createNotificationChannel()
+        com.stepq.app.push.WaterInbox.schedule(this)
     }
 
     private fun createNotificationChannel() {

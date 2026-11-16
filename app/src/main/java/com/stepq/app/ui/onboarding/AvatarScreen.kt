@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,7 +40,6 @@ import com.stepq.app.ui.theme.StepqColors
 /** A08 Create your avatar: pick a colour for skin, hair, outfit and headband. */
 @Composable
 fun AvatarScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: () -> Unit) {
-    var part by rememberSaveable { mutableStateOf(AvatarPart.Skin) }
 
     OnboardingFrame(
         step = 4,
@@ -54,8 +54,17 @@ fun AvatarScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: () 
             })
         },
     ) {
+        AvatarPicker(state.avatar, 168.dp) { state.avatar = it }
+    }
+}
+
+/** The A08 avatar builder: preview, part tabs and colour choices. Also used by Edit profile. */
+@Composable
+fun AvatarPicker(avatar: AvatarConfig, size: androidx.compose.ui.unit.Dp, onChange: (AvatarConfig) -> Unit) {
+    var part by rememberSaveable { mutableStateOf(AvatarPart.Skin) }
+    Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            StepqAvatar(state.avatar, 168.dp)
+            StepqAvatar(avatar, size)
         }
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
@@ -64,7 +73,7 @@ fun AvatarScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: () 
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             AvatarPalette.options(part).forEachIndexed { i, color ->
-                val selected = state.avatar.get(part) == i
+                val selected = avatar.get(part) == i
                 Box(
                     Modifier
                         .size(48.dp)
@@ -73,7 +82,7 @@ fun AvatarScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: () 
                         .clip(CircleShape)
                         .background(color)
                         .border(1.dp, StepqColors.Line, CircleShape)
-                        .clickable { state.avatar = state.avatar.with(part, i) }
+                        .clickable { onChange(avatar.with(part, i)) }
                         .semantics {
                             contentDescription = "${part.label} option ${i + 1}"
                             this.selected = selected

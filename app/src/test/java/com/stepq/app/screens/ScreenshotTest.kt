@@ -2,6 +2,7 @@ package com.stepq.app.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -45,7 +46,11 @@ class ScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private fun snap(name: String, content: @Composable () -> Unit) {
-        compose.setContent { StepqTheme(content) }
+        compose.setContent {
+            StepqTheme {
+                androidx.compose.runtime.CompositionLocalProvider(com.stepq.app.ui.components.LocalMotionEnabled provides false, content)
+            }
+        }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
     }
 
@@ -66,6 +71,36 @@ class ScreenshotTest {
     @Test fun a09Goal() = snap("A09-daily-goal") { GoalScreen(riya, null, {}, {}) }
     @Test fun a10Connect() = snap("A10-connect-steps") { ConnectStepsScreen(onBack = {}) {} }
     @Test fun a26ConnectedApps() = snap("A26-connected-apps") { ConnectStepsScreen(onBack = {}, fromSettings = true) {} }
+    private val me = com.stepq.app.data.Profile(id = "me", displayName = "Riya Sharma", username = "riya.walks", gender = "female", birthdate = "2001-03-14", avatar = AvatarConfig(skin = 2, hair = 1, outfit = 2))
+    @Test fun a26EditProfile() = snap("A26-edit-profile") {
+        com.stepq.app.ui.profile.EditProfileScreen(me, false, null, { true }, { _, _, _, _ -> }, {})
+    }
+    @Test fun a26Account() = snap("A26-account") {
+        com.stepq.app.ui.profile.AccountScreen("riya@example.com", null, true, {}, {}, {}, {})
+    }
+    @Test fun a26AccountGoogle() = snap("A26-account-google") {
+        com.stepq.app.ui.profile.AccountScreen("riya@gmail.com", null, false, {}, {}, {}, {})
+    }
+    @Test fun a26ChangePassword() = snap("A26-change-password") {
+        com.stepq.app.ui.profile.NewPasswordScreen("Change password", "You'll stay logged in on this phone.", false, null, {}, {})
+    }
+    @Test fun a03SetNewPassword() = snap("A03-set-new-password") {
+        com.stepq.app.ui.profile.NewPasswordScreen("Set a new password", "Choose a new password for riya@example.com.", false, null, {}, null)
+    }
+    @Test fun a26ChangeEmail() = snap("A26-change-email") {
+        com.stepq.app.ui.profile.ChangeEmailScreen("riya@example.com", false, null, null, {}, {})
+    }
+    @Test fun loadingSkeletons() = snap("Z-loading-friends") {
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(20.dp)) { com.stepq.app.ui.components.SkeletonList() }
+    }
+    @Test fun lottieFrames() = snap("Z-lottie-frames") {
+        androidx.compose.foundation.layout.Row {
+            listOf(com.stepq.app.R.raw.lottie_confetti to 0.3f, com.stepq.app.R.raw.lottie_confetti to 0.6f, com.stepq.app.R.raw.lottie_success to 0.7f).forEach { (res, p) ->
+                val c = com.airbnb.lottie.compose.rememberLottieComposition(com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(res)).value
+                com.airbnb.lottie.compose.LottieAnimation(c, { p }, androidx.compose.ui.Modifier.size(130.dp))
+            }
+        }
+    }
     @Test fun a11AllSet() = snap("A11-all-set") { AllSetScreen("Riya", 8000) {} }
     private fun home(steps: Int, mood: PikoMood, greeting: String = "Good morning") = HomeUiState(
         loading = false, dateLabel = "Saturday, 17 Oct", greeting = greeting, firstName = "Riya", streak = 12,
@@ -80,6 +115,7 @@ class ScreenshotTest {
     )
 
     @Test fun a12Home() = snap("A12-home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
+    @Test fun a12Loading() = snap("A12-home-loading") { HomeScreen(home(0, PikoMood.Nudge).copy(loading = true), {}, {}, {}) }
     @Test fun a12bGoalReached() = snap("A12b-home-goal-reached") { HomeScreen(home(8000, PikoMood.Cheer), {}, {}, {}) }
     @Test fun a12cRestOfDay() = snap("A12c-home-rest-of-day") { HomeScreen(home(9450, PikoMood.Happy, "Good evening"), {}, {}, {}) }
     @Test fun a12NotConnected() = snap("A12-home-not-connected") {

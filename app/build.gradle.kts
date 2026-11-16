@@ -34,8 +34,8 @@ android {
         applicationId = "in.stepq.app"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = config("VERSION_CODE", "1").toInt()
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${config("SUPABASE_URL", "https://koagkmedvsplbgmltehk.supabase.co")}\"")
@@ -54,12 +54,24 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // The Play upload key: never in the repo. Set STEPQ_KEYSTORE (path to the .jks),
+        // STEPQ_KEYSTORE_PASSWORD, STEPQ_KEY_ALIAS and STEPQ_KEY_PASSWORD in local.properties
+        // or the environment (CI secrets). Without them, release builds are left unsigned.
+        if (config("STEPQ_KEYSTORE").isNotBlank()) {
+            create("upload") {
+                storeFile = file(config("STEPQ_KEYSTORE"))
+                storePassword = config("STEPQ_KEYSTORE_PASSWORD")
+                keyAlias = config("STEPQ_KEY_ALIAS", "upload")
+                keyPassword = config("STEPQ_KEY_PASSWORD", config("STEPQ_KEYSTORE_PASSWORD"))
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfigs.findByName("upload")?.let { signingConfig = it }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -87,6 +99,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.lottie.compose)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
