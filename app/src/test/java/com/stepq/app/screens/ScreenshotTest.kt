@@ -2,6 +2,8 @@ package com.stepq.app.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -317,6 +319,33 @@ class ScreenshotTest {
 
     @Test fun a26Profile() = snap("A26-profile") {
         com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter") {}
+    }
+
+    /** Frames of Profile -> Account -> back, with motion on, to check the page transitions. */
+    @Test fun pageTransitionFrames() {
+        var page by androidx.compose.runtime.mutableStateOf<String?>(null)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            StepqTheme {
+                com.stepq.app.ui.components.PageHost(page, { if (it == null) 0 else 1 }, onBack = { page = null }) { shown ->
+                    if (shown == null) {
+                        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter") {}
+                    } else {
+                        com.stepq.app.ui.profile.AccountScreen("riya@example.com", null, true, {}, {}, {}, {})
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(500)
+        var n = 0
+        fun frame() = compose.onRoot().captureRoboImage("build/outputs/roborazzi/frames/f${(n++).toString().padStart(2, '0')}.png")
+        frame()
+        page = "account"
+        repeat(10) { compose.mainClock.advanceTimeBy(48); frame() }
+        compose.mainClock.advanceTimeBy(400); frame()
+        page = null
+        repeat(10) { compose.mainClock.advanceTimeBy(48); frame() }
+        compose.mainClock.advanceTimeBy(400); frame()
     }
 
     @Test fun a27Pro() = snap("A27-stepq-pro") {

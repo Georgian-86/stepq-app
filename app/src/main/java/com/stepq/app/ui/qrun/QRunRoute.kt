@@ -50,6 +50,11 @@ class QRunSection internal constructor(
     /** null for the list, "post" for A19, "planner" for A21. */
     val page: String? get() = pageState.value
 
+    fun close() {
+        if (pageState.value == PLANNER) vm.bannerShown()
+        pageState.value = null
+    }
+
     @Composable
     fun List() {
         QRunList(
@@ -67,10 +72,10 @@ class QRunSection internal constructor(
     }
 
     @Composable
-    fun Page() {
+    fun Page(which: String? = page) {
         val context = LocalContext.current
         val s = state.value
-        when (page) {
+        when (which) {
             POST -> PostQRunScreen(
                 places = places,
                 here = s.here,
@@ -136,6 +141,7 @@ class QRunSection internal constructor(
     }
 
     companion object {
+        /** Leaves the open page (Post or Planner), as its back arrow does. */
         const val POST = "post"
         const val PLANNER = "planner"
     }

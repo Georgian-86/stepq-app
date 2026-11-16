@@ -136,13 +136,14 @@ fun StepqNavHost(
         return
     }
 
+    val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
     NavHost(
         nav,
         startDestination = start,
-        enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(300)) { it / 6 } },
-        exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) + androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { -it / 10 } },
-        popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(300)) { -it / 6 } },
-        popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) + androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { it / 10 } },
+        enterTransition = { com.stepq.app.ui.components.forwardTransition(motion).targetContentEnter },
+        exitTransition = { com.stepq.app.ui.components.forwardTransition(motion).initialContentExit },
+        popEnterTransition = { com.stepq.app.ui.components.backTransition(motion).targetContentEnter },
+        popExitTransition = { com.stepq.app.ui.components.backTransition(motion).initialContentExit },
     ) {
         composable(Routes.SPLASH) {
             SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) })

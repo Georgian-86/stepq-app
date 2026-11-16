@@ -37,9 +37,23 @@ fun ChallengesRoute(repo: ChallengesRepository) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        val card = state.data?.challenges?.firstOrNull { it.challenge.id == open }
+        val key = when {
+            open == null -> null
+            justJoined -> "joined:$open"
+            else -> "detail:$open"
+        }
+        com.stepq.app.ui.components.PageHost(
+            target = key,
+            depth = { when { it == null -> 0; it.startsWith("joined:") -> 2; else -> 1 } },
+            onBack = {
+                justJoined = false
+                open = null
+            },
+        ) { shown ->
+        val card = shown?.substringAfter(':')?.let { id -> state.data?.challenges?.firstOrNull { it.challenge.id == id } }
         when {
-            card != null && justJoined -> ChallengeJoinedScreen(
+            shown == null -> ChallengesScreen(state, monthly, { monthly = it }, vm::refresh, onOpen = { open = it })
+            card != null && shown.startsWith("joined:") -> ChallengeJoinedScreen(
                 card,
                 onDone = {
                     justJoined = false
@@ -54,7 +68,8 @@ fun ChallengesRoute(repo: ChallengesRepository) {
                 onLeave = { vm.leave(card.challenge.id) },
                 onBack = { open = null },
             )
-            else -> ChallengesScreen(state, monthly, { monthly = it }, vm::refresh, onOpen = { open = it })
+            else -> Box(Modifier.fillMaxSize())
+        }
         }
         state.toast?.let { message ->
             LaunchedEffect(message) {
