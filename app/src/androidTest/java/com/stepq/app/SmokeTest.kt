@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +27,18 @@ class SmokeTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     private val args = InstrumentationRegistry.getArguments()
+
+    // The app asks for notifications once Home opens; a system dialog on top would take focus
+    // from the app and hide its UI from the test, so grant it up front.
+    @Before fun grantNotifications() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            instrumentation.uiAutomation.grantRuntimePermission(
+                instrumentation.targetContext.packageName,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
+    }
 
     @Test fun opensAndLogsIn() {
         // Signed out shows the splash; a saved session goes straight to Home.
