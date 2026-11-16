@@ -42,9 +42,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.stepq.app.R
 import com.stepq.app.ui.components.StepqAvatar
@@ -78,7 +75,6 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
             Ring(state)
             Spacer(Modifier.height(12.dp))
-            ScorePill(state, Modifier.align(Alignment.CenterHorizontally))
             if (!state.healthConnected) {
                 Spacer(Modifier.height(16.dp))
                 ConnectCard(onConnectSteps)
@@ -121,15 +117,22 @@ private fun Header(state: HomeUiState) {
                 style = StepqType.Heading, color = StepqColors.Ink,
             )
         }
-        if (state.streak > 0) {
-            Row(
-                Modifier.clip(CircleShape).background(StepqColors.Mango).padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Outlined.Whatshot, contentDescription = null, tint = StepqColors.Ink, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("${state.streak}-day streak", style = StepqType.SmallStrong, color = StepqColors.Ink)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (state.streak > 0) {
+                Row(
+                    Modifier
+                        .clip(CircleShape)
+                        .background(StepqColors.Mango)
+                        .semantics(mergeDescendants = true) { contentDescription = "${state.streak}-day streak" }
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.Whatshot, contentDescription = null, tint = StepqColors.Ink, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(state.streak.toString(), style = StepqType.SmallStrong, color = StepqColors.Ink)
+                }
             }
+            ScoreBadge(state.score)
         }
     }
 }
@@ -171,23 +174,21 @@ private fun Ring(state: HomeUiState) {
     }
 }
 
+/** The StepQ score in the top-right corner, with a shoe. */
 @Composable
-private fun ScorePill(state: HomeUiState, modifier: Modifier = Modifier) {
-    val tail = when {
-        state.steps < state.goal -> " · ${formatSteps(state.goal - state.steps)} to go"
-        state.mood == PikoMood.Cheer -> " · goal reached"
-        else -> " · +${formatSteps(state.steps - state.goal)} past goal"
+private fun ScoreBadge(score: Int) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(StepqColors.MangoSoft)
+            .semantics(mergeDescendants = true) { contentDescription = "StepQ score $score" }
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(painterResource(R.drawable.ic_shoe), contentDescription = null, tint = StepqColors.Deep, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(5.dp))
+        Text(score.toString(), style = StepqType.SmallStrong, color = StepqColors.Ink)
     }
-    Text(
-        buildAnnotatedString {
-            append("StepQ score  ")
-            withStyle(SpanStyle(fontWeight = StepqType.BodyStrong.fontWeight)) { append(state.score.toString()) }
-            withStyle(SpanStyle(color = StepqColors.Muted)) { append(tail) }
-        },
-        style = StepqType.Small,
-        color = StepqColors.Ink,
-        modifier = modifier.clip(CircleShape).background(StepqColors.MangoSoft).padding(horizontal = 16.dp, vertical = 8.dp),
-    )
 }
 
 @Composable

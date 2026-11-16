@@ -42,4 +42,6 @@ data class Profile(
     val avatar: AvatarConfig = AvatarConfig(),
     @SerialName("daily_goal") val dailyGoal: Int = 8000,
     val plan: String = "free",
+    /** ISO country code for the country rankings, e.g. "IN". */
+    val country: String? = null,
 )

@@ -128,6 +128,31 @@ set role anon;
 select pg_temp.expect_error('select * from app.qrun_feed()', 'anon reading the QRun feed');
 reset role;
 
+-- Country rankings: everyone in my country, with only name, avatar and totals.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+update app.profiles set country = 'IN' where id = auth.uid();
+select pg_temp.expect_error($$update app.profiles set country = 'india' where id = auth.uid()$$, 'country must be a 2-letter code');
+with u as (update app.profiles set country = 'US' where id = '00000000-0000-0000-0000-00000000000c' returning 1)
+select pg_temp.expect((select count(*) from u) = 0, 'setting someone else''s country');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+update app.profiles set country = 'IN' where id = auth.uid();
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+update app.profiles set country = 'IN' where id = auth.uid();
+select pg_temp.expect((select count(*) from app.country_ranking(current_date - 6, current_date)) = 3, 'ranking includes strangers in my country');
+select pg_temp.expect((select display_name from app.country_ranking(current_date - 6, current_date) where rank = 1) = 'Arjun', 'most steps ranks first');
+select pg_temp.expect((select rank from app.country_ranking(current_date - 6, current_date) where is_me) = 3, 'I''m ranked even with no steps');
+select pg_temp.expect((select count(*) from app.daily_steps) = 0, 'stranger still can''t read anyone''s daily steps');
+select pg_temp.expect((select count(*) from app.country_ranking(current_date - 6, current_date, 1)) = 2, 'top rows plus my own row');
+select pg_temp.expect((select count(*) from app.country_ranking(current_date - 365, current_date)) = 0, 'ranking spans at most 40 days');
+update app.profiles set country = 'US' where id = auth.uid();
+select pg_temp.expect((select count(*) from app.country_ranking(current_date - 6, current_date)) = 1, 'other countries are ranked separately');
+reset role;
+set role anon;
+select pg_temp.expect_error($$select * from app.country_ranking(current_date - 6, current_date)$$, 'anon reading rankings');
+reset role;
+
 -- An admin (listed in stepq.admins) can read every row, for the stepq.in dashboard; can't write.
 insert into auth.users values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');
 insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');

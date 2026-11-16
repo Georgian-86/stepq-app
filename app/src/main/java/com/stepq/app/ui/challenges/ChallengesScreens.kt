@@ -86,8 +86,8 @@ fun ChallengesScreen(
             Spacer(Modifier.height(16.dp))
             Switch(monthly, onPeriod)
             Spacer(Modifier.height(16.dp))
-            PeriodCard(today, monthly)
             val data = state.data
+            PeriodCard(today, monthly, data?.let { rankingScope(it.country, if (monthly) it.monthlyCount else it.weeklyCount) })
             when {
                 data == null && state.loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = StepqColors.Deep)
@@ -100,12 +100,12 @@ fun ChallengesScreen(
                     val myRank = board.indexOfFirst { it.isMe }
                     if (myRank >= 3) {
                         Spacer(Modifier.height(12.dp))
-                        RankRow(myRank + 1, board[myRank], highlight = true)
+                        RankRow(board[myRank].rank.takeIf { it > 0 } ?: (myRank + 1), board[myRank], highlight = true)
                     }
-                    board.drop(3).forEachIndexed { i, r -> if (!r.isMe) RankRow(i + 4, r, highlight = false) }
+                    board.drop(3).forEachIndexed { i, r -> if (!r.isMe) RankRow(r.rank.takeIf { it > 0 } ?: (i + 4), r, highlight = false) }
                     if (board.size <= 1) {
                         Text(
-                            "Add friends or join a group to compete with them here.",
+                            "No one else in ${countryName(data.country) ?: "your country"} has walked this ${if (monthly) "month" else "week"} yet. Invite friends to join you.",
                             style = StepqType.Small,
                             color = StepqColors.Muted,
                             modifier = Modifier.padding(top = 8.dp),
@@ -163,7 +163,7 @@ private fun Switch(monthly: Boolean, onPeriod: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun PeriodCard(today: LocalDate, monthly: Boolean) {
+private fun PeriodCard(today: LocalDate, monthly: Boolean, scope: String?) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -182,6 +182,7 @@ private fun PeriodCard(today: LocalDate, monthly: Boolean) {
         }
         Spacer(Modifier.height(6.dp))
         Text(periodLabel(today, monthly), style = StepqType.Small, color = StepqColors.Muted)
+        if (scope != null) Text(scope, style = StepqType.SmallStrong, color = StepqColors.Ink, modifier = Modifier.padding(top = 2.dp))
     }
 }
 

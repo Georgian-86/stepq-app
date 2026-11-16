@@ -32,8 +32,20 @@ private data class Count(@SerialName("challenge_id") val challengeId: String, va
 
 enum class Period { Weekly, Monthly }
 
-/** A22/A23 ranking row: total steps in the period. */
-data class Ranked(val person: PersonSummary, val steps: Int, val isMe: Boolean)
+/** A22/A23 ranking row: total steps in the period and the place (ties share a place). */
+data class Ranked(val person: PersonSummary, val steps: Int, val isMe: Boolean, val rank: Int = 0)
+
+/** A row of app.country_ranking(). */
+@Serializable
+private data class RankRow(
+    val rank: Int,
+    val id: String,
+    @SerialName("display_name") val displayName: String,
+    val avatar: AvatarConfig = AvatarConfig(),
+    val steps: Long,
+    @SerialName("is_me") val isMe: Boolean,
+    val ranked: Long,
+)
 
 data class ChallengeCard(
     val challenge: Challenge,
@@ -48,6 +60,11 @@ data class ChallengesData(
     val me: Profile,
     val weekly: List<Ranked>,
     val monthly: List<Ranked>,
+    /** ISO country code the rankings cover, e.g. "IN". */
+    val country: String? = null,
+    /** How many people are in each ranking (everyone in the country who walked, plus me). */
+    val weeklyCount: Int = weekly.size,
+    val monthlyCount: Int = monthly.size,
     val challenges: List<ChallengeCard>,
 )
 
@@ -56,27 +73,51 @@ class ChallengesRepository(private val client: SupabaseClient?, private val prof
 
     private fun db() = (client ?: throw NotConfiguredException()).postgrest
 
-    suspend fun load(today: LocalDate = LocalDate.now(FriendsRepository.IST)): Result<ChallengesData?> = runCatching {
+    /**
+     * [country] is where the phone is from (SIM, then network, then region setting); it's saved
+     * on my profile when it changes, and the rankings cover everyone with the same country.
+     */
+    suspend fun load(country: String?, today: LocalDate = LocalDate.now(FriendsRepository.IST)): Result<ChallengesData?> = runCatching {
         val db = db()
-        val me = profiles.mine().getOrThrow() ?: return@runCatching null
+        var me = profiles.mine().getOrThrow() ?: return@runCatching null
+        if (country != null && country != me.country) {
+            runCatching { db["profiles"].update({ set("country", country) }) { filter { eq("id", me.id) } } }
+                .onSuccess { me = me.copy(country = country) }
+        }
         val monthStart = today.withDayOfMonth(1)
         val weekStart = weekStart(today)
-        val from = minOf(monthStart, weekStart)
 
-        // Everyone RLS lets me see: me, friends and group mates.
-        val people = db["profiles"].select().decodeList<PersonSummary>()
-        val days = db["daily_steps"].select {
-            filter {
-                gte("day", from.toString())
-                lte("day", today.toString())
-            }
-        }.decodeList<DailySteps>()
-
-        fun rank(start: LocalDate): List<Ranked> {
-            val totals = days.filter { it.day >= start.toString() }.groupBy { it.userId }.mapValues { (_, d) -> d.sumOf { it.steps } }
-            return people.map { Ranked(it, totals[it.id] ?: 0, it.id == me.id) }
-                .sortedWith(compareByDescending<Ranked> { it.steps }.thenBy { it.person.displayName })
+        suspend fun countryRank(start: LocalDate): Pair<List<Ranked>, Int> {
+            val rows = db.rpc(
+                "country_ranking",
+                kotlinx.serialization.json.buildJsonObject {
+                    put("from_day", kotlinx.serialization.json.JsonPrimitive(start.toString()))
+                    put("to_day", kotlinx.serialization.json.JsonPrimitive(today.toString()))
+                    put("max_rows", kotlinx.serialization.json.JsonPrimitive(50))
+                },
+            ).decodeList<RankRow>()
+            val list = rows.map { Ranked(PersonSummary(it.id, it.displayName, "", it.avatar), it.steps.toInt(), it.isMe, it.rank) }
+            return list to (rows.firstOrNull()?.ranked?.toInt() ?: 0)
         }
+
+        // Until the country_ranking migration is applied: everyone RLS shows me (friends, group mates).
+        suspend fun visibleRank(start: LocalDate): Pair<List<Ranked>, Int> {
+            val people = db["profiles"].select().decodeList<PersonSummary>()
+            val days = db["daily_steps"].select {
+                filter {
+                    gte("day", start.toString())
+                    lte("day", today.toString())
+                }
+            }.decodeList<DailySteps>()
+            val totals = days.groupBy { it.userId }.mapValues { (_, d) -> d.sumOf { it.steps } }
+            val list = withRanks(people.map { Ranked(it, totals[it.id] ?: 0, it.id == me.id) })
+            return list to list.size
+        }
+
+        suspend fun rank(start: LocalDate) = runCatching { countryRank(start) }.getOrElse { visibleRank(start) }
+
+        val (weekly, weeklyCount) = rank(weekStart)
+        val (monthly, monthlyCount) = rank(monthStart)
 
         val now = Instant.now()
         val challenges = db["challenges"].select { filter { gt("ends_at", now.toString()) } }.decodeList<Challenge>()
@@ -88,8 +129,11 @@ class ChallengesRepository(private val client: SupabaseClient?, private val prof
 
         ChallengesData(
             me = me,
-            weekly = rank(weekStart),
-            monthly = rank(monthStart),
+            weekly = weekly,
+            monthly = monthly,
+            country = me.country,
+            weeklyCount = weeklyCount,
+            monthlyCount = monthlyCount,
             challenges = challenges.map { c ->
                 val joinedAt = entries[c.id]?.joinedAt?.let(::parseInstant)
                 ChallengeCard(
@@ -116,6 +160,12 @@ class ChallengesRepository(private val client: SupabaseClient?, private val prof
     }
 
     companion object {
+        /** Sorts by steps, most first, and numbers them; ties share a place (1, 2, 2, 4). */
+        fun withRanks(rows: List<Ranked>): List<Ranked> {
+            val sorted = rows.sortedWith(compareByDescending<Ranked> { it.steps }.thenBy { it.person.displayName })
+            return sorted.mapIndexed { i, r -> r.copy(rank = sorted.indexOfFirst { it.steps == r.steps } + 1) }
+        }
+
         fun weekStart(day: LocalDate): LocalDate = day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
         /** Steps from the day of joining (India time) through the last day of the challenge. */
