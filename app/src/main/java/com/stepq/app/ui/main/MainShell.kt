@@ -60,6 +60,7 @@ fun MainShell(
 ) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
+    AskForNotificationsOnce()
     Scaffold(
         containerColor = StepqColors.White,
         bottomBar = {
@@ -132,6 +133,25 @@ private fun ComingSoon(title: String, body: String, extra: (@Composable () -> Un
         if (extra != null) {
             Spacer(Modifier.height(32.dp))
             extra()
+        }
+    }
+}
+
+/** Asks once (Android 13+) so water reminders from friends and QRun reminders can be shown. */
+@Composable
+private fun AskForNotificationsOnce() {
+    if (android.os.Build.VERSION.SDK_INT < 33) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("stepq", android.content.Context.MODE_PRIVATE)
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!granted && !prefs.getBoolean("asked_notifications", false)) {
+            prefs.edit().putBoolean("asked_notifications", true).apply()
+            launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }

@@ -28,7 +28,9 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Shield
@@ -62,7 +64,7 @@ import com.stepq.app.ui.theme.StepqDimens
 import com.stepq.app.ui.theme.StepqType
 
 /** What a Profile row opens. */
-enum class ProfileAction { Goal, ConnectedApps, Notifications, Privacy, Help, LogOut, Pro }
+enum class ProfileAction { EditProfile, Account, Goal, ConnectedApps, Notifications, Privacy, Help, LogOut, Pro }
 
 /** A26 Profile. */
 @Composable
@@ -129,6 +131,8 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
                 Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
+            Item(Icons.Outlined.Edit, "Edit profile", "Name, username, avatar") { onAction(ProfileAction.EditProfile) }
+            Item(Icons.Outlined.ManageAccounts, "Account", "Email, password, delete account") { onAction(ProfileAction.Account) }
             Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps") { onAction(ProfileAction.Goal) }
             Item(Icons.Outlined.Link, "Connected apps", stepSource) { onAction(ProfileAction.ConnectedApps) }
             Item(Icons.Outlined.NotificationsNone, "Notifications") { onAction(ProfileAction.Notifications) }

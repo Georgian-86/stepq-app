@@ -2,6 +2,7 @@ package com.stepq.app.data
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
@@ -55,9 +56,46 @@ class AuthRepository(private val client: SupabaseClient?) {
         }
     }
 
+    /** A03: the reset link opens the app, which then asks for a new password (see [PasswordRecovery]). */
     suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.resetPasswordForEmail(email.trim())
+        c.auth.resetPasswordForEmail(email.trim(), redirectUrl = Supabase.AUTH_REDIRECT_URL)
+        PasswordRecovery.requested()
+    }
+
+    /** The signed-in account's email, or null. */
+    fun email(): String? = client?.auth?.currentUserOrNull()?.email
+
+    /** The email waiting to be confirmed after a change, if any. */
+    fun pendingEmail(): String? = client?.auth?.currentUserOrNull()?.newEmail
+
+    /** True when the account has a password (signed up with email), so it can be changed. */
+    fun hasPassword(): Boolean {
+        val user = client?.auth?.currentUserOrNull() ?: return false
+        val providers = user.identities?.map { it.provider }.orEmpty()
+        return providers.isEmpty() || "email" in providers
+    }
+
+    /** Sets a new password: from Profile, or after opening a reset link. */
+    suspend fun updatePassword(newPassword: String): Result<Unit> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.auth.updateUser { password = newPassword }
+        PasswordRecovery.done()
+    }
+
+    /** Supabase emails a confirmation link to the new address; the change applies once it's opened. */
+    suspend fun updateEmail(newEmail: String): Result<Unit> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.auth.updateUser(redirectUrl = Supabase.AUTH_REDIRECT_URL) { email = newEmail.trim() }
+    }
+
+    /** Deletes the account and everything in it (app.delete_my_account), then signs out. */
+    suspend fun deleteAccount(): Result<Unit> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.postgrest.rpc("delete_my_account")
+        runCatching { c.auth.signOut() }
+        runCatching { c.auth.clearSession() }
+        Unit
     }
 
     suspend fun logOut() {
@@ -87,3 +125,28 @@ fun authStates(statuses: Flow<SessionStatus>): Flow<AuthState> =
             if (next == AuthState.Loading && previous != AuthState.Loading) previous else next
         }
         .distinctUntilChanged()
+
+/**
+ * A password reset link was opened: the app shows "Set a new password" until the user saves one.
+ * The link signs the user in first, so the new password can be saved with [AuthRepository.updatePassword].
+ */
+object PasswordRecovery {
+    private val _active = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val active: kotlinx.coroutines.flow.StateFlow<Boolean> = _active
+
+    /** When a reset was last requested on this phone, to recognise the link if it carries no type. */
+    @Volatile private var requestedAt: Long = 0
+
+    fun requested() { requestedAt = System.currentTimeMillis() }
+
+    /** Called with what the opened link said about itself. */
+    fun linkOpened(url: String?, sessionType: String?) {
+        val recent = System.currentTimeMillis() - requestedAt < 2 * 60 * 60 * 1000
+        if (isRecovery(url, sessionType) || (recent && url?.contains("code=") == true)) _active.value = true
+    }
+
+    fun done() { _active.value = false; requestedAt = 0 }
+
+    fun isRecovery(url: String?, sessionType: String?): Boolean =
+        sessionType == "recovery" || url?.contains("type=recovery") == true
+}

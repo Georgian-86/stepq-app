@@ -66,6 +66,25 @@ class ScreenshotTest {
     @Test fun a09Goal() = snap("A09-daily-goal") { GoalScreen(riya, null, {}, {}) }
     @Test fun a10Connect() = snap("A10-connect-steps") { ConnectStepsScreen(onBack = {}) {} }
     @Test fun a26ConnectedApps() = snap("A26-connected-apps") { ConnectStepsScreen(onBack = {}, fromSettings = true) {} }
+    private val me = com.stepq.app.data.Profile(id = "me", displayName = "Riya Sharma", username = "riya.walks", gender = "female", birthdate = "2001-03-14", avatar = AvatarConfig(skin = 2, hair = 1, outfit = 2))
+    @Test fun a26EditProfile() = snap("A26-edit-profile") {
+        com.stepq.app.ui.profile.EditProfileScreen(me, false, null, { true }, { _, _, _, _ -> }, {})
+    }
+    @Test fun a26Account() = snap("A26-account") {
+        com.stepq.app.ui.profile.AccountScreen("riya@example.com", null, true, {}, {}, {}, {})
+    }
+    @Test fun a26AccountGoogle() = snap("A26-account-google") {
+        com.stepq.app.ui.profile.AccountScreen("riya@gmail.com", null, false, {}, {}, {}, {})
+    }
+    @Test fun a26ChangePassword() = snap("A26-change-password") {
+        com.stepq.app.ui.profile.NewPasswordScreen("Change password", "You'll stay logged in on this phone.", false, null, {}, {})
+    }
+    @Test fun a03SetNewPassword() = snap("A03-set-new-password") {
+        com.stepq.app.ui.profile.NewPasswordScreen("Set a new password", "Choose a new password for riya@example.com.", false, null, {}, null)
+    }
+    @Test fun a26ChangeEmail() = snap("A26-change-email") {
+        com.stepq.app.ui.profile.ChangeEmailScreen("riya@example.com", false, null, null, {}, {})
+    }
     @Test fun a11AllSet() = snap("A11-all-set") { AllSetScreen("Riya", 8000) {} }
     private fun home(steps: Int, mood: PikoMood, greeting: String = "Good morning") = HomeUiState(
         loading = false, dateLabel = "Saturday, 17 Oct", greeting = greeting, firstName = "Riya", streak = 12,

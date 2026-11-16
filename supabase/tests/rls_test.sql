@@ -153,6 +153,37 @@ set role anon;
 select pg_temp.expect_error($$select * from app.country_ranking(current_date - 6, current_date)$$, 'anon reading rankings');
 reset role;
 
+-- Water reminders reach the friend they were sent to, with the sender's name.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.water_inbox(now() - interval '1 hour')) = 5, 'inbox: reminders sent to me');
+select pg_temp.expect((select bool_and(from_name = 'Riya') from app.water_inbox(now() - interval '1 hour')), 'inbox: sender name');
+select pg_temp.expect((select count(*) from app.water_inbox(now() + interval '1 minute')) = 0, 'inbox: nothing newer than since');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select count(*) from app.water_inbox(now() - interval '1 hour')) = 0, 'inbox: not reminders I sent');
+reset role;
+
+-- Deleting an account removes it; a group it created passes to the next member.
+insert into auth.users values ('00000000-0000-0000-0000-00000000000d', 'leaver@test');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'Leaver', 'leaver');
+insert into app.groups (name, created_by) values ('Shared walk', auth.uid()), ('Solo walk', auth.uid());
+insert into app.group_members (group_id, user_id) select id, auth.uid() from app.groups where created_by = auth.uid();
+reset role;
+insert into app.group_members (group_id, user_id) select id, '00000000-0000-0000-0000-00000000000b' from app.groups where name = 'Shared walk';
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+select app.delete_my_account();
+reset role;
+select pg_temp.expect(not exists (select 1 from auth.users where id = '00000000-0000-0000-0000-00000000000d'), 'delete: auth user gone');
+select pg_temp.expect(not exists (select 1 from app.profiles where id = '00000000-0000-0000-0000-00000000000d'), 'delete: profile gone');
+select pg_temp.expect((select created_by from app.groups where name = 'Shared walk') = '00000000-0000-0000-0000-00000000000b', 'delete: shared group handed to a member');
+select pg_temp.expect(not exists (select 1 from app.groups where name = 'Solo walk'), 'delete: solo group removed');
+select pg_temp.expect((select count(*) from app.profiles) = 3, 'delete: other accounts untouched');
+select set_config('request.jwt.claims', '', false);
+set role anon;
+select pg_temp.expect_error($$select app.delete_my_account()$$, 'anon deleting an account');
+reset role;
+
 -- An admin (listed in stepq.admins) can read every row, for the stepq.in dashboard; can't write.
 insert into auth.users values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');
 insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');

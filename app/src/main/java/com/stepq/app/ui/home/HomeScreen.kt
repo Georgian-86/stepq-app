@@ -169,7 +169,7 @@ private fun Ring(state: HomeUiState) {
                 },
             ),
             contentDescription = "Piko",
-            modifier = Modifier.size(64.dp).align(Alignment.BottomEnd).offset(x = (-40).dp, y = (-16).dp),
+            modifier = Modifier.size(84.dp).align(Alignment.BottomEnd).offset(x = (-28).dp, y = (-6).dp),
         )
     }
 }

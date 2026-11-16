@@ -113,6 +113,29 @@ fun StepqNavHost(
         else -> Routes.SPLASH
     }
 
+    // A password reset link signed the user in: ask for the new password before anything else.
+    val recovering by com.stepq.app.data.PasswordRecovery.active.collectAsState()
+    if (recovering && authState == AuthState.SignedIn) {
+        var busy by remember { mutableStateOf(false) }
+        var error by remember { mutableStateOf<String?>(null) }
+        com.stepq.app.ui.profile.NewPasswordScreen(
+            "Set a new password",
+            "Choose a new password for ${auth.email() ?: "your account"}.",
+            busy,
+            error,
+            onSave = { pw ->
+                busy = true
+                error = null
+                scope.launch {
+                    auth.updatePassword(pw).onFailure { error = com.stepq.app.ui.profile.authErrorMessage(it) }
+                    busy = false
+                }
+            },
+            onBack = null,
+        )
+        return
+    }
+
     NavHost(nav, startDestination = start) {
         composable(Routes.SPLASH) {
             SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) })
