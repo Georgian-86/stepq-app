@@ -99,6 +99,7 @@ class AuthRepository(private val client: SupabaseClient?) {
     }
 
     suspend fun logOut() {
+        com.stepq.app.push.PushTokens.unregister()
         client?.auth?.signOut()
     }
 }

@@ -22,6 +22,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install Android 37 platform
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" > /dev/null
+      - name: Firebase config (push), when the secret is set
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf %s "$GOOGLE_SERVICES_JSON" > app/google-services.json; fi
       - name: Build, unit tests, lint
         env:
           # Public anon key and project URL, from repo Settings → Secrets / Variables → Actions.

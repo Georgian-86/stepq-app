@@ -3,4 +3,10 @@
     <string name="app_name">StepQ</string>
     <string name="notification_channel_default">reminders</string>
     <string name="notification_channel_default_name">Reminders and nudges</string>
+    <string name="notification_channel_nudges_name">Step nudges</string>
+    <string name="notification_channel_nudges_desc">Morning kick-offs, evening progress, streaks and goal celebrations</string>
+    <string name="notification_channel_water_name">Water reminders</string>
+    <string name="notification_channel_water_desc">A glass of water, twice a day</string>
+    <string name="notification_channel_news_name">News and challenges</string>
+    <string name="notification_channel_news_desc">New challenges, events and updates from StepQ</string>
 </resources>
