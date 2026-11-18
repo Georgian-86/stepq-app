@@ -2,6 +2,9 @@ package com.stepq.app.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.ui.test.performClick
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.size
@@ -392,5 +395,71 @@ class ScreenshotTest {
 
     @Test fun a26GoalTomorrow() = snap("A26-goal-from-tomorrow") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {}, pending = 10000)
+    }
+
+    // Frame-by-frame recordings of the new animations, turned into GIFs for review.
+    private fun recordFrames(dir: String, content: @Composable () -> Unit): (Long) -> Unit {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            StepqTheme {
+                androidx.compose.runtime.CompositionLocalProvider(com.stepq.app.ui.components.LocalMotionEnabled provides true, content)
+            }
+        }
+        var n = 0
+        return { step ->
+            compose.mainClock.advanceTimeBy(step)
+            compose.onRoot().captureRoboImage("build/outputs/roborazzi/anim/$dir/f${(n++).toString().padStart(3, '0')}.png")
+        }
+    }
+
+    @Test fun animSplash() {
+        val frame = recordFrames("splash") { SplashScreen({}, {}) }
+        repeat(45) { frame(50) }
+        repeat(6) { frame(150) }
+    }
+
+    @Test fun animLogin() {
+        var loading by androidx.compose.runtime.mutableStateOf(false)
+        var reveal by androidx.compose.runtime.mutableStateOf(false)
+        var home by androidx.compose.runtime.mutableStateOf(false)
+        val frame = recordFrames("login") {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                if (home) {
+                    HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {})
+                } else {
+                    androidx.compose.foundation.layout.Column(
+                        Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White).padding(24.dp),
+                    ) {
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(80.dp))
+                        androidx.compose.material3.Text("Welcome back", style = com.stepq.app.ui.theme.StepqType.Title, color = com.stepq.app.ui.theme.StepqColors.Ink)
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(28.dp))
+                        com.stepq.app.ui.components.UnderlineField(label = "Email", value = "riya@example.com", onValueChange = {})
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp))
+                        com.stepq.app.ui.components.UnderlineField(label = "Password", value = "walks2026", onValueChange = {}, password = true)
+                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                        com.stepq.app.ui.components.StepqButton("Log in", {}, loading = loading)
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(40.dp))
+                    }
+                }
+                if (reveal) com.stepq.app.ui.components.SuccessReveal { reveal = false }
+            }
+        }
+        repeat(6) { frame(80) }
+        loading = true
+        repeat(12) { frame(50) }
+        repeat(6) { frame(100) }
+        reveal = true
+        repeat(10) { frame(50) }
+        home = true
+        repeat(26) { frame(50) }
+        repeat(6) { frame(150) }
+    }
+
+    @Test fun animHomeWeekTap() {
+        val frame = recordFrames("home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
+        repeat(24) { frame(50) }
+        compose.onNode(androidx.compose.ui.test.hasContentDescription("Tuesday", substring = true)).performClick()
+        repeat(8) { frame(50) }
+        repeat(8) { frame(120) }
     }
 }
