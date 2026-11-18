@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -97,9 +98,18 @@ fun ChallengesScreen(
                     Spacer(Modifier.height(20.dp))
                     Podium(board.take(3))
                     val myRank = board.indexOfFirst { it.isMe }
-                    if (myRank >= 3) {
-                        Spacer(Modifier.height(12.dp))
-                        RankRow(board[myRank].rank.takeIf { it > 0 } ?: (myRank + 1), board[myRank], highlight = true)
+                    // Outside the top 3 (or not on the board yet): a "Your rank" card under the podium.
+                    if (myRank >= 3 || myRank < 0) {
+                        Spacer(Modifier.height(14.dp))
+                        Box(Modifier.appear(0)) {
+                            YourRankCard(
+                                me = board.getOrNull(myRank),
+                                rank = board.getOrNull(myRank)?.let { it.rank.takeIf { r -> r > 0 } ?: (myRank + 1) },
+                                ahead = board.getOrNull(myRank - 1)?.takeIf { myRank > 0 },
+                                total = if (monthly) data.monthlyCount else data.weeklyCount,
+                                monthly = monthly,
+                            )
+                        }
                     }
                     board.drop(3).forEachIndexed { i, r -> if (!r.isMe) Box(Modifier.appear(i)) { RankRow(r.rank.takeIf { it > 0 } ?: (i + 4), r, highlight = false) } }
                     if (board.size <= 1) {
@@ -217,6 +227,45 @@ private fun Podium(top: List<Ranked>) {
                 ) {
                     Text((i + 1).toString(), style = StepqType.NumberM, color = StepqColors.Ink)
                 }
+            }
+        }
+    }
+}
+
+/** "Your rank" when you're not on the podium: place, steps, and how far to the next place. */
+@Composable
+private fun YourRankCard(me: Ranked?, rank: Int?, ahead: Ranked?, total: Int, monthly: Boolean) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(StepqDimens.RadiusM))
+            .background(StepqColors.Deep)
+            .semantics(mergeDescendants = true) {}
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Your rank", style = StepqType.SmallStrong, color = StepqColors.Mint)
+            Text(
+                if (rank != null) "#$rank" + (if (total > 0) " of $total" else "") else "Not ranked yet",
+                style = StepqType.NumberM,
+                color = StepqColors.White,
+            )
+            val gap = if (me != null && ahead != null) (ahead.steps - me.steps + 1).coerceAtLeast(1) else null
+            Text(
+                when {
+                    me == null -> "Walk this ${if (monthly) "month" else "week"} to get on the board."
+                    gap != null -> "${formatSteps(gap)} steps to move up to #${ahead!!.rank.takeIf { it > 0 } ?: rank!! - 1}"
+                    else -> "${formatSteps(me.steps)} steps"
+                },
+                style = StepqType.Small,
+                color = StepqColors.Mint,
+            )
+        }
+        if (me != null) {
+            Column(horizontalAlignment = Alignment.End) {
+                StepqAvatar(me.person.avatar, 40.dp)
+                Text(formatSteps(me.steps), style = StepqType.SmallStrong, color = StepqColors.White, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

@@ -68,6 +68,10 @@ class QRunSection internal constructor(
                 vm.clearFormError()
                 pageState.value = POST
             },
+            onSort = vm::setSort,
+            onPrice = vm::setPrice,
+            onCenter = vm::setCenter,
+            searchPlaces = { q -> places.search(q, state.value.here) },
         )
     }
 
@@ -81,8 +85,9 @@ class QRunSection internal constructor(
                 here = s.here,
                 busy = s.busy,
                 error = s.formError,
-                onPost = { title, place, date, time ->
-                    vm.post(title, place, date, time, java.time.ZoneId.systemDefault()) {
+                canSetPrice = s.data?.isAdmin == true,
+                onPost = { title, place, date, time, price ->
+                    vm.post(title, place, date, time, java.time.ZoneId.systemDefault(), price) {
                         askNotifications()
                         pageState.value = PLANNER
                     }

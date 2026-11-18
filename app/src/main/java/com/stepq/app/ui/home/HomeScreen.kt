@@ -12,6 +12,9 @@ import com.stepq.app.ui.components.SkeletonRow
 import com.stepq.app.ui.components.animatedProgress
 import com.stepq.app.ui.components.appear
 import com.stepq.app.ui.components.bob
+import com.stepq.app.ui.components.zoomPulse
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -130,6 +133,12 @@ fun HomeScreen(
                 Text("Friends today", style = StepqType.Subheading, color = StepqColors.Ink, modifier = Modifier.weight(1f))
                 StepqTextLink(if (state.hasFriends) "See all" else "Add friends", onSeeAllFriends)
             }
+            if (!state.hasFriends) {
+                Text(
+                    "Add friends to see their steps today next to yours.",
+                    style = StepqType.Small, color = StepqColors.Muted, modifier = Modifier.padding(top = 6.dp),
+                )
+            }
             state.friends.forEachIndexed { i, f -> Box(Modifier.appear(3 + i)) { FriendLine(f) } }
             Spacer(Modifier.height(16.dp))
         }
@@ -229,7 +238,7 @@ private fun Ring(state: HomeUiState) {
         }
         androidx.compose.animation.Crossfade(
             state.mood,
-            Modifier.size(84.dp).align(Alignment.BottomEnd).offset(x = (-28).dp, y = (-6).dp).bob(),
+            Modifier.size(84.dp).align(Alignment.BottomEnd).offset(x = (-28).dp, y = (-6).dp).zoomPulse().bob(),
             label = "piko",
         ) { mood ->
             Image(
@@ -295,9 +304,46 @@ private val dayLetters = listOf("M", "T", "W", "T", "F", "S", "S")
 private fun WeekBars(week: List<Int?>, goal: Int) {
     val max = maxOf(goal, week.filterNotNull().maxOrNull() ?: 0).coerceAtLeast(1)
     val todayIndex = week.indexOfLast { it != null }
+    // Tapping a day shows its steps above the bar; tapping it again hides them.
+    var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Int?>(null) }
+    Row(Modifier.fillMaxWidth().height(28.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+        week.forEachIndexed { i, steps ->
+            Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = selected == i,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.7f),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.7f),
+                ) {
+                    Text(
+                        if (steps == null) "—" else formatSteps(steps),
+                        style = StepqType.SmallStrong,
+                        color = StepqColors.White,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .wrapContentWidth(unbounded = true)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(StepqColors.Ink)
+                            .padding(horizontal = 6.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(4.dp))
     Row(Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
         week.forEachIndexed { i, steps ->
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Show steps") {
+                        selected = if (selected == i) null else i
+                    }
+                    .semantics { contentDescription = "${dayNames[i]}: ${if (steps == null) "no steps yet" else "${formatSteps(steps)} steps"}" },
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 val fraction = animatedProgress(((steps ?: 0).toFloat() / max).coerceIn(0.06f, 1f), durationMs = 700, delayMs = i * 60)
                     .coerceAtLeast(0.06f)
                 Box(
@@ -308,6 +354,7 @@ private fun WeekBars(week: List<Int?>, goal: Int) {
                         .background(
                             when {
                                 steps == null -> StepqColors.Mint
+                                selected == i -> StepqColors.Ink
                                 i == todayIndex -> StepqColors.Deep
                                 else -> StepqColors.Leaf
                             },
@@ -317,11 +364,19 @@ private fun WeekBars(week: List<Int?>, goal: Int) {
         }
     }
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        dayLetters.forEach {
-            Text(it, style = StepqType.Small, color = StepqColors.Muted, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        dayLetters.forEachIndexed { i, letter ->
+            Text(
+                letter,
+                style = if (selected == i) StepqType.SmallStrong else StepqType.Small,
+                color = if (selected == i) StepqColors.Ink else StepqColors.Muted,
+                modifier = Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
         }
     }
 }
+
+private val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 @Composable
 private fun FriendLine(row: FriendRow) {

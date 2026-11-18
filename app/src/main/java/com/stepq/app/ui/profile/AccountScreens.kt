@@ -156,8 +156,9 @@ fun EditProfileScreen(
         UnderlineField(
             "Username",
             username,
-            { username = normalizeUsername(it).take(20) },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Done),
+            { username = normalizeUsername(it).filter { c -> c.isLetterOrDigit() || c == '.' || c == '_' }.take(20) },
+            prefix = "@",
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
         )
         when {
             username != profile.username && !isValidUsername(username) ->
@@ -169,7 +170,10 @@ fun EditProfileScreen(
         SectionLabel("Gender")
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Gender.entries.forEach { g -> StepqChip(g.label, selected = gender == g.value, onClick = { gender = g.value }) }
+            Gender.entries.forEach { g -> StepqChip(g.label, selected = gender == g.value, onClick = {
+                gender = g.value
+                avatar = avatar.copy(style = com.stepq.app.data.defaultHairStyle(g.value))
+            }) }
         }
         if (profile.birthdate != null) {
             Spacer(Modifier.height(20.dp))
@@ -179,8 +183,8 @@ fun EditProfileScreen(
 }
 
 private val AvatarSaver = androidx.compose.runtime.saveable.Saver<AvatarConfig, List<Int>>(
-    save = { listOf(it.skin, it.hair, it.outfit, it.headband) },
-    restore = { AvatarConfig(it[0], it[1], it[2], it[3]) },
+    save = { listOf(it.skin, it.hair, it.outfit, it.headband, it.style) },
+    restore = { AvatarConfig(it[0], it[1], it[2], it[3], it.getOrElse(4) { 0 }) },
 )
 
 /** A26 Account and security: email, password and deleting the account. */

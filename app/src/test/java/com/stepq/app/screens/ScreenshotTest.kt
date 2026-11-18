@@ -179,14 +179,36 @@ class ScreenshotTest {
         )
     }
 
+    private fun suggestion(id: String, name: String, user: String, skin: Int, style: Int, mutual: Long = 0) =
+        com.stepq.app.data.Suggestion(id, name, user, AvatarConfig(skin = skin, hair = 1, outfit = 1, style = style), mutual)
+
     @Test fun a13AddFriend() = snap("A13-add-friend") {
         com.stepq.app.ui.friends.AddFriendScreen(
             myUsername = "riya.walks",
-            result = com.stepq.app.ui.friends.SearchResult.Found(
-                com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 4, hair = 1, outfit = 1)),
-                com.stepq.app.ui.friends.Relation.None,
+            state = com.stepq.app.ui.friends.AddFriendState(
+                query = "ar",
+                results = listOf(
+                    suggestion("a", "Arjun Mehta", "arjun.m", 4, 0, mutual = 3),
+                    suggestion("b", "Aarav Shah", "aarav.walks", 2, 0),
+                    suggestion("c", "Sara Arora", "sara.runs", 1, 1, mutual = 1),
+                ),
             ),
-            onSearch = {}, onTyping = {}, onRequest = {}, onAccept = {}, onBack = {},
+            relationOf = { if (it == "b") com.stepq.app.ui.friends.Relation.Requested else com.stepq.app.ui.friends.Relation.None },
+            onType = {}, onFindContacts = {}, onRequest = {}, onAccept = {}, onInvite = {}, onBack = {},
+        )
+    }
+
+    @Test fun a13AddFriendSuggestions() = snap("A13-add-friend-suggestions") {
+        com.stepq.app.ui.friends.AddFriendScreen(
+            myUsername = "riya.walks",
+            state = com.stepq.app.ui.friends.AddFriendState(
+                mayKnow = listOf(
+                    suggestion("d", "Kabir Singh", "kabir.s", 3, 0, mutual = 4),
+                    suggestion("e", "Ananya Rao", "ananya", 0, 2, mutual = 2),
+                ),
+            ),
+            relationOf = { com.stepq.app.ui.friends.Relation.None },
+            onType = {}, onFindContacts = {}, onRequest = {}, onAccept = {}, onInvite = {}, onBack = {},
         )
     }
 
@@ -247,6 +269,16 @@ class ScreenshotTest {
         )
     }
 
+    @Test fun a23YourRank() = snap("A23-challenges-your-rank") {
+        val board = com.stepq.app.data.ChallengesRepository.withRanks(
+            friendsData.board.map { com.stepq.app.data.Ranked(it.person, if (it.isMe) 21000 else it.steps * 12, it.isMe) },
+        )
+        com.stepq.app.ui.challenges.ChallengesScreen(
+            com.stepq.app.ui.challenges.ChallengesUiState(loading = false, data = challengesData.copy(monthly = board)),
+            monthly = true, onPeriod = {}, onRefresh = {}, onOpen = {}, today = LocalDate.of(2026, 11, 12),
+        )
+    }
+
     @Test fun a24Detail() = snap("A24-challenge-detail") {
         com.stepq.app.ui.challenges.ChallengeDetailScreen(shoes, joining = false, onJoin = {}, onLeave = {}, onBack = {})
     }
@@ -265,7 +297,7 @@ class ScreenshotTest {
     private val sunsetWalk = com.stepq.app.data.QRun(
         id = "q2", title = "Sunset walk by the sea", placeName = "Juhu Beach, near Gate 5", lat = 19.0988, lng = 72.8267,
         startsAtRaw = "2026-10-22T12:30:00Z", createdAtRaw = "2026-10-16T05:00:00Z", createdBy = "sana", hostName = "Sana Khan",
-        hostAvatar = AvatarConfig(skin = 1, hair = 2, headband = 1), going = 3,
+        hostAvatar = AvatarConfig(skin = 1, hair = 2, headband = 1, style = 1), going = 3, priceInr = 499,
     )
     private val qrunState = com.stepq.app.ui.qrun.QRunUiState(
         loading = false,
@@ -284,7 +316,7 @@ class ScreenshotTest {
     @Test fun a19PostQRun() = snap("A19-post-qrun") {
         com.stepq.app.ui.qrun.PostQRunScreen(
             places = com.stepq.app.ui.qrun.NoPlaceSearch, here = null, busy = false, error = null,
-            onPost = { _, _, _, _ -> }, onTyping = {}, onPickCustomTime = {}, onClose = {},
+            onPost = { _, _, _, _, _ -> }, onTyping = {}, onPickCustomTime = {}, onClose = {},
             today = LocalDate.of(2026, 10, 17),
             initialPlace = "Carter Road",
             initialSuggestions = listOf(
@@ -356,5 +388,9 @@ class ScreenshotTest {
 
     @Test fun a26Goal() = snap("A26-daily-goal") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
+    }
+
+    @Test fun a26GoalTomorrow() = snap("A26-goal-from-tomorrow") {
+        com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {}, pending = 10000)
     }
 }

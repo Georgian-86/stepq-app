@@ -66,6 +66,8 @@ fun OnboardingFrame(
     header: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // The phone's back gesture does what the arrow does (and never closes the app mid-sign-up).
+    if (onBack != null) androidx.activity.compose.BackHandler(onBack = onBack)
     Column(
         Modifier.fillMaxSize().background(StepqColors.White).safeDrawingPadding().imePadding().padding(horizontal = 24.dp),
     ) {

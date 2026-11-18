@@ -117,16 +117,31 @@ fun FriendsRoute(
             )
             }
         } else if (shown == "add") {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val loadContacts = { vm.loadContacts { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.stepq.app.data.Contacts.emailHashes(context) } } }
+            val contactsPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            ) { granted -> if (granted) loadContacts() }
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                vm.openAdd()
+                // Already allowed earlier: show contacts straight away.
+                if (state.add.contacts == null && androidx.core.content.ContextCompat.checkSelfPermission(
+                        context, android.Manifest.permission.READ_CONTACTS,
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) loadContacts()
+            }
             AddFriendScreen(
                 myUsername = state.data?.me?.username.orEmpty(),
-                result = state.search,
-                onSearch = vm::search,
-                onTyping = vm::clearSearch,
+                state = state.add,
+                relationOf = { id -> state.data?.let { relationTo(id, it) } ?: Relation.None },
+                onType = vm::type,
+                onFindContacts = { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) },
                 onRequest = vm::sendRequest,
                 onAccept = vm::accept,
+                onInvite = { shareText(context, appInviteText(state.data?.me?.username)) },
                 onBack = {
                     adding = false
-                    vm.clearSearch()
+                    vm.type("")
                 },
             )
         } else {

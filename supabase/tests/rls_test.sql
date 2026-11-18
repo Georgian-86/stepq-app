@@ -194,11 +194,75 @@ with u as (update app.profiles set display_name = 'x' returning 1)
 select pg_temp.expect((select count(*) from u) = 0, 'admin: cannot edit profiles');
 reset role;
 
+-- Add friends: search as you type, people you may know, contacts. Public fields only.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select count(*) from app.search_people('ri')) = 1, 'search finds Riya by the start of her name');
+select pg_temp.expect((select count(*) from app.search_people('@riya.w')) = 1, 'search by username with @');
+select pg_temp.expect((select count(*) from app.search_people('r')) = 0, 'search needs 2 characters');
+select pg_temp.expect((select count(*) from app.search_people('%%')) = 0, 'search wildcards are literal');
+select pg_temp.expect((select count(*) from app.search_people('riya_')) = 0, 'underscore is not a wildcard');
+select pg_temp.expect((select count(*) from app.search_people('stranger')) = 0, 'search leaves out myself');
+select pg_temp.expect((select count(*) from app.people_you_may_know()) = 0, 'no friends, no suggestions');
+insert into app.friendships (requester, addressee) values (auth.uid(), '00000000-0000-0000-0000-00000000000b');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+update app.friendships set status = 'accepted' where addressee = auth.uid();
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select username from app.people_you_may_know()) = 'riya.walks', 'friend of a friend is suggested');
+select pg_temp.expect((select mutual from app.people_you_may_know()) = 1, 'suggestion counts mutual friends');
+select pg_temp.expect((select mutual from app.search_people('riya')) = 1, 'search shows mutual friends');
+select pg_temp.expect(
+  (select username from app.match_contacts(array[encode(sha256(convert_to('Riya@Test ', 'UTF8')), 'hex')])) is null,
+  'contacts: hash must be of the trimmed, lower-cased email');
+select pg_temp.expect(
+  (select username from app.match_contacts(array[encode(sha256(convert_to('riya@test', 'UTF8')), 'hex')])) = 'riya.walks',
+  'contacts: matching email hash finds Riya');
+select pg_temp.expect(
+  (select count(*) from app.match_contacts(array[encode(sha256(convert_to('stranger@test', 'UTF8')), 'hex')])) = 0,
+  'contacts: leaves out myself');
+select pg_temp.expect((select count(*) from app.people_you_may_know() where username = 'arjun') = 0, 'friends are not suggested');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select username from app.people_you_may_know()) = 'stranger', 'suggestions work both ways');
+-- A pending request (either way) drops them from suggestions.
+insert into app.friendships (requester, addressee) values (auth.uid(), '00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select count(*) from app.people_you_may_know()) = 0, 'requested people are not suggested');
+delete from app.friendships where addressee = '00000000-0000-0000-0000-00000000000c';
+reset role;
+
+-- Daily goal changes wait for the next day.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+update app.profiles set next_daily_goal = 12000, next_goal_from = current_date + 1 where id = auth.uid();
+select pg_temp.expect((select next_daily_goal from app.profiles where id = auth.uid()) = 12000, 'setting tomorrow''s goal');
+select pg_temp.expect_error($$update app.profiles set next_daily_goal = 50 where id = auth.uid()$$, 'goal below 1,000');
+with u as (update app.profiles set next_daily_goal = 9000 where id = '00000000-0000-0000-0000-00000000000b' returning 1)
+select pg_temp.expect((select count(*) from u) = 0, 'setting a friend''s goal');
+reset role;
+
+-- Paid QRuns: only StepQ admins can post one or set a price.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at, price_inr) values (auth.uid(), 'Paid', 'X', now() + interval '1 day', 299)$$, 'member posting a paid QRun');
+select pg_temp.expect_error($$update app.qruns set price_inr = 99 where created_by = auth.uid()$$, 'member making own QRun paid');
+select pg_temp.expect((select bool_and(price_inr = 0) from app.qruns), 'member QRuns are free');
+select pg_temp.expect(not app.i_am_admin(), 'member is not an admin');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'StepQ', 'stepq');
+select pg_temp.expect(app.i_am_admin(), 'admin is an admin');
+insert into app.qruns (created_by, title, place_name, starts_at, price_inr) values (auth.uid(), 'Sunday 10K', 'Marine Drive', now() + interval '2 days', 499);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select price_inr from app.qruns where title = 'Sunday 10K') = 499, 'admin''s paid QRun shows its price');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
 select pg_temp.expect_error('select * from app.profiles', 'anon reading profiles');
 select pg_temp.expect_error($$select app.username_available('x')$$, 'anon checking usernames');
+select pg_temp.expect_error($$select * from app.search_people('ri')$$, 'anon searching people');
+select pg_temp.expect_error($$select * from app.match_contacts(array['x'])$$, 'anon matching contacts');
 reset role;
 
 \echo 'All RLS checks passed.'

@@ -9,6 +9,19 @@ import kotlinx.serialization.json.put
 import java.time.LocalDate
 import java.time.ZoneId
 
+/** Someone to add: from search, contacts, or friends of friends. Public fields only. */
+@Serializable
+data class Suggestion(
+    val id: String,
+    @SerialName("display_name") val displayName: String,
+    val username: String,
+    val avatar: AvatarConfig = AvatarConfig(),
+    /** Friends you have in common. */
+    val mutual: Long = 0,
+) {
+    val person: PersonSummary get() = PersonSummary(id, displayName, username, avatar)
+}
+
 /** A13 leaderboard row: someone the user can see, with today's numbers. */
 data class FriendToday(
     val person: PersonSummary,
@@ -65,7 +78,7 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
             }
         }.decodeList<DailySteps>().associateBy { it.userId }
 
-        val mePerson = PersonSummary(me.id, me.displayName, me.username, me.avatar)
+        val mePerson = PersonSummary(me.id, me.displayName, me.username, me.avatar, me.dailyGoal)
         val board = (people + mePerson).map {
             val d = days[it.id]
             FriendToday(it, d?.steps ?: 0, d?.distanceM ?: 0, isMe = it.id == me.id)
@@ -106,6 +119,36 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
         db().rpc("find_by_username", buildJsonObject { put("name", name) })
             .decodeList<PersonSummary>()
             .firstOrNull()
+    }
+
+    /**
+     * Search as you type: names or usernames starting with [query]. Falls back to the exact
+     * username lookup until the search migration is applied.
+     */
+    suspend fun searchPeople(query: String): Result<List<Suggestion>> = runCatching {
+        val q = query.trim().removePrefix("@")
+        if (q.length < 2) return@runCatching emptyList()
+        runCatching {
+            db().rpc("search_people", buildJsonObject { put("q", q) }).decodeList<Suggestion>()
+        }.getOrElse {
+            findByUsername(q).getOrThrow()?.let { listOf(Suggestion(it.id, it.displayName, it.username, it.avatar)) }.orEmpty()
+        }
+    }
+
+    /** Friends of friends you aren't connected with yet. Empty until the migration is applied. */
+    suspend fun peopleYouMayKnow(): Result<List<Suggestion>> = runCatching {
+        runCatching { db().rpc("people_you_may_know").decodeList<Suggestion>() }.getOrDefault(emptyList())
+    }
+
+    /** People whose sign-in email is in the phone's contacts. Only SHA-256 hashes are sent. */
+    suspend fun matchContacts(emailHashes: List<String>): Result<List<Suggestion>> = runCatching {
+        if (emailHashes.isEmpty()) return@runCatching emptyList()
+        db().rpc(
+            "match_contacts",
+            buildJsonObject {
+                put("email_hashes", kotlinx.serialization.json.JsonArray(emailHashes.take(2000).map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            },
+        ).decodeList<Suggestion>()
     }
 
     suspend fun sendRequest(fromId: String, toId: String): Result<Unit> = runCatching {

@@ -153,6 +153,7 @@ class HomeViewModel(
                 me = "You" to data.me.avatar,
                 mySteps = steps,
                 friends = data.friendsToday.map { (p, s) -> Triple(p.displayName.substringBefore(' '), p.avatar, s) },
+                size = 5,
             ),
             hasFriends = data.friendsToday.isNotEmpty(),
             mood = mood,

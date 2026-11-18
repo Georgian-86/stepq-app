@@ -63,9 +63,21 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
     fun saveGoal(goal: Int, onSaved: () -> Unit) {
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
-            repo.updateGoal(goal)
+            val current = _state.value.profile?.dailyGoal ?: goal
+            repo.updateGoal(goal, current)
                 .onSuccess {
-                    _state.update { s -> s.copy(saving = false, profile = s.profile?.copy(dailyGoal = goal), toast = "Daily goal set to ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps.") }
+                    val tomorrow = java.time.LocalDate.now().plusDays(1).toString()
+                    _state.update { s ->
+                        s.copy(
+                            saving = false,
+                            profile = s.profile?.copy(
+                                nextDailyGoal = goal.takeIf { it != current },
+                                nextGoalFrom = tomorrow.takeIf { goal != current },
+                            ),
+                            toast = if (goal == current) "Your goal stays at ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps."
+                            else "From tomorrow your goal is ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps.",
+                        )
+                    }
                     onSaved()
                 }
                 .onFailure { _state.update { it.copy(saving = false, toast = "Couldn't save your goal. Try again.") } }

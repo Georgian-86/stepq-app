@@ -98,8 +98,13 @@ fun QRunList(
     onPost: () -> Unit,
     now: Instant = Instant.now(),
     zone: ZoneId = ZoneId.systemDefault(),
+    onSort: (QRunSort) -> Unit = {},
+    onPrice: (PriceFilter) -> Unit = {},
+    onCenter: (Place?) -> Unit = {},
+    searchPlaces: suspend (String) -> List<Place> = { emptyList() },
 ) {
     val data = state.data
+    var searchingPlace by rememberSaveable { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
             Column(
@@ -114,16 +119,17 @@ fun QRunList(
                         Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable(enabled = !locationAllowed, role = Role.Button, onClick = onAllowLocation),
+                            .clickable(role = Role.Button, onClickLabel = "Search a location") { searchingPlace = !searchingPlace },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Outlined.NearMe, contentDescription = null, tint = StepqColors.Deep, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             when {
-                                !locationAllowed -> "Allow location to see QRuns near you"
-                                state.areaName != null -> "Near ${state.areaName} · nearest first"
-                                state.here != null -> "Near you · nearest first"
+                                state.center != null -> "Near ${shortPlace(state.center.name)}"
+                                !locationAllowed -> "Allow location or search a place"
+                                state.areaName != null -> "Near ${state.areaName}"
+                                state.here != null -> "Near you"
                                 else -> "Finding where you are…"
                             },
                             style = StepqType.SmallStrong,
@@ -149,15 +155,45 @@ fun QRunList(
                         }
                     }
                 }
+                androidx.compose.animation.AnimatedVisibility(searchingPlace) {
+                    LocationSearch(
+                        locationAllowed = locationAllowed,
+                        searchPlaces = searchPlaces,
+                        onPick = {
+                            onCenter(it)
+                            searchingPlace = false
+                        },
+                        onUseMyLocation = {
+                            onCenter(null)
+                            if (!locationAllowed) onAllowLocation()
+                            searchingPlace = false
+                        },
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val sorts = if (state.origin == null) listOf(QRunSort.Soonest) else QRunSort.entries
+                    sorts.forEach { so ->
+                        StepqChip(so.label, selected = state.sort == so || sorts.size == 1, onClick = { onSort(so) })
+                    }
+                    Box(Modifier.width(1.dp).height(24.dp).background(StepqColors.Line))
+                    listOf(PriceFilter.Free, PriceFilter.Paid).forEach { pf ->
+                        StepqChip(pf.label, selected = state.price == pf, onClick = { onPrice(if (state.price == pf) PriceFilter.All else pf) })
+                    }
+                }
                 when {
                     data == null && state.loading -> com.stepq.app.ui.components.SkeletonList(rows = 3, withCard = false, modifier = Modifier.padding(top = 16.dp))
                     data == null -> Text(state.error ?: "Couldn't load QRuns.", style = StepqType.Body, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 16.dp))
                     else -> {
                         state.error?.let { Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 8.dp)) }
-                        val runs = listOrder(data.runs, state.here, now)
+                        val runs = listOrder(data.runs, state.origin, now, state.sort, state.price)
                         runs.forEachIndexed { i, run ->
                             Spacer(Modifier.height(14.dp))
-                            Box(Modifier.appear(i)) { QRunCard(run, run.distanceFrom(state.here), hosting = run.createdBy == data.myId, now, zone, { onJoin(run) }, onOpenPlanner) }
+                            Box(Modifier.appear(i)) { QRunCard(run, run.distanceFrom(state.origin), hosting = run.createdBy == data.myId, now, zone, { onJoin(run) }, onOpenPlanner) }
                         }
                         if (runs.isEmpty()) {
                             Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -167,7 +203,15 @@ fun QRunList(
                                     modifier = Modifier.size(120.dp),
                                 )
                                 Spacer(Modifier.height(12.dp))
-                                Text("No QRuns coming up yet", style = StepqType.Heading, color = StepqColors.Ink)
+                                Text(
+                                    when (state.price) {
+                                        PriceFilter.Paid -> "No paid QRuns right now"
+                                        PriceFilter.Free -> "No free QRuns coming up"
+                                        PriceFilter.All -> "No QRuns coming up yet"
+                                    },
+                                    style = StepqType.Heading,
+                                    color = StepqColors.Ink,
+                                )
                                 Spacer(Modifier.height(6.dp))
                                 Text(
                                     "Post a walk or run, pick a public place and a time, and anyone on StepQ can join you.",
@@ -194,6 +238,52 @@ fun QRunList(
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Outlined.Add, contentDescription = "Post a QRun", tint = StepqColors.White, modifier = Modifier.size(30.dp))
+        }
+    }
+}
+
+/** A18 location filter: search a place or area, or go back to where the phone is. */
+@Composable
+private fun LocationSearch(
+    locationAllowed: Boolean,
+    searchPlaces: suspend (String) -> List<Place>,
+    onPick: (Place) -> Unit,
+    onUseMyLocation: () -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<Place>>(emptyList()) }
+    LaunchedEffect(text) {
+        if (text.trim().length < 3) {
+            results = emptyList()
+            return@LaunchedEffect
+        }
+        delay(400)
+        results = searchPlaces(text).filter { it.lat != null && it.lng != null }
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .clip(RoundedCornerShape(StepqDimens.RadiusM))
+            .background(StepqColors.Mint)
+            .padding(14.dp),
+    ) {
+        UnderlineField(
+            label = "Search a place or area",
+            value = text,
+            onValueChange = { text = it.take(80) },
+            placeholder = "e.g. Bandra, Cubbon Park",
+        )
+        results.take(5).forEach { p ->
+            IconLine(Icons.Outlined.LocationOn, p.name, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onPick(p) }.padding(vertical = 10.dp))
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClick = onUseMyLocation).padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.NearMe, contentDescription = null, tint = StepqColors.Deep, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (locationAllowed) "Use my location" else "Allow location to use where I am", style = StepqType.SmallStrong, color = StepqColors.Deep)
         }
     }
 }
@@ -231,7 +321,20 @@ private fun QRunCard(run: QRun, km: Double?, hosting: Boolean, now: Instant, zon
             }
         }
         Spacer(Modifier.height(12.dp))
-        Text(run.title, style = StepqType.Subheading, color = StepqColors.Ink)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(run.title, style = StepqType.Subheading, color = StepqColors.Ink, modifier = Modifier.weight(1f))
+            val paid = run.priceInr > 0
+            Text(
+                if (paid) "${priceLabel(run.priceInr)} · StepQ event" else "Free",
+                style = StepqType.SmallStrong,
+                color = if (paid) StepqColors.Ink else StepqColors.Deep,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .clip(CircleShape)
+                    .background(if (paid) StepqColors.MangoSoft else StepqColors.LeafSoft)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
         Spacer(Modifier.height(8.dp))
         IconLine(Icons.Outlined.LocationOn, run.placeName)
         Spacer(Modifier.height(6.dp))
@@ -251,8 +354,8 @@ private fun QRunCard(run: QRun, km: Double?, hosting: Boolean, now: Instant, zon
 }
 
 @Composable
-private fun IconLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color = StepqColors.Ink) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun IconLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color = StepqColors.Ink, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = StepqColors.Muted, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(text, style = StepqType.Small, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -288,16 +391,19 @@ fun PostQRunScreen(
     here: LatLng?,
     busy: Boolean,
     error: String?,
-    onPost: (title: String, place: Place, date: LocalDate?, time: LocalTime?) -> Unit,
+    onPost: (title: String, place: Place, date: LocalDate?, time: LocalTime?, priceInr: Int) -> Unit,
     onTyping: () -> Unit,
     onPickCustomTime: ((LocalTime) -> Unit) -> Unit,
     onClose: () -> Unit,
     today: LocalDate = LocalDate.now(),
     initialPlace: String = "",
     initialSuggestions: List<Place> = emptyList(),
+    /** StepQ admins can set a price; everyone else posts free QRuns. */
+    canSetPrice: Boolean = false,
 ) {
     BackHandler(onBack = onClose)
     var title by rememberSaveable { mutableStateOf("") }
+    var price by rememberSaveable { mutableStateOf("") }
     var placeText by rememberSaveable { mutableStateOf(initialPlace) }
     var picked by remember { mutableStateOf<Place?>(null) }
     var suggestions by remember { mutableStateOf(initialSuggestions) }
@@ -402,6 +508,16 @@ fun PostQRunScreen(
                     }
                 })
             }
+            if (canSetPrice) {
+                Spacer(Modifier.height(20.dp))
+                UnderlineField(
+                    label = "Price in ₹ (StepQ events only)",
+                    value = price,
+                    onValueChange = { v -> price = v.filter(Char::isDigit).take(6) },
+                    placeholder = "0 for a free QRun",
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                )
+            }
             Spacer(Modifier.height(16.dp))
         }
         Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -414,7 +530,7 @@ fun PostQRunScreen(
             Spacer(Modifier.height(10.dp))
             StepqButton(
                 "Post QRun",
-                { onPost(title, picked?.takeIf { it.name == placeText } ?: Place(placeText.trim()), date, time) },
+                { onPost(title, picked?.takeIf { it.name == placeText } ?: Place(placeText.trim()), date, time, if (canSetPrice) price.toIntOrNull() ?: 0 else 0) },
                 enabled = title.isNotBlank() && placeText.isNotBlank() && date != null && time != null,
                 loading = busy,
             )
@@ -507,6 +623,15 @@ fun JoinQRunSheet(run: QRun, busy: Boolean, onJoin: () -> Unit, onCancel: () -> 
             Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = StepqColors.Deep, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text(sheetSummary(run, zone), style = StepqType.SmallStrong, color = StepqColors.Ink)
+        }
+        if (run.priceInr > 0) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "This is a paid StepQ event: ${priceLabel(run.priceInr)} a person.",
+                style = StepqType.SmallStrong,
+                color = StepqColors.Ink,
+                textAlign = TextAlign.Center,
+            )
         }
         Spacer(Modifier.height(14.dp))
         Row(

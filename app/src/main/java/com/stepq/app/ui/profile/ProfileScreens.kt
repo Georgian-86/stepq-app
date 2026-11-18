@@ -133,7 +133,7 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
             Spacer(Modifier.height(12.dp))
             Item(Icons.Outlined.Edit, "Edit profile", "Name, username, avatar") { onAction(ProfileAction.EditProfile) }
             Item(Icons.Outlined.ManageAccounts, "Account", "Email, password, delete account") { onAction(ProfileAction.Account) }
-            Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps") { onAction(ProfileAction.Goal) }
+            Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps" + (p.nextDailyGoal?.let { " · ${formatSteps(it)} from tomorrow" } ?: "")) { onAction(ProfileAction.Goal) }
             Item(Icons.Outlined.Link, "Connected apps", stepSource) { onAction(ProfileAction.ConnectedApps) }
             Item(Icons.Outlined.NotificationsNone, "Notifications") { onAction(ProfileAction.Notifications) }
             Item(Icons.Outlined.Shield, "Privacy and data") { onAction(ProfileAction.Privacy) }
@@ -174,9 +174,9 @@ private fun Item(icon: ImageVector, label: String, value: String? = null, color:
 
 /** Change the daily goal from Profile. */
 @Composable
-fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack: () -> Unit) {
+fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack: () -> Unit, pending: Int? = null) {
     BackHandler(onBack = onBack)
-    var goal by rememberSaveable { mutableIntStateOf(current) }
+    var goal by rememberSaveable { mutableIntStateOf(pending ?: current) }
     Column(Modifier.fillMaxSize().background(StepqColors.White).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(4.dp))
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = StepqColors.Ink) }
@@ -209,8 +209,23 @@ fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack:
                 }
             }
         }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            if (goal == current) "Today's goal is ${formatSteps(current)} steps."
+            else "Starts tomorrow. Today you're still aiming for ${formatSteps(current)} steps, so today's score and streak don't change.",
+            style = StepqType.Small,
+            color = StepqColors.Muted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.weight(1f))
-        StepqButton("Save", { onSave(goal) }, Modifier.padding(vertical = 16.dp), enabled = goal != current, loading = saving)
+        StepqButton(
+            if (goal == current && pending != null) "Keep today's goal" else "Save",
+            { onSave(goal) },
+            Modifier.padding(vertical = 16.dp),
+            enabled = goal != (pending ?: current),
+            loading = saving,
+        )
     }
 }
 

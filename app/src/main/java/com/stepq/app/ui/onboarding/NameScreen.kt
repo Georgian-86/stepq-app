@@ -73,8 +73,14 @@ fun NameScreen(state: OnboardingViewModel, profiles: ProfileRepository?, onBack:
         )
         Spacer(Modifier.height(20.dp))
         UnderlineField(
-            "Username", if (state.username.isEmpty()) "" else "@${state.username}",
-            { state.username = normalizeUsername(it).take(20) },
+            "Username", state.username,
+            { state.username = normalizeUsername(it).filter { c -> c.isLetterOrDigit() || c == '.' || c == '_' }.take(20) },
+            prefix = "@",
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                autoCorrectEnabled = false,
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii,
+            ),
         )
         when (status) {
             UsernameStatus.Available -> FieldHint("Available. You can change it later.", ok = true)

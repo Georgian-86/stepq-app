@@ -115,10 +115,9 @@ fun LoginScreen(
             Spacer(Modifier.height(16.dp))
             OrDivider()
             Spacer(Modifier.height(16.dp))
-            val soon = { error = "Apple sign-in is coming soon. Use Google or your email for now." }
             GoogleSignInButton(auth, onError = { error = it })
             Spacer(Modifier.height(12.dp))
-            StepqButton("Continue with Apple", soon, style = StepqButtonStyle.Dark)
+            com.stepq.app.ui.components.AppleSignInButton(auth, onError = { error = it })
             Spacer(Modifier.height(24.dp))
         }
         StepqButton("Log in", ::submit, loading = busy)

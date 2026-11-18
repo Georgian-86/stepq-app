@@ -31,6 +31,9 @@ data class GroupToday(
 ) {
     val totalSteps: Int get() = members.sumOf { it.steps }
     val totalDistanceM: Int get() = members.sumOf { it.distanceM }
+    /** The group's StepQ score: the average of each member's score (share of their own goal). */
+    val score: Int get() = if (members.isEmpty()) 0 else
+        members.sumOf { com.stepq.app.ui.home.stepqScore(it.steps, it.person.dailyGoal) } / members.size
 }
 
 data class GroupsData(

@@ -1,5 +1,6 @@
 package com.stepq.app.ui.onboarding
 
+import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -23,11 +24,19 @@ import com.stepq.app.ui.theme.StepqType
 
 /** After A05 when Supabase requires email confirmation. Same look as A04. */
 @Composable
-fun CheckEmailScreen(email: String, onLogIn: () -> Unit) {
+fun CheckEmailScreen(email: String, onLogIn: () -> Unit, onBack: () -> Unit = onLogIn) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
     Column(
         Modifier.fillMaxSize().background(StepqColors.White).safeDrawingPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        androidx.compose.material3.IconButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) {
+            androidx.compose.material3.Icon(
+                androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBackIos,
+                contentDescription = "Back",
+                tint = StepqColors.Ink,
+            )
+        }
         Spacer(Modifier.weight(1f))
         Image(painterResource(R.drawable.piko_cheer), contentDescription = null, Modifier.size(120.dp))
         Spacer(Modifier.height(16.dp))
@@ -39,5 +48,6 @@ fun CheckEmailScreen(email: String, onLogIn: () -> Unit) {
         )
         Spacer(Modifier.weight(1.4f))
         StepqButton("Go to log in", onLogIn)
+        com.stepq.app.ui.components.StepqTextLink("Use a different email", onBack)
     }
 }

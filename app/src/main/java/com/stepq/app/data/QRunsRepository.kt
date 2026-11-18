@@ -22,6 +22,8 @@ data class QRun(
     @SerialName("host_avatar") val hostAvatar: AvatarConfig = AvatarConfig(),
     val going: Int = 0,
     val joined: Boolean = false,
+    /** Rupees; 0 is free. Paid QRuns can only be posted by StepQ. Read from app.qruns. */
+    @SerialName("price_inr") val priceInr: Int = 0,
 ) {
     val startsAt: Instant get() = ChallengesRepository.parseInstant(startsAtRaw)
     val createdAt: Instant get() = ChallengesRepository.parseInstant(createdAtRaw)
@@ -42,12 +44,31 @@ private data class NewQRun(
 )
 
 @Serializable
+private data class PaidQRun(
+    @SerialName("created_by") val createdBy: String,
+    val title: String,
+    @SerialName("place_name") val placeName: String,
+    val lat: Double?,
+    val lng: Double?,
+    @SerialName("starts_at") val startsAt: String,
+    @SerialName("price_inr") val priceInr: Int,
+)
+
+@Serializable
+private data class QRunPrice(val id: String, @SerialName("price_inr") val priceInr: Int = 0)
+
+@Serializable
 private data class QRunId(val id: String)
 
 @Serializable
 private data class Participant(@SerialName("qrun_id") val qrunId: String, @SerialName("user_id") val userId: String)
 
-data class QRunsData(val myId: String, val runs: List<QRun>)
+data class QRunsData(
+    val myId: String,
+    val runs: List<QRun>,
+    /** StepQ admins can post paid QRuns. */
+    val isAdmin: Boolean = false,
+)
 
 /**
  * QRuns (A18–A21). Anyone signed in can see QRuns and post or join as themselves; RLS blocks
@@ -59,17 +80,33 @@ class QRunsRepository(private val client: SupabaseClient?) {
     private fun myId() = client().auth.currentUserOrNull()?.id ?: throw IllegalStateException("Not signed in")
 
     suspend fun load(): Result<QRunsData> = runCatching {
-        val runs = client().postgrest.rpc("qrun_feed").decodeList<QRun>()
-        QRunsData(myId(), runs)
+        val db = client().postgrest
+        val runs = db.rpc("qrun_feed").decodeList<QRun>()
+        // Prices and the admin check need the Nov 18 migration; without it every QRun is free.
+        val prices = if (runs.isEmpty()) emptyMap() else runCatching {
+            db["qruns"].select(io.github.jan.supabase.postgrest.query.Columns.list("id", "price_inr")) {
+                filter { isIn("id", runs.map { it.id }) }
+            }.decodeList<QRunPrice>().associate { it.id to it.priceInr }
+        }.getOrDefault(emptyMap())
+        val admin = runCatching { db.rpc("i_am_admin").decodeAs<Boolean>() }.getOrDefault(false)
+        QRunsData(myId(), runs.map { it.copy(priceInr = prices[it.id] ?: 0) }, admin)
     }
 
     /** A19: posts the QRun and joins the host to it. Returns the new QRun's id. */
-    suspend fun post(title: String, place: Place, startsAt: Instant): Result<String> = runCatching {
+    suspend fun post(title: String, place: Place, startsAt: Instant, priceInr: Int = 0): Result<String> = runCatching {
         val db = client().postgrest
         val me = myId()
-        val id = db["qruns"].insert(NewQRun(me, title.trim(), place.name.trim(), place.lat, place.lng, startsAt.toString())) {
-            select(io.github.jan.supabase.postgrest.query.Columns.list("id"))
-        }.decodeSingle<QRunId>().id
+        val columns = io.github.jan.supabase.postgrest.query.Columns.list("id")
+        val id = if (priceInr > 0) {
+            // Postgres refuses this unless I'm a StepQ admin.
+            db["qruns"].insert(PaidQRun(me, title.trim(), place.name.trim(), place.lat, place.lng, startsAt.toString(), priceInr)) {
+                select(columns)
+            }.decodeSingle<QRunId>().id
+        } else {
+            db["qruns"].insert(NewQRun(me, title.trim(), place.name.trim(), place.lat, place.lng, startsAt.toString())) {
+                select(columns)
+            }.decodeSingle<QRunId>().id
+        }
         db["qrun_participants"].insert(Participant(id, me))
         id
     }

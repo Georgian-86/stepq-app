@@ -74,7 +74,7 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
             onBack = { go(if (page == "password" || page == "email") "account" else null) },
         ) { shown ->
         when (shown) {
-            "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
+            "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, pending = state.profile?.nextDailyGoal, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
             "connect" -> ConnectStepsScreen(onBack = { page = null }, fromSettings = true) { page = null }
             "edit" -> state.profile?.let { p ->
                 EditProfileScreen(

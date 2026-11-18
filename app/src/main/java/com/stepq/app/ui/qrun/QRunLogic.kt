@@ -87,11 +87,36 @@ fun goingLabel(n: Int) = "$n going"
  * A18 list: QRuns that haven't started, nearest first when we know where you are (those without
  * a location go last), soonest first otherwise.
  */
-fun listOrder(runs: List<QRun>, here: LatLng?, now: Instant): List<QRun> {
-    val open = runs.filter { it.startsAt.isAfter(now) }
-    if (here == null) return open.sortedBy { it.startsAt }
-    return open.sortedWith(compareBy<QRun>({ it.distanceFrom(here) ?: Double.MAX_VALUE }, { it.startsAt }))
+fun listOrder(
+    runs: List<QRun>,
+    here: LatLng?,
+    now: Instant,
+    sort: QRunSort = QRunSort.Nearest,
+    price: PriceFilter = PriceFilter.All,
+): List<QRun> {
+    val open = runs.filter { it.startsAt.isAfter(now) }.filter {
+        when (price) {
+            PriceFilter.All -> true
+            PriceFilter.Free -> it.priceInr <= 0
+            PriceFilter.Paid -> it.priceInr > 0
+        }
+    }
+    if (here == null || sort == QRunSort.Soonest) return open.sortedBy { it.startsAt }
+    // QRuns without a location go last either way.
+    val located = open.filter { it.distanceFrom(here) != null }
+    val unlocated = open.filter { it.distanceFrom(here) == null }.sortedBy { it.startsAt }
+    val byDistance = located.sortedWith(compareBy<QRun>({ it.distanceFrom(here) }, { it.startsAt }))
+    return (if (sort == QRunSort.Farthest) byDistance.sortedWith(compareByDescending<QRun> { it.distanceFrom(here) }.thenBy { it.startsAt }) else byDistance) + unlocated
 }
+
+/** A18 sort chips. */
+enum class QRunSort(val label: String) { Nearest("Nearest"), Farthest("Farthest"), Soonest("Soonest") }
+
+/** A18 price chips. */
+enum class PriceFilter(val label: String) { All("All"), Free("Free"), Paid("Paid") }
+
+/** "₹499" on paid QRuns. */
+fun priceLabel(priceInr: Int): String = if (priceInr <= 0) "Free" else "₹" + java.text.NumberFormat.getIntegerInstance(Locale("en", "IN")).format(priceInr)
 
 /** A21 tabs: the QRuns I host or joined, upcoming soonest first and past latest first. */
 fun plannerSplit(runs: List<QRun>, myId: String, now: Instant): Pair<List<QRun>, List<QRun>> {

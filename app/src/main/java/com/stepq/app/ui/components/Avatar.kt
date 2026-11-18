@@ -27,16 +27,22 @@ object AvatarPalette {
         AvatarPart.Hair -> hair
         AvatarPart.Outfit -> outfit
         AvatarPart.Headband -> headband
+        AvatarPart.Style -> emptyList()
     }
+
+    val styles = listOf("Short", "Long", "Bun")
 }
 
-enum class AvatarPart(val label: String) { Skin("Skin"), Hair("Hair"), Outfit("Outfit"), Headband("Headband") }
+enum class AvatarPart(val label: String) {
+    Style("Style"), Skin("Skin"), Hair("Hair"), Outfit("Outfit"), Headband("Headband"),
+}
 
 fun AvatarConfig.get(part: AvatarPart): Int = when (part) {
     AvatarPart.Skin -> skin
     AvatarPart.Hair -> hair
     AvatarPart.Outfit -> outfit
     AvatarPart.Headband -> headband
+    AvatarPart.Style -> style
 }
 
 fun AvatarConfig.with(part: AvatarPart, index: Int): AvatarConfig = when (part) {
@@ -44,6 +50,7 @@ fun AvatarConfig.with(part: AvatarPart, index: Int): AvatarConfig = when (part) 
     AvatarPart.Hair -> copy(hair = index)
     AvatarPart.Outfit -> copy(outfit = index)
     AvatarPart.Headband -> copy(headband = index)
+    AvatarPart.Style -> copy(style = index)
 }
 
 /** The round avatar from A08: head with hair and headband over a shirt, on a mint disc. */
@@ -60,6 +67,14 @@ fun StepqAvatar(config: AvatarConfig, size: Dp, modifier: Modifier = Modifier) {
         val clip = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(0f, 0f, w, w)) }
         clipPath(clip) {
             drawCircle(outfit, radius = w * 0.36f, center = Offset(w / 2, w * 1.02f))
+        }
+        // Long hair falls behind the head and onto the shoulders; a bun sits on top.
+        when (config.style) {
+            1 -> drawRoundRect(
+                hair, topLeft = Offset(w * 0.23f, w * 0.24f), size = Size(w * 0.54f, w * 0.52f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.22f, w * 0.18f),
+            )
+            2 -> drawCircle(hair, radius = w * 0.09f, center = Offset(w / 2, w * 0.19f))
         }
         // Neck and head.
         drawRect(skin, topLeft = Offset(w * 0.44f, w * 0.52f), size = Size(w * 0.12f, w * 0.16f))

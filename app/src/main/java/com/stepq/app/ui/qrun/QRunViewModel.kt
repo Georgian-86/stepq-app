@@ -28,7 +28,14 @@ data class QRunUiState(
     val toast: String? = null,
     /** The QRun just joined or posted, for the "You're in!" banner on the planner. */
     val justJoined: String? = null,
-)
+    val sort: QRunSort = QRunSort.Nearest,
+    val price: PriceFilter = PriceFilter.All,
+    /** A place picked in the location search; distances are measured from it instead of here. */
+    val center: Place? = null,
+) {
+    /** Where distances are measured from: the searched place, else the phone. */
+    val origin: LatLng? get() = center?.let { c -> if (c.lat != null && c.lng != null) LatLng(c.lat, c.lng) else null } ?: here
+}
 
 class QRunViewModel(private val repo: QRunsRepository) : ViewModel() {
     private val _state = MutableStateFlow(QRunUiState())
@@ -43,9 +50,12 @@ class QRunViewModel(private val repo: QRunsRepository) : ViewModel() {
     }
 
     fun setLocation(here: LatLng?, area: String?) = _state.update { it.copy(here = here, areaName = area) }
+    fun setSort(sort: QRunSort) = _state.update { it.copy(sort = sort) }
+    fun setPrice(price: PriceFilter) = _state.update { it.copy(price = price) }
+    fun setCenter(place: Place?) = _state.update { it.copy(center = place) }
 
     /** A19. Calls [onPosted] with the new QRun's id once it's saved and the list reloaded. */
-    fun post(title: String, place: Place, date: LocalDate?, time: LocalTime?, zone: ZoneId, onPosted: (String) -> Unit) {
+    fun post(title: String, place: Place, date: LocalDate?, time: LocalTime?, zone: ZoneId, priceInr: Int = 0, onPosted: (String) -> Unit) {
         val problem = postProblem(title, place.name, date, time, zone, Instant.now())
         if (problem != null || date == null || time == null) {
             _state.update { it.copy(formError = problem) }
@@ -53,13 +63,21 @@ class QRunViewModel(private val repo: QRunsRepository) : ViewModel() {
         }
         _state.update { it.copy(busy = true, formError = null) }
         viewModelScope.launch {
-            repo.post(title, place, date.atTime(time).atZone(zone).toInstant())
+            repo.post(title, place, date.atTime(time).atZone(zone).toInstant(), priceInr)
                 .onSuccess { id ->
                     reload()
                     _state.update { it.copy(busy = false, justJoined = id) }
                     onPosted(id)
                 }
-                .onFailure { _state.update { it.copy(busy = false, formError = "Couldn't post your QRun. Check the time and try again.") } }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            formError = if (e.message?.contains("paid QRuns") == true) "Only StepQ can post paid QRuns. Set the price to 0."
+                            else "Couldn't post your QRun. Check the time and try again.",
+                        )
+                    }
+                }
         }
     }
 

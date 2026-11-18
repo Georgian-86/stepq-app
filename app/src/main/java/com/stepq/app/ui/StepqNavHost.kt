@@ -137,6 +137,20 @@ fun StepqNavHost(
     }
 
     val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
+    // Logging in or signing up: the green from the button grows to fill the screen, then
+    // opens onto Home (or the first onboarding step), as in the reference reel.
+    var reveal by remember { mutableStateOf(false) }
+    var lastAuth by remember { mutableStateOf(authState) }
+    LaunchedEffect(authState) {
+        val route = nav.currentDestination?.route
+        if (lastAuth == AuthState.SignedOut && authState == AuthState.SignedIn &&
+            (route == Routes.LOG_IN || route == Routes.SIGN_UP) && motion
+        ) {
+            reveal = true
+        }
+        lastAuth = authState
+    }
+    Box(Modifier.fillMaxSize()) {
     NavHost(
         nav,
         startDestination = start,
@@ -171,6 +185,7 @@ fun StepqNavHost(
             CheckEmailScreen(
                 email = entry.arguments?.getString("email").orEmpty(),
                 onLogIn = { nav.navigate(Routes.LOG_IN) { popUpTo(Routes.SPLASH) } },
+                onBack = { nav.navigate(Routes.SIGN_UP) { popUpTo(Routes.SPLASH) } },
             )
         }
         // A06–A09 back out to the previous step; from A06, back signs out of the new account.
@@ -200,5 +215,7 @@ fun StepqNavHost(
             }
         }
         composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges, profiles, qruns) }
+    }
+    if (reveal) com.stepq.app.ui.components.SuccessReveal { reveal = false }
     }
 }
