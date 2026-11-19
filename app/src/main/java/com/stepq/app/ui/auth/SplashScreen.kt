@@ -1,22 +1,19 @@
 package com.stepq.app.ui.auth
 
 import androidx.compose.foundation.Image
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.Box
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import com.stepq.app.ui.components.appear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -39,6 +36,9 @@ import com.stepq.app.ui.theme.StepqColors
 import com.stepq.app.ui.theme.StepqTheme
 import com.stepq.app.ui.theme.StepqType
 
+private const val STEP_MS = 640
+private const val CROSS_MS = 6400
+
 /** A01 Splash. */
 @Composable
 fun SplashScreen(onLogIn: () -> Unit, onSignUp: () -> Unit) {
@@ -50,55 +50,54 @@ fun SplashScreen(onLogIn: () -> Unit, onSignUp: () -> Unit) {
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Intro (reference reel 1): Piko walks in from the left, step by step, then keeps
-        // walking on the spot while the ground slides past, so it looks like Piko is out for a
-        // walk. The wordmark rises in, the taglines follow and the buttons slide up.
+        // Intro (reference reel 1): Piko walks across the screen, left to right, step by
+        // step, and keeps going: off the right edge and back in from the left. The wordmark
+        // rises in, the taglines follow and the buttons slide up.
         val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
-        val enter = remember { Animatable(if (motion) 0f else 1f) }
-        LaunchedEffect(Unit) {
-            if (motion) enter.animateTo(1f, tween(1500, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
-        }
-        val cycle = if (motion) {
-            androidx.compose.animation.core.rememberInfiniteTransition(label = "walk").animateFloat(
-                0f, 1f,
-                androidx.compose.animation.core.infiniteRepeatable(tween(620, easing = androidx.compose.animation.core.LinearEasing)),
-                label = "step",
-            ).value
-        } else {
-            0f
-        }
-        val phase = cycle * 2f * Math.PI.toFloat()
-        val density = LocalDensity.current
+        val walk = androidx.compose.animation.core.rememberInfiniteTransition(label = "walk")
+        val cycle by walk.animateFloat(
+            0f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(tween(STEP_MS, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "step",
+        )
+        // Starts just off the left edge; one crossing takes CROSS_MS.
+        val across by walk.animateFloat(
+            0f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(tween(CROSS_MS, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "across",
+        )
+        val phase = if (motion) cycle * 2f * Math.PI.toFloat() else 0f
         Spacer(Modifier.weight(1f))
-        Box(Modifier.size(width = 260.dp, height = 200.dp), contentAlignment = Alignment.BottomCenter) {
-            // The ground: dashes that slide left once Piko is walking on the spot.
-            if (motion) {
-                androidx.compose.foundation.Canvas(Modifier.size(width = 260.dp, height = 14.dp)) {
-                    val gap = 34.dp.toPx()
-                    val dash = 16.dp.toPx()
-                    val shift = (cycle * gap) * enter.value
-                    var x = -shift
-                    val fade = enter.value
-                    while (x < size.width) {
-                        val edge = (kotlin.math.min(x, size.width - x) / (size.width * 0.3f)).coerceIn(0f, 1f)
-                        drawLine(
-                            StepqColors.Deep.copy(alpha = 0.35f * fade * edge),
-                            androidx.compose.ui.geometry.Offset(x, size.height / 2),
-                            androidx.compose.ui.geometry.Offset(x + dash, size.height / 2),
-                            strokeWidth = 3.dp.toPx(),
-                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                        )
-                        x += gap
-                    }
+        androidx.compose.foundation.layout.BoxWithConstraints(
+            Modifier.fillMaxWidth().height(200.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            val track = maxWidth + 24.dp * 2 + 190.dp
+            // A faint path for Piko to walk along.
+            androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(10.dp)) {
+                val gap = 30.dp.toPx()
+                var x = 0f
+                while (x < size.width) {
+                    drawLine(
+                        StepqColors.Deep.copy(alpha = 0.25f),
+                        androidx.compose.ui.geometry.Offset(x, size.height / 2),
+                        androidx.compose.ui.geometry.Offset(x + 14.dp.toPx(), size.height / 2),
+                        strokeWidth = 3.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                    )
+                    x += gap
                 }
             }
             com.stepq.app.ui.components.WalkingPiko(
                 phase = phase,
                 stride = if (motion) 1f else 0f,
                 modifier = Modifier.size(190.dp).padding(bottom = 4.dp).graphicsLayer {
-                    translationX = -(1f - enter.value) * with(density) { 420.dp.toPx() }
-                    // Up on each step: twice per cycle.
-                    translationY = -kotlin.math.abs(kotlin.math.cos(phase)) * with(density) { 5.dp.toPx() }
+                    if (motion) {
+                        // From fully off the left edge (past the screen padding) to fully off the right.
+                        translationX = (across - 0.5f) * track.toPx()
+                        // A small lift on each step, twice per cycle.
+                        translationY = -kotlin.math.abs(kotlin.math.cos(phase)) * 3.dp.toPx()
+                    }
                 },
             )
         }

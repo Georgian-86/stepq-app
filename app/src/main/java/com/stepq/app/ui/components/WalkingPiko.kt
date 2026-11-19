@@ -22,12 +22,12 @@ fun WalkingPiko(phase: Float, stride: Float, modifier: Modifier = Modifier, cont
     val image = ImageVector.vectorResource(R.drawable.piko_walk)
     val s = sin(phase) * stride
     val rotations = mapOf(
-        "legL" to s * 26f,
-        "legR" to -s * 26f,
-        "armL" to -s * 20f,
-        "armR" to s * 16f,
-        // A slight lean into each step.
-        "body" to s * 2.5f,
+        // Legs swing from the hips, arms a little the other way; the body stays upright, so it
+        // reads as a steady walk rather than a dance.
+        "legL" to s * 20f,
+        "legR" to -s * 20f,
+        "armL" to -s * 8f,
+        "armR" to -s * 8f,
     )
     val configs = rotations.mapValues { (_, degrees) ->
         object : VectorConfig {

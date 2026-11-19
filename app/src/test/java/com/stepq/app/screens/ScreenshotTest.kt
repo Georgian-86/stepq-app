@@ -414,7 +414,7 @@ class ScreenshotTest {
 
     @Test fun animSplash() {
         val frame = recordFrames("splash") { SplashScreen({}, {}) }
-        repeat(80) { frame(50) }
+        repeat(132) { frame(50) }
     }
 
     @Test fun animLogin() {
