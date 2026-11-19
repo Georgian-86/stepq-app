@@ -23,6 +23,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,6 +63,13 @@ fun MainShell(
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
     AskForNotificationsOnce()
+    val pushRoute by com.stepq.app.push.PushRoute.pending.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(pushRoute) {
+        com.stepq.app.push.PushRoute.tabFor(pushRoute)?.let {
+            tab = it
+            com.stepq.app.push.PushRoute.pending.value = null
+        }
+    }
     Scaffold(
         containerColor = StepqColors.White,
         bottomBar = {

@@ -256,6 +256,26 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 select pg_temp.expect((select price_inr from app.qruns where title = 'Sunday 10K') = 499, 'admin''s paid QRun shows its price');
 reset role;
 
+-- Push tokens: a phone registers for its user; signing in as someone else moves it to them.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select app.register_push_token('fcm-token-phone-1-aaaaaaaaaaaa', 'android');
+select app.register_push_token('fcm-token-phone-1-aaaaaaaaaaaa', 'android');
+select pg_temp.expect((select count(*) from app.push_tokens) = 1, 'push: registers own token once');
+select pg_temp.expect_error($$select app.register_push_token('short')$$, 'push: junk token');
+select pg_temp.expect_error($$insert into app.push_tokens (token, user_id) values ('fcm-token-forged-bbbbbbbbbbbb', '00000000-0000-0000-0000-00000000000b')$$, 'push: inserting a token for someone else');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.push_tokens) = 0, 'push: cannot see others'' tokens');
+select app.register_push_token('fcm-token-phone-1-aaaaaaaaaaaa', 'android');
+select pg_temp.expect((select user_id from app.push_tokens) = auth.uid(), 'push: token moves to whoever signs in');
+delete from app.push_tokens where token = 'fcm-token-phone-1-aaaaaaaaaaaa';
+select pg_temp.expect((select count(*) from app.push_tokens) = 0, 'push: log-out removes own token');
+reset role;
+select set_config('request.jwt.claims', '', false);
+set role anon;
+select pg_temp.expect_error($$select app.register_push_token('fcm-token-anon-cccccccccccccccc')$$, 'anon registering a token');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
