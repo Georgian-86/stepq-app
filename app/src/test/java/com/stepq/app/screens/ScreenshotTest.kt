@@ -116,7 +116,11 @@ class ScreenshotTest {
             FriendRow(2, "Meera", AvatarConfig(skin = 1, outfit = 2, headband = 2), 7480, false),
             FriendRow(3, "You", AvatarConfig(), steps, true),
         ).sortedByDescending { it.steps }.mapIndexed { i, r -> r.copy(rank = i + 1) },
-        hasFriends = true, mood = mood,
+        hasFriends = true, mood = mood, score = 42, sharedToday = steps >= 8000,
+        shareTo = listOf(
+            com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 3, outfit = 3)),
+            com.stepq.app.data.PersonSummary("m", "Meera Iyer", "meera", AvatarConfig(skin = 1, outfit = 2, style = 1)),
+        ),
     )
 
     @Test fun a12Home() = snap("A12-home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
@@ -217,7 +221,7 @@ class ScreenshotTest {
 
     private fun group(id: String, name: String, take: Int, extra: Int) = com.stepq.app.data.GroupToday(
         com.stepq.app.data.GroupRow(id, name, "me", "3f9a1c07b2de"),
-        friendsData.board.take(take).map { it.copy(steps = it.steps + extra) },
+        friendsData.board.take(take).mapIndexed { i, m -> m.copy(steps = m.steps + extra, score = 64 - i * 9) },
     )
     private val groupsData = com.stepq.app.data.GroupsData(
         me = friendsData.me,
@@ -349,7 +353,7 @@ class ScreenshotTest {
     private val profileState = com.stepq.app.ui.profile.ProfileUiState(
         loading = false,
         profile = friendsData.me.copy(avatar = AvatarConfig(skin = 2)),
-        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186),
+        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186, score = 48),
     )
 
     @Test fun a26Profile() = snap("A26-profile") {
@@ -414,7 +418,7 @@ class ScreenshotTest {
 
     @Test fun animSplash() {
         val frame = recordFrames("splash") { SplashScreen({}, {}) }
-        repeat(132) { frame(50) }
+        repeat(96) { frame(40) }
     }
 
     @Test fun animLogin() {

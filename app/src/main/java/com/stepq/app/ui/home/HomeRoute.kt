@@ -32,6 +32,13 @@ fun HomeRoute(repo: HomeRepository, onSeeAllFriends: () -> Unit) {
             vm.refresh()
         }
     } else {
-        HomeScreen(state, onRefresh = vm::refresh, onConnectSteps = { connecting = true }, onSeeAllFriends = onSeeAllFriends)
+        HomeScreen(
+            state,
+            onRefresh = vm::refresh,
+            onConnectSteps = { connecting = true },
+            onSeeAllFriends = onSeeAllFriends,
+            onShare = vm::share,
+            onToastShown = vm::toastShown,
+        )
     }
 }

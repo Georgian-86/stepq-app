@@ -144,7 +144,7 @@ private fun GroupCard(g: GroupToday, onClick: () -> Unit) {
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Text(g.group.name, style = StepqType.BodyStrong, color = StepqColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(groupSummary(g.members.size, g.totalSteps), style = StepqType.Small, color = StepqColors.Muted)
-            Text("StepQ score ${g.score}", style = StepqType.SmallStrong, color = StepqColors.Deep)
+            g.score?.let { Text("StepQ score ${formatSteps(it)}", style = StepqType.SmallStrong, color = StepqColors.Deep) }
         }
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = StepqColors.Ink)
     }
@@ -321,9 +321,11 @@ fun GroupScreen(
                         Text("Together today", style = StepqType.Small, color = StepqColors.Ink)
                         Text("${formatSteps(group.totalSteps)} steps", style = StepqType.NumberL, color = StepqColors.Ink)
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("Group StepQ score", style = StepqType.Small, color = StepqColors.Ink)
-                        Text(group.score.toString(), style = StepqType.NumberL, color = StepqColors.Deep)
+                    group.score?.let { score ->
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Group StepQ score", style = StepqType.Small, color = StepqColors.Ink)
+                            Text(formatSteps(score), style = StepqType.NumberL, color = StepqColors.Deep)
+                        }
                     }
                 }
                 val (d, unit) = distanceLabel(group.totalDistanceM / 1000.0)
@@ -363,11 +365,9 @@ private fun MemberRow(rank: Int, m: FriendToday, isFriend: Boolean, reminded: Bo
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                "StepQ score ${com.stepq.app.ui.home.stepqScore(m.steps, m.person.dailyGoal)}",
-                style = StepqType.Small,
-                color = StepqColors.Deep,
-            )
+            m.score?.let {
+                Text("StepQ score ${formatSteps(it)}", style = StepqType.Small, color = StepqColors.Deep)
+            }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(formatSteps(m.steps), style = StepqType.NumberM, color = StepqColors.Ink)

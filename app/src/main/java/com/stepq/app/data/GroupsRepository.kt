@@ -31,9 +31,8 @@ data class GroupToday(
 ) {
     val totalSteps: Int get() = members.sumOf { it.steps }
     val totalDistanceM: Int get() = members.sumOf { it.distanceM }
-    /** The group's StepQ score: the average of each member's score (share of their own goal). */
-    val score: Int get() = if (members.isEmpty()) 0 else
-        members.sumOf { com.stepq.app.ui.home.stepqScore(it.steps, it.person.dailyGoal) } / members.size
+    /** The group's StepQ score: every member's score added up (null before the Nov 20 migration). */
+    val score: Int? get() = if (members.any { it.score == null }) null else members.sumOf { it.score ?: 0 }
 }
 
 data class GroupsData(
@@ -70,6 +69,7 @@ class GroupsRepository(private val client: SupabaseClient?, private val profiles
             }
         }.decodeList<DailySteps>().associateBy { it.userId }
 
+        val scores = StreakScore.scores(db, members.map { it.userId }.distinct())
         val byGroup = members.groupBy { it.groupId }
         GroupsData(
             me = me,
@@ -77,7 +77,7 @@ class GroupsRepository(private val client: SupabaseClient?, private val profiles
                 val rows = byGroup[g.id].orEmpty().mapNotNull { m ->
                     val p = people[m.userId] ?: return@mapNotNull null
                     val d = days[p.id]
-                    FriendToday(p, d?.steps ?: 0, d?.distanceM ?: 0, isMe = p.id == me.id)
+                    FriendToday(p, d?.steps ?: 0, d?.distanceM ?: 0, isMe = p.id == me.id, score = scores?.let { it[p.id] ?: 0 })
                 }.sortedWith(compareByDescending<FriendToday> { it.steps }.thenBy { it.person.displayName })
                 GroupToday(g, rows)
             }.sortedByDescending { it.totalSteps },

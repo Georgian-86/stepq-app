@@ -1,5 +1,8 @@
 package com.stepq.app.ui.home
 
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,7 +79,10 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onConnectSteps: () -> Unit,
     onSeeAllFriends: () -> Unit,
+    onShare: (Set<String>) -> Unit = {},
+    onToastShown: () -> Unit = {},
 ) {
+    var sharing by remember { mutableStateOf(false) }
     val goalReached = !state.loading && state.goal > 0 && state.steps >= state.goal
     var celebrate by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -107,6 +113,7 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
             Ring(state)
             Spacer(Modifier.height(12.dp))
+            Box(Modifier.appear(1)) { ShareCard(state, onOpen = { sharing = true }, onAddFriends = onSeeAllFriends) }
             if (!state.healthConnected) {
                 Spacer(Modifier.height(16.dp))
                 ConnectCard(onConnectSteps)
@@ -142,8 +149,31 @@ fun HomeScreen(
             state.friends.forEachIndexed { i, f -> Box(Modifier.appear(3 + i)) { FriendLine(f) } }
             Spacer(Modifier.height(16.dp))
         }
+        state.toast?.let { message ->
+            LaunchedEffect(message) {
+                kotlinx.coroutines.delay(3_000)
+                onToastShown()
+            }
+            com.stepq.app.ui.friends.Toast(
+                message,
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp),
+                icon = Icons.Outlined.Whatshot,
+            )
+        }
         if (celebrate) {
             LottieOnce(R.raw.lottie_confetti, Modifier.fillMaxWidth().height(420.dp).align(Alignment.TopCenter)) { celebrate = false }
+        }
+    }
+    if (sharing) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { sharing = false },
+            sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = StepqColors.White,
+        ) {
+            ShareSheet(state, onSend = { ids ->
+                onShare(ids)
+                sharing = false
+            })
         }
     }
 }
@@ -198,8 +228,10 @@ private fun Header(state: HomeUiState) {
                 Row(
                     Modifier
                         .clip(CircleShape)
-                        .background(StepqColors.Mango)
-                        .semantics(mergeDescendants = true) { contentDescription = "${state.streak}-day streak" }
+                        .background(if (state.sharedToday) StepqColors.Mango else StepqColors.MangoSoft)
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "${state.streak}-day streak" + if (state.sharedToday) "" else ", share today to keep it"
+                        }
                         .padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -253,6 +285,107 @@ private fun Ring(state: HomeUiState) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+/**
+ * The streak card under the ring: share today's steps with a friend to keep the streak going
+ * (Snapchat style). Once shared, it says so and offers to share again.
+ */
+@Composable
+private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -> Unit) {
+    val noFriends = state.shareTo.isEmpty()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(StepqDimens.RadiusM))
+            .background(if (state.sharedToday) StepqColors.LeafSoft else StepqColors.MangoSoft)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Whatshot, contentDescription = null, tint = StepqColors.Ink, modifier = Modifier.size(24.dp))
+        Column(Modifier.padding(horizontal = 12.dp).weight(1f)) {
+            Text(
+                when {
+                    state.sharedToday -> "${state.streak}-day streak · shared today"
+                    state.streak > 0 -> "Share today to keep your ${state.streak}-day streak"
+                    else -> "Start a streak"
+                },
+                style = StepqType.BodyStrong,
+                color = StepqColors.Ink,
+            )
+            Text(
+                when {
+                    noFriends -> "Add a friend, then share your steps with them every day."
+                    state.sharedToday -> "Come back tomorrow and share again."
+                    else -> "Share your steps with a friend every day."
+                },
+                style = StepqType.Small,
+                color = StepqColors.Muted,
+            )
+        }
+        com.stepq.app.ui.friends.SmallPill(
+            when {
+                noFriends -> "Add friends"
+                state.sharedToday -> "Share again"
+                else -> "Share"
+            },
+            filled = !state.sharedToday,
+            enabled = !state.sharing,
+            onClick = if (noFriends) onAddFriends else onOpen,
+        )
+    }
+}
+
+/** Pick friends to share today's steps with. Everyone is picked to start with. */
+@Composable
+private fun ShareSheet(state: HomeUiState, onSend: (Set<String>) -> Unit) {
+    var picked by remember(state.shareTo) { mutableStateOf(state.shareTo.map { it.id }.toSet()) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp)) {
+        Text("Share today's steps", style = StepqType.Heading, color = StepqColors.Ink)
+        Text(
+            "${formatSteps(state.steps)} steps so far. Sharing with at least one friend each day keeps your streak going.",
+            style = StepqType.Small,
+            color = StepqColors.Muted,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+            state.shareTo.forEach { p ->
+                val on = p.id in picked
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(StepqDimens.RadiusS))
+                        .clickable(role = androidx.compose.ui.semantics.Role.Checkbox) { picked = if (on) picked - p.id else picked + p.id }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StepqAvatar(p.avatar, 40.dp)
+                    Text(p.displayName, style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.padding(start = 12.dp).weight(1f))
+                    Box(
+                        Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(if (on) StepqColors.Deep else StepqColors.White)
+                            .border(1.5.dp, if (on) StepqColors.Deep else StepqColors.Line, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (on) Icon(Icons.Outlined.Check, contentDescription = null, tint = StepqColors.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        StepqButton(
+            when (picked.size) {
+                0 -> "Pick a friend"
+                1 -> "Send to 1 friend"
+                else -> "Send to ${picked.size} friends"
+            },
+            { onSend(picked) },
+            enabled = picked.isNotEmpty(),
+            loading = state.sharing,
+        )
     }
 }
 

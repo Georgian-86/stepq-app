@@ -22,7 +22,11 @@ data class HomeUiState(
     val dateLabel: String = "",
     val greeting: String = "",
     val firstName: String = "",
+    /** Days in a row I shared my steps with a friend. */
     val streak: Int = 0,
+    val sharedToday: Boolean = false,
+    /** One point per day the goal was reached. */
+    val score: Int = 0,
     val steps: Int = 0,
     val goal: Int = 8000,
     val km: Double = 0.0,
@@ -34,9 +38,11 @@ data class HomeUiState(
     val hasFriends: Boolean = false,
     val mood: PikoMood = PikoMood.Nudge,
     val healthConnected: Boolean = true,
-) {
-    val score: Int get() = stepqScore(steps, goal)
-}
+    /** Friends I can share my steps with. */
+    val shareTo: List<com.stepq.app.data.PersonSummary> = emptyList(),
+    val sharing: Boolean = false,
+    val toast: String? = null,
+)
 
 class HomeViewModel(
     private val repo: HomeRepository,
@@ -141,7 +147,9 @@ class HomeViewModel(
             dateLabel = today.format(DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.ENGLISH)),
             greeting = greeting(LocalTime.now()),
             firstName = data.me.displayName.substringBefore(' '),
-            streak = streak(data.myDays, goal, today),
+            streak = data.streak?.streak ?: 0,
+            sharedToday = data.streak?.sharedToday ?: false,
+            score = data.score ?: com.stepq.app.data.goalDays(data.myDays, goal),
             steps = steps,
             goal = goal,
             km = (todayRow?.distanceM ?: 0) / 1000.0,
@@ -158,7 +166,37 @@ class HomeViewModel(
             hasFriends = data.friendsToday.isNotEmpty(),
             mood = mood,
             healthConnected = connected,
+            shareTo = data.friendsToday.map { it.first }.sortedBy { it.displayName },
         )
+    }
+
+    /** Shares today's steps with [friendIds]; the first share of the day grows the streak. */
+    fun share(friendIds: Set<String>) {
+        val s = _state.value
+        if (friendIds.isEmpty() || s.sharing) return
+        _state.value = s.copy(sharing = true)
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            repo.shareSteps(friendIds, s.steps, today)
+                .onSuccess { (sent, streak) ->
+                    val names = s.shareTo.filter { it.id in friendIds }.map { it.displayName.substringBefore(' ') }
+                    val newStreak = streak?.streak ?: s.streak
+                    data = data?.copy(streak = streak ?: data?.streak)
+                    _state.value = _state.value.copy(
+                        sharing = false,
+                        sharedToday = sent > 0 || s.sharedToday,
+                        streak = newStreak,
+                        toast = shareToast(names, s.steps, newStreak, firstToday = !s.sharedToday && sent > 0),
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(sharing = false, toast = "Couldn't share your steps. Try again.")
+                }
+        }
+    }
+
+    fun toastShown() {
+        _state.value = _state.value.copy(toast = null)
     }
 
     private companion object {

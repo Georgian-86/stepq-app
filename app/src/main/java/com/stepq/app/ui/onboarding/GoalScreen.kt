@@ -58,7 +58,7 @@ fun GoalScreen(state: OnboardingViewModel, profiles: ProfileRepository?, onBack:
     OnboardingFrame(
         step = 5,
         title = "Pick your daily step goal",
-        subtitle = "This is your StepQ score target. Piko cheers, and rewards you, every time you hit it.",
+        subtitle = "Each day you reach it, your StepQ score goes up by 1, and Piko cheers.",
         onBack = onBack,
         bottom = {
             error?.let { Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(bottom = 8.dp)) }

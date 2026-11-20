@@ -27,6 +27,25 @@ import java.util.concurrent.TimeUnit
 @Serializable
 data class InboxReminder(val id: Long, @SerialName("from_name") val fromName: String, @SerialName("sent_at") val sentAt: String)
 
+@Serializable
+data class InboxShare(
+    val id: Long,
+    @SerialName("from_name") val fromName: String,
+    val steps: Int,
+    @SerialName("shared_at") val sharedAt: String,
+)
+
+/** "Arjun shared 9,120 steps with you", for shares that arrived since the last check. */
+fun shareMessage(shares: List<InboxShare>): Pair<String, String>? {
+    if (shares.isEmpty()) return null
+    val latest = shares.maxBy { it.sharedAt }
+    val first = latest.fromName.substringBefore(' ')
+    val others = shares.map { it.fromName }.distinct().size - 1
+    val title = if (others == 0) "$first shared ${com.stepq.app.ui.onboarding.formatSteps(latest.steps)} steps with you"
+    else "$first and ${if (others == 1) "1 friend" else "$others friends"} shared their steps with you"
+    return title to "Share yours back to keep your streak going."
+}
+
 /** The notification text for reminders that arrived since the last check, or null for none. */
 fun inboxMessage(reminders: List<InboxReminder>): Pair<String, String>? {
     if (reminders.isEmpty()) return null
@@ -47,6 +66,7 @@ object WaterInbox {
     private const val WORK = "water-inbox"
     private const val PREFS = "stepq"
     private const val SEEN = "water_inbox_seen"
+    private const val SHARES_SEEN = "share_inbox_seen"
 
     fun schedule(context: Context) {
         val request = PeriodicWorkRequestBuilder<WaterInboxWorker>(15, TimeUnit.MINUTES)
@@ -62,6 +82,7 @@ object WaterInbox {
         client.auth.awaitInitialization()
         if (client.auth.currentSessionOrNull() == null) return
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        checkShares(context, client, prefs)
         val seen = prefs.getString(SEEN, null)
         if (seen == null) {
             // First run: start from now rather than replaying old reminders.
@@ -76,7 +97,22 @@ object WaterInbox {
         notify(context, title, body)
     }
 
-    private fun notify(context: Context, title: String, body: String) {
+    /** Friends sharing their steps (the streak). Needs the Nov 20 migration; skipped without it. */
+    private suspend fun checkShares(context: Context, client: io.github.jan.supabase.SupabaseClient, prefs: android.content.SharedPreferences) {
+        val seen = prefs.getString(SHARES_SEEN, null)
+        if (seen == null) {
+            prefs.edit().putString(SHARES_SEEN, Instant.now().toString()).apply()
+            return
+        }
+        val shares = runCatching {
+            client.postgrest.rpc("step_share_inbox", buildJsonObject { put("since", seen) }).decodeList<InboxShare>()
+        }.getOrNull() ?: return
+        val (title, body) = shareMessage(shares) ?: return
+        prefs.edit().putString(SHARES_SEEN, shares.maxOf { it.sharedAt }).apply()
+        notify(context, title, body, id = SHARES_SEEN.hashCode())
+    }
+
+    private fun notify(context: Context, title: String, body: String, id: Int = WORK.hashCode()) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
         val intent = PendingIntent.getActivity(
@@ -93,7 +129,7 @@ object WaterInbox {
             .setContentIntent(intent)
             .build()
         @Suppress("MissingPermission") // checked by areNotificationsEnabled()
-        manager.notify(WORK.hashCode(), notification)
+        manager.notify(id, notification)
     }
 }
 

@@ -37,7 +37,6 @@ import com.stepq.app.ui.theme.StepqTheme
 import com.stepq.app.ui.theme.StepqType
 
 private const val STEP_MS = 640
-private const val CROSS_MS = 6400
 
 /** A01 Splash. */
 @Composable
@@ -50,9 +49,9 @@ fun SplashScreen(onLogIn: () -> Unit, onSignUp: () -> Unit) {
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Intro (reference reel 1): Piko walks across the screen, left to right, step by
-        // step, and keeps going: off the right edge and back in from the left. The wordmark
-        // rises in, the taglines follow and the buttons slide up.
+        // Piko walks on the spot in the middle of the screen, endlessly, while the path under
+        // its feet scrolls backwards, so it looks like Piko keeps walking forward. The
+        // wordmark rises in, the taglines follow and the buttons slide up.
         val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
         val walk = androidx.compose.animation.core.rememberInfiniteTransition(label = "walk")
         val cycle by walk.animateFloat(
@@ -60,26 +59,19 @@ fun SplashScreen(onLogIn: () -> Unit, onSignUp: () -> Unit) {
             androidx.compose.animation.core.infiniteRepeatable(tween(STEP_MS, easing = androidx.compose.animation.core.LinearEasing)),
             label = "step",
         )
-        // Starts just off the left edge; one crossing takes CROSS_MS.
-        val across by walk.animateFloat(
-            0f, 1f,
-            androidx.compose.animation.core.infiniteRepeatable(tween(CROSS_MS, easing = androidx.compose.animation.core.LinearEasing)),
-            label = "across",
-        )
         val phase = if (motion) cycle * 2f * Math.PI.toFloat() else 0f
         Spacer(Modifier.weight(1f))
-        androidx.compose.foundation.layout.BoxWithConstraints(
-            Modifier.fillMaxWidth().height(200.dp),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            val track = maxWidth + 24.dp * 2 + 190.dp
-            // A faint path for Piko to walk along.
+        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.BottomCenter) {
+            // The path: dashes sliding left by one dash gap per step cycle, so they loop seamlessly.
             androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(10.dp)) {
                 val gap = 30.dp.toPx()
-                var x = 0f
+                val shift = if (motion) cycle * gap else 0f
+                var x = -shift
                 while (x < size.width) {
+                    // Fade out towards the edges.
+                    val edge = (kotlin.math.min(x + 7.dp.toPx(), size.width - x) / (size.width * 0.25f)).coerceIn(0f, 1f)
                     drawLine(
-                        StepqColors.Deep.copy(alpha = 0.25f),
+                        StepqColors.Deep.copy(alpha = 0.3f * edge),
                         androidx.compose.ui.geometry.Offset(x, size.height / 2),
                         androidx.compose.ui.geometry.Offset(x + 14.dp.toPx(), size.height / 2),
                         strokeWidth = 3.dp.toPx(),
@@ -92,12 +84,8 @@ fun SplashScreen(onLogIn: () -> Unit, onSignUp: () -> Unit) {
                 phase = phase,
                 stride = if (motion) 1f else 0f,
                 modifier = Modifier.size(190.dp).padding(bottom = 4.dp).graphicsLayer {
-                    if (motion) {
-                        // From fully off the left edge (past the screen padding) to fully off the right.
-                        translationX = (across - 0.5f) * track.toPx()
-                        // A small lift on each step, twice per cycle.
-                        translationY = -kotlin.math.abs(kotlin.math.cos(phase)) * 3.dp.toPx()
-                    }
+                    // A small lift on each step, twice per cycle.
+                    if (motion) translationY = -kotlin.math.abs(kotlin.math.cos(phase)) * 3.dp.toPx()
                 },
             )
         }

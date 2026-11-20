@@ -127,6 +127,10 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat(state.stats.streak.toString(), "day streak", Modifier.weight(1f))
+                Stat(formatSteps(state.stats.score), "StepQ score", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat(formatSteps(state.stats.bestDay), "best day", Modifier.weight(1f))
                 Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
             }
@@ -182,7 +186,7 @@ fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack:
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = StepqColors.Ink) }
         Text("Daily goal", style = StepqType.Title, color = StepqColors.Ink)
         Spacer(Modifier.height(6.dp))
-        Text("Your StepQ score is how much of this you walk each day.", style = StepqType.Body, color = StepqColors.Muted)
+        Text("Each day you reach it, your StepQ score goes up by 1.", style = StepqType.Body, color = StepqColors.Muted)
         Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             RoundButton(Icons.Outlined.Remove, "Fewer steps", goal > GOAL_MIN) { goal = (goal - GOAL_STEP).coerceAtLeast(GOAL_MIN) }
@@ -212,7 +216,7 @@ fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack:
         Spacer(Modifier.height(20.dp))
         Text(
             if (goal == current) "Today's goal is ${formatSteps(current)} steps."
-            else "Starts tomorrow. Today you're still aiming for ${formatSteps(current)} steps, so today's score and streak don't change.",
+            else "Starts tomorrow. Today you're still aiming for ${formatSteps(current)} steps, so today still counts towards your StepQ score at that goal.",
             style = StepqType.Small,
             color = StepqColors.Muted,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,

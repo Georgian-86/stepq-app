@@ -276,6 +276,54 @@ set role anon;
 select pg_temp.expect_error($$select app.register_push_token('fcm-token-anon-cccccccccccccccc')$$, 'anon registering a token');
 reset role;
 
+-- Streak: share steps with a friend each day. Only friends get it; writes only via share_steps().
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect(app.share_steps(array['00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000c']::uuid[], 6240, current_date) = 1, 'share: only friends get it');
+select pg_temp.expect(app.share_steps(array['00000000-0000-0000-0000-00000000000b']::uuid[], 7000, current_date) = 1, 'share: again the same day');
+select pg_temp.expect((select count(*) from app.step_shares) = 1 and (select steps from app.step_shares) = 7000, 'share: same day updates the number');
+select pg_temp.expect((select streak from app.share_streak(current_date)) = 1 and (select shared_today from app.share_streak(current_date)), 'streak: 1 after sharing today');
+select pg_temp.expect_error($$select app.share_steps(array['00000000-0000-0000-0000-00000000000b']::uuid[], 100, current_date - 5)$$, 'share: an old day');
+select pg_temp.expect_error($$insert into app.step_shares (from_user, to_user, day, steps) values (auth.uid(), '00000000-0000-0000-0000-00000000000b', current_date - 3, 1)$$, 'share: writing the table directly');
+reset role;
+insert into app.step_shares (from_user, to_user, day, steps) values
+  ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b', current_date - 1, 5000),
+  ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b', current_date - 2, 5000),
+  ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b', current_date - 4, 5000);
+update app.step_shares set shared_at = now() - (current_date - day) * interval '1 day' where day < current_date;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select streak from app.share_streak(current_date)) = 3, 'streak: counts days in a row, stops at a gap');
+select pg_temp.expect((select streak from app.share_streak(current_date + 1)) = 3 and not (select shared_today from app.share_streak(current_date + 1)), 'streak: kept until the day ends');
+select pg_temp.expect((select streak from app.share_streak(current_date + 2)) = 0, 'streak: a missed day resets it');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select from_name from app.step_share_inbox(now() - interval '1 hour')) = 'Riya' and (select steps from app.step_share_inbox(now() - interval '1 hour')) = 7000, 'share: friend gets it in the inbox');
+select pg_temp.expect((select count(*) from app.step_share_inbox(now() - interval '1 hour')) = 1, 'share: inbox only has new ones');
+select pg_temp.expect((select streak from app.share_streak(current_date)) = 0, 'streak: receiving doesn''t count');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select count(*) from app.step_shares) = 0, 'share: others can''t read it');
+reset role;
+
+-- StepQ score: +1 per day the goal (as it was that day) was reached.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select coalesce(sum(score), 0) from app.stepq_scores(array[auth.uid()])) = 0, 'score: 0 before reaching a goal');
+insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date - 1, 9000);
+select pg_temp.expect((select score from app.stepq_scores(array[auth.uid()])) = 1, 'score: +1 for a day at goal');
+-- Tomorrow's goal is 12,000 (set above), so 10,000 tomorrow doesn't count.
+insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date + 1, 10000);
+select pg_temp.expect((select goal from app.daily_steps where user_id = auth.uid() and day = current_date + 1) = 12000, 'score: day keeps the goal it started with');
+select pg_temp.expect((select score from app.stepq_scores(array[auth.uid()])) = 1, 'score: below that day''s goal');
+update app.daily_steps set steps = 8500 where user_id = auth.uid() and day = current_date;
+select pg_temp.expect((select score from app.stepq_scores(array[auth.uid()])) = 2, 'score: today counts once reached');
+select pg_temp.expect_error($$update app.daily_steps set goal = 1000 where user_id = auth.uid() and day = current_date - 1$$, 'score: changing a day''s goal');
+update app.daily_steps set steps = 4000 where user_id = auth.uid() and day = current_date - 1;
+select pg_temp.expect((select goal from app.daily_steps where user_id = auth.uid() and day = current_date - 1) = 8000, 'score: re-saving a day keeps its goal');
+update app.daily_steps set steps = 9000 where user_id = auth.uid() and day = current_date - 1;
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select score from app.stepq_scores(array['00000000-0000-0000-0000-00000000000a']::uuid[])) = 2, 'score: friends see it');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
@@ -283,6 +331,8 @@ select pg_temp.expect_error('select * from app.profiles', 'anon reading profiles
 select pg_temp.expect_error($$select app.username_available('x')$$, 'anon checking usernames');
 select pg_temp.expect_error($$select * from app.search_people('ri')$$, 'anon searching people');
 select pg_temp.expect_error($$select * from app.match_contacts(array['x'])$$, 'anon matching contacts');
+select pg_temp.expect_error($$select app.share_steps(array[]::uuid[], 1, current_date)$$, 'anon sharing steps');
+select pg_temp.expect_error($$select * from app.stepq_scores(array[]::uuid[])$$, 'anon reading scores');
 reset role;
 
 \echo 'All RLS checks passed.'

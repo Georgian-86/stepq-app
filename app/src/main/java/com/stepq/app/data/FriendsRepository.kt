@@ -28,6 +28,8 @@ data class FriendToday(
     val steps: Int,
     val distanceM: Int,
     val isMe: Boolean,
+    /** StepQ score: days the goal was reached. Null when unknown. */
+    val score: Int? = null,
 )
 
 /** Everything A13 Friends shows. */

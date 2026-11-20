@@ -95,6 +95,14 @@ class ProfileRepository(private val client: SupabaseClient?) {
         }.decodeList<DailySteps>()
     }
 
+    /** My share streak and StepQ score; nulls until the Nov 20 migration is applied. */
+    suspend fun streakAndScore(today: java.time.LocalDate): Pair<Int?, Int?> {
+        val c = client ?: return null to null
+        val id = currentUserId() ?: return null to null
+        val db = c.postgrest
+        return StreakScore.streak(db, today)?.streak to StreakScore.scores(db, listOf(id))?.let { it[id] ?: 0 }
+    }
+
     /** A27: is the user on the StepQ Pro waitlist? */
     suspend fun onProWaitlist(): Result<Boolean> = runCatching {
         val id = currentUserId() ?: return@runCatching false
