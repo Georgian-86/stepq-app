@@ -107,7 +107,9 @@ class QRunsRepository(private val client: SupabaseClient?) {
                 select(columns)
             }.decodeSingle<QRunId>().id
         }
-        db["qrun_participants"].insert(Participant(id, me))
+        // The QRun is saved at this point. Joining the host is a second step; if it fails the
+        // QRun still counts as posted, and it shows in the planner because the host made it.
+        runCatching { db["qrun_participants"].insert(Participant(id, me)) }
         id
     }
 

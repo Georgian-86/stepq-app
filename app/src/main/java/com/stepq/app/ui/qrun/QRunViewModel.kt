@@ -63,18 +63,25 @@ class QRunViewModel(private val repo: QRunsRepository) : ViewModel() {
         }
         _state.update { it.copy(busy = true, formError = null) }
         viewModelScope.launch {
-            repo.post(title, place, date.atTime(time).atZone(zone).toInstant(), priceInr)
+            val startsAt = date.atTime(time).atZone(zone).toInstant()
+            repo.post(title, place, startsAt, priceInr)
                 .onSuccess { id ->
                     reload()
-                    _state.update { it.copy(busy = false, justJoined = id) }
+                    // Make sure the new QRun shows even if the list couldn't be refreshed.
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            justJoined = id,
+                            data = withPosted(it.data, id, title, place, startsAt, priceInr, Instant.now()),
+                        )
+                    }
                     onPosted(id)
                 }
                 .onFailure { e ->
                     _state.update {
                         it.copy(
                             busy = false,
-                            formError = if (e.message?.contains("paid QRuns") == true) "Only StepQ can post paid QRuns. Set the price to 0."
-                            else "Couldn't post your QRun. Check the time and try again.",
+                            formError = postErrorMessage(e.message),
                         )
                     }
                 }

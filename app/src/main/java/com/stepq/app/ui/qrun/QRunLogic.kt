@@ -151,6 +151,53 @@ fun postProblem(title: String, place: String, date: LocalDate?, time: LocalTime?
     else -> null
 }
 
+/**
+ * The list after posting: the server's copy of the new QRun when the reload found it, otherwise a
+ * local copy, so a QRun that was saved always shows in the planner straight away.
+ */
+fun withPosted(
+    data: com.stepq.app.data.QRunsData?,
+    id: String,
+    title: String,
+    place: com.stepq.app.data.Place,
+    startsAt: Instant,
+    priceInr: Int,
+    now: Instant,
+): com.stepq.app.data.QRunsData {
+    val base = data ?: com.stepq.app.data.QRunsData(myId = "", runs = emptyList())
+    if (base.runs.any { it.id == id }) return base
+    val run = QRun(
+        id = id,
+        title = title.trim(),
+        placeName = place.name.trim(),
+        lat = place.lat,
+        lng = place.lng,
+        startsAtRaw = startsAt.toString(),
+        createdAtRaw = now.toString(),
+        createdBy = base.myId,
+        hostName = "You",
+        going = 1,
+        joined = true,
+        priceInr = priceInr,
+    )
+    return base.copy(runs = (base.runs + run).sortedBy { it.startsAt })
+}
+
+/** What to tell the host when a post is refused, from the server's message. */
+fun postErrorMessage(message: String?): String {
+    val m = message.orEmpty()
+    return when {
+        "paid QRuns" in m -> "Only StepQ can post paid QRuns. Set the price to 0."
+        "starts_at" in m || "row-level security" in m -> "Pick a time at least 15 minutes from now, then try again."
+        "check constraint" in m -> "Check the name and place, then try again."
+        "Unable to resolve host" in m || "timeout" in m.lowercase() || "failed to connect" in m.lowercase() ->
+            "You're offline. Connect to the internet and try again."
+        "schema" in m || "PGRST" in m || "does not exist" in m ->
+            "QRuns aren't set up on the server yet. Try again later."
+        else -> "Couldn't post your QRun. Check the time and try again."
+    }
+}
+
 /** Opens the maps app with directions; works with or without Google Maps installed. */
 fun directionsUrl(run: QRun): String {
     val dest = if (run.lat != null && run.lng != null) "${run.lat},${run.lng}" else java.net.URLEncoder.encode(run.placeName, "UTF-8")
