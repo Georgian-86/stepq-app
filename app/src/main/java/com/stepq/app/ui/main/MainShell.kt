@@ -97,13 +97,10 @@ fun MainShell(
     ) { padding ->
         // Pages inside a tab pad for the status bar themselves; consuming the shell's padding stops it being added twice.
         Column(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
+            val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
             androidx.compose.animation.AnimatedContent(
                 tab,
-                transitionSpec = {
-                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
-                        androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220, delayMillis = 60), initialScale = 0.98f)) togetherWith
-                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90))
-                },
+                transitionSpec = { com.stepq.app.ui.components.tabTransition(targetState.ordinal > initialState.ordinal, motion) },
                 label = "tabs",
             ) { current ->
             when (current) {

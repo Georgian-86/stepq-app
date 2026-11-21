@@ -10,7 +10,12 @@ data class AvatarConfig(
     val hair: Int = 0,
     val outfit: Int = 0,
     val headband: Int = 0,
+    /** Hair style: 0 short, 1 long, 2 bun. Picked from gender at sign-up, changeable after. */
+    val style: Int = 0,
 )
+
+/** The hair style that matches a gender: long for female, short for everyone else. */
+fun defaultHairStyle(gender: String?): Int = if (gender == "female") 1 else 0
 
 enum class Gender(val value: String, val label: String) {
     Female("female", "Female"),
@@ -41,6 +46,10 @@ data class Profile(
     val birthdate: String? = null,
     val avatar: AvatarConfig = AvatarConfig(),
     @SerialName("daily_goal") val dailyGoal: Int = 8000,
+    /** A goal change waiting for the next day: today's goal never moves mid-day. */
+    @SerialName("next_daily_goal") val nextDailyGoal: Int? = null,
+    /** ISO date the pending goal starts, yyyy-MM-dd. */
+    @SerialName("next_goal_from") val nextGoalFrom: String? = null,
     val plan: String = "free",
     /** ISO country code for the country rankings, e.g. "IN". */
     val country: String? = null,

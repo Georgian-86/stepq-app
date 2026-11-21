@@ -49,7 +49,7 @@ fun AvatarScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: () 
         bottom = {
             StepqButton("Save avatar", onContinue)
             StepqTextLink("Skip for now", {
-                state.avatar = AvatarConfig()
+                state.avatar = AvatarConfig(style = com.stepq.app.data.defaultHairStyle(state.gender?.value))
                 onContinue()
             })
         },
@@ -61,16 +61,43 @@ fun AvatarScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: () 
 /** The A08 avatar builder: preview, part tabs and colour choices. Also used by Edit profile. */
 @Composable
 fun AvatarPicker(avatar: AvatarConfig, size: androidx.compose.ui.unit.Dp, onChange: (AvatarConfig) -> Unit) {
-    var part by rememberSaveable { mutableStateOf(AvatarPart.Skin) }
+    var part by rememberSaveable { mutableStateOf(AvatarPart.Style) }
     Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             StepqAvatar(avatar, size)
         }
         Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             AvatarPart.entries.forEach { p -> StepqChip(p.label, selected = part == p, onClick = { part = p }) }
         }
         Spacer(Modifier.height(24.dp))
+        if (part == AvatarPart.Style) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                AvatarPalette.styles.forEachIndexed { i, label ->
+                    val selected = avatar.style == i
+                    Column(
+                        Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            .then(if (selected) Modifier.border(2.dp, StepqColors.Ink, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)) else Modifier)
+                            .clickable { onChange(avatar.copy(style = i)) }
+                            .padding(8.dp)
+                            .semantics {
+                                contentDescription = "$label hair"
+                                this.selected = selected
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        StepqAvatar(avatar.copy(style = i), 56.dp)
+                        androidx.compose.material3.Text(label, style = com.stepq.app.ui.theme.StepqType.Small, color = StepqColors.Ink)
+                    }
+                }
+            }
+            return@Column
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             AvatarPalette.options(part).forEachIndexed { i, color ->
                 val selected = avatar.get(part) == i

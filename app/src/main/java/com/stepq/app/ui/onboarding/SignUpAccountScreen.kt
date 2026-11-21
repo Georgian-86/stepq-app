@@ -49,6 +49,7 @@ fun SignUpAccountScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -57,6 +58,7 @@ fun SignUpAccountScreen(
     fun submit() {
         if (!isValidEmail(email)) { error = "Enter a valid email."; return }
         if (!passwordOk) { error = "Use 8+ characters with a number."; return }
+        if (confirm != password) { error = "The passwords don't match."; return }
         busy = true
         error = null
         scope.launch {
@@ -85,10 +87,9 @@ fun SignUpAccountScreen(
             StepqTextLink("Already have an account? Log in", onLogIn)
         },
     ) {
-        val soon = { error = "Apple sign-in is coming soon. Use Google or your email for now." }
         GoogleSignInButton(auth, onError = { error = it })
         Spacer(Modifier.height(12.dp))
-        StepqButton("Continue with Apple", soon, style = StepqButtonStyle.Dark)
+        com.stepq.app.ui.components.AppleSignInButton(auth, onError = { error = it })
         Spacer(Modifier.height(20.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             HorizontalDivider(Modifier.weight(1f), color = StepqColors.Line)
@@ -103,9 +104,17 @@ fun SignUpAccountScreen(
         Spacer(Modifier.height(20.dp))
         UnderlineField(
             "Create a password", password, { password = it }, password = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
         )
         FieldHint("8+ characters with a number", ok = passwordOk || password.isEmpty())
+        Spacer(Modifier.height(20.dp))
+        UnderlineField(
+            "Confirm password", confirm, { confirm = it }, password = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+        )
+        if (confirm.isNotEmpty()) {
+            if (confirm == password) FieldHint("Passwords match", ok = true) else FieldHint("The passwords don't match.", ok = false)
+        }
         error?.let { Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 12.dp)) }
     }
 }

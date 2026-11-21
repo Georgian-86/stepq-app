@@ -87,3 +87,19 @@ fun estimatedActiveMinutes(steps: Int): Int =
     if (steps <= 0) 0 else ((steps + STEPS_PER_ACTIVE_MINUTE - 1) / STEPS_PER_ACTIVE_MINUTE).coerceAtMost(1440)
 
 private const val STEPS_PER_ACTIVE_MINUTE = 100
+
+/** "Shared 6,240 steps with Arjun. 4-day streak!" */
+fun shareToast(names: List<String>, steps: Int, streak: Int, firstToday: Boolean): String {
+    val who = when (names.size) {
+        0 -> "your friends"
+        1 -> names[0]
+        2 -> "${names[0]} and ${names[1]}"
+        else -> "${names[0]} and ${names.size - 1} friends"
+    }
+    val tail = when {
+        !firstToday -> ""
+        streak <= 1 -> " Streak started!"
+        else -> " $streak-day streak!"
+    }
+    return "Shared ${com.stepq.app.ui.onboarding.formatSteps(steps)} steps with $who.$tail"
+}

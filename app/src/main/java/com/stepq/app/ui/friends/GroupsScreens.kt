@@ -144,6 +144,7 @@ private fun GroupCard(g: GroupToday, onClick: () -> Unit) {
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Text(g.group.name, style = StepqType.BodyStrong, color = StepqColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(groupSummary(g.members.size, g.totalSteps), style = StepqType.Small, color = StepqColors.Muted)
+            g.score?.let { Text("StepQ score ${formatSteps(it)}", style = StepqType.SmallStrong, color = StepqColors.Deep) }
         }
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = StepqColors.Ink)
     }
@@ -315,8 +316,18 @@ fun GroupScreen(
                     .background(StepqColors.LeafSoft)
                     .padding(16.dp),
             ) {
-                Text("Together today", style = StepqType.Small, color = StepqColors.Ink)
-                Text("${formatSteps(group.totalSteps)} steps", style = StepqType.NumberL, color = StepqColors.Ink)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Together today", style = StepqType.Small, color = StepqColors.Ink)
+                        Text("${formatSteps(group.totalSteps)} steps", style = StepqType.NumberL, color = StepqColors.Ink)
+                    }
+                    group.score?.let { score ->
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Group StepQ score", style = StepqType.Small, color = StepqColors.Ink)
+                            Text(formatSteps(score), style = StepqType.NumberL, color = StepqColors.Deep)
+                        }
+                    }
+                }
                 val (d, unit) = distanceLabel(group.totalDistanceM / 1000.0)
                 Text("That is about $d $unit as a group", style = StepqType.Small, color = StepqColors.Muted)
             }
@@ -346,15 +357,22 @@ private fun MemberRow(rank: Int, m: FriendToday, isFriend: Boolean, reminded: Bo
     ) {
         Text(rank.toString(), style = StepqType.BodyStrong, color = StepqColors.Muted, modifier = Modifier.width(22.dp))
         StepqAvatar(m.person.avatar, 40.dp)
-        Text(
-            if (m.isMe) "You" else m.person.displayName,
-            style = StepqType.BodyStrong,
-            color = StepqColors.Ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 12.dp).weight(1f),
-        )
-        Text(formatSteps(m.steps), style = StepqType.NumberM, color = StepqColors.Ink)
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(
+                if (m.isMe) "You" else m.person.displayName,
+                style = StepqType.BodyStrong,
+                color = StepqColors.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            m.score?.let {
+                Text("StepQ score ${formatSteps(it)}", style = StepqType.Small, color = StepqColors.Deep)
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(formatSteps(m.steps), style = StepqType.NumberM, color = StepqColors.Ink)
+            Text("steps", style = StepqType.Small, color = StepqColors.Muted)
+        }
         if (!m.isMe && isFriend) {
             Spacer(Modifier.width(12.dp))
             Box(

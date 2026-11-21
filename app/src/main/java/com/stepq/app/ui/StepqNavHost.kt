@@ -58,6 +58,9 @@ object Routes {
 /** Where a session lands: signed out, signed in without a profile yet, or ready. */
 private enum class Landing { Loading, SignedOut, Onboarding, Main }
 
+/** The shortest time the launch screen shows, so Piko and the wordmark are seen on every open. */
+const val LAUNCH_MIN_MS = 1800L
+
 @Composable
 fun StepqNavHost(
     auth: AuthRepository,
@@ -100,10 +103,15 @@ fun StepqNavHost(
         if (target != null && target != current) nav.navigate(target) { popUpTo(0) { inclusive = true } }
     }
 
-    if (landing == Landing.Loading) {
-        Box(Modifier.fillMaxSize().background(StepqColors.Leaf), contentAlignment = Alignment.Center) {
-            if (authState == AuthState.SignedIn) CircularProgressIndicator(color = StepqColors.White)
-        }
+    // Every launch opens on the green screen with Piko walking, while the session and profile
+    // load. It stays up at least long enough for the wordmark to rise in, so it never flashes.
+    var launchDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(LAUNCH_MIN_MS)
+        launchDone = true
+    }
+    if (landing == Landing.Loading || !launchDone) {
+        SplashScreen(onLogIn = {}, onSignUp = {}, showButtons = false)
         return
     }
 
@@ -136,16 +144,33 @@ fun StepqNavHost(
         return
     }
 
+    val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
+    // Logging in or signing up: the green from the button grows to fill the screen, then
+    // opens onto Home (or the first onboarding step), as in the reference reel.
+    var reveal by remember { mutableStateOf(false) }
+    var lastAuth by remember { mutableStateOf(authState) }
+    LaunchedEffect(authState) {
+        val route = nav.currentDestination?.route
+        if (lastAuth == AuthState.SignedOut && authState == AuthState.SignedIn &&
+            (route == Routes.LOG_IN || route == Routes.SIGN_UP) && motion
+        ) {
+            reveal = true
+        }
+        lastAuth = authState
+    }
+    Box(Modifier.fillMaxSize()) {
     NavHost(
         nav,
         startDestination = start,
-        enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(300)) { it / 6 } },
-        exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) + androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { -it / 10 } },
-        popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(300)) { -it / 6 } },
-        popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) + androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { it / 10 } },
+        enterTransition = { com.stepq.app.ui.components.forwardTransition(motion).targetContentEnter },
+        exitTransition = { com.stepq.app.ui.components.forwardTransition(motion).initialContentExit },
+        popEnterTransition = { com.stepq.app.ui.components.backTransition(motion).targetContentEnter },
+        popExitTransition = { com.stepq.app.ui.components.backTransition(motion).initialContentExit },
     ) {
         composable(Routes.SPLASH) {
-            SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) })
+            // After the launch screen the text is already in place; only the buttons slide up.
+            // Signing out later lands here too, also without replaying the intro.
+            SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) }, intro = false)
         }
         composable(Routes.LOG_IN) {
             LoginScreen(
@@ -170,6 +195,7 @@ fun StepqNavHost(
             CheckEmailScreen(
                 email = entry.arguments?.getString("email").orEmpty(),
                 onLogIn = { nav.navigate(Routes.LOG_IN) { popUpTo(Routes.SPLASH) } },
+                onBack = { nav.navigate(Routes.SIGN_UP) { popUpTo(Routes.SPLASH) } },
             )
         }
         // A06–A09 back out to the previous step; from A06, back signs out of the new account.
@@ -199,5 +225,7 @@ fun StepqNavHost(
             }
         }
         composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges, profiles, qruns) }
+    }
+    if (reveal) com.stepq.app.ui.components.SuccessReveal { reveal = false }
     }
 }

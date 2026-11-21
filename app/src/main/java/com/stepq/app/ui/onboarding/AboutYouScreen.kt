@@ -67,7 +67,10 @@ fun AboutYouScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: (
         Spacer(Modifier.height(12.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Gender.entries.forEach { g ->
-                StepqChip(g.label, selected = state.gender == g, onClick = { state.gender = g })
+                StepqChip(g.label, selected = state.gender == g, onClick = {
+                    state.gender = g
+                    state.avatar = state.avatar.copy(style = com.stepq.app.data.defaultHairStyle(g.value))
+                })
             }
         }
         Spacer(Modifier.height(24.dp))

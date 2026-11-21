@@ -52,3 +52,19 @@ fun GoogleSignInButton(auth: AuthRepository?, onError: (String?) -> Unit, modifi
         }
     }, style = StepqButtonStyle.Outline, loading = busy, modifier = modifier)
 }
+
+/** "Continue with Apple": opens Apple's sign-in page; the app picks the session up when it returns. */
+@Composable
+fun AppleSignInButton(auth: AuthRepository?, onError: (String?) -> Unit, modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    StepqButton("Continue with Apple", {
+        busy = true
+        onError(null)
+        scope.launch {
+            val result = (auth ?: return@launch run { busy = false; onError("Sign-in isn't set up in this build.") }).logInWithApple()
+            busy = false
+            result.onFailure { onError(authErrorMessage(it, "Couldn't open Apple sign-in. Try Google or your email.")) }
+        }
+    }, style = StepqButtonStyle.Dark, loading = busy, modifier = modifier)
+}

@@ -22,6 +22,19 @@ sealed interface SearchResult {
 
 enum class Relation { Me, Friend, Requested, AsksYou, None }
 
+/** What the Add friends page shows: live results while typing, suggestions otherwise. */
+data class AddFriendState(
+    val query: String = "",
+    val searching: Boolean = false,
+    /** Null until the first search for [query] returns. */
+    val results: List<com.stepq.app.data.Suggestion>? = null,
+    val failed: Boolean = false,
+    val mayKnow: List<com.stepq.app.data.Suggestion> = emptyList(),
+    /** Null until contacts have been read (permission granted and matched). */
+    val contacts: List<com.stepq.app.data.Suggestion>? = null,
+    val contactsLoading: Boolean = false,
+)
+
 data class FriendsUiState(
     val loading: Boolean = true,
     val error: String? = null,
@@ -30,6 +43,7 @@ data class FriendsUiState(
     val toast: String? = null,
     val sending: Set<String> = emptySet(),
     val search: SearchResult = SearchResult.Idle,
+    val add: AddFriendState = AddFriendState(),
 )
 
 class FriendsViewModel(private val repo: FriendsRepository) : ViewModel() {
@@ -100,6 +114,45 @@ class FriendsViewModel(private val repo: FriendsRepository) : ViewModel() {
     }
 
     fun clearSearch() = _state.update { it.copy(search = SearchResult.Idle) }
+
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    /** Search as you type, 250 ms after the last key. */
+    fun type(query: String) {
+        _state.update { it.copy(add = it.add.copy(query = query, failed = false, results = if (query.trim().removePrefix("@").length < 2) null else it.add.results)) }
+        searchJob?.cancel()
+        val q = query.trim().removePrefix("@")
+        if (q.length < 2) {
+            _state.update { it.copy(add = it.add.copy(searching = false, results = null)) }
+            return
+        }
+        searchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(250)
+            _state.update { it.copy(add = it.add.copy(searching = true)) }
+            repo.searchPeople(q)
+                .onSuccess { list -> _state.update { it.copy(add = it.add.copy(searching = false, results = list)) } }
+                .onFailure { _state.update { it.copy(add = it.add.copy(searching = false, failed = true)) } }
+        }
+    }
+
+    /** Loads "People you may know" when Add friends opens. */
+    fun openAdd() {
+        _state.update { it.copy(add = AddFriendState(contacts = it.add.contacts)) }
+        viewModelScope.launch {
+            repo.peopleYouMayKnow().onSuccess { list -> _state.update { it.copy(add = it.add.copy(mayKnow = list)) } }
+        }
+    }
+
+    /** Matches the phone's contacts (hashed emails) against StepQ accounts. */
+    fun loadContacts(hashes: suspend () -> List<String>) {
+        _state.update { it.copy(add = it.add.copy(contactsLoading = true)) }
+        viewModelScope.launch {
+            val list = runCatching { hashes() }.getOrDefault(emptyList())
+            repo.matchContacts(list)
+                .onSuccess { found -> _state.update { it.copy(add = it.add.copy(contactsLoading = false, contacts = found)) } }
+                .onFailure { _state.update { it.copy(add = it.add.copy(contactsLoading = false, contacts = emptyList())) } }
+        }
+    }
 
     fun sendRequest(person: PersonSummary) {
         val data = _state.value.data ?: return

@@ -127,13 +127,17 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat(state.stats.streak.toString(), "day streak", Modifier.weight(1f))
+                Stat(formatSteps(state.stats.score), "StepQ score", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat(formatSteps(state.stats.bestDay), "best day", Modifier.weight(1f))
                 Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
             Item(Icons.Outlined.Edit, "Edit profile", "Name, username, avatar") { onAction(ProfileAction.EditProfile) }
             Item(Icons.Outlined.ManageAccounts, "Account", "Email, password, delete account") { onAction(ProfileAction.Account) }
-            Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps") { onAction(ProfileAction.Goal) }
+            Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps" + (p.nextDailyGoal?.let { " · ${formatSteps(it)} from tomorrow" } ?: "")) { onAction(ProfileAction.Goal) }
             Item(Icons.Outlined.Link, "Connected apps", stepSource) { onAction(ProfileAction.ConnectedApps) }
             Item(Icons.Outlined.NotificationsNone, "Notifications") { onAction(ProfileAction.Notifications) }
             Item(Icons.Outlined.Shield, "Privacy and data") { onAction(ProfileAction.Privacy) }
@@ -174,15 +178,15 @@ private fun Item(icon: ImageVector, label: String, value: String? = null, color:
 
 /** Change the daily goal from Profile. */
 @Composable
-fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack: () -> Unit) {
+fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack: () -> Unit, pending: Int? = null) {
     BackHandler(onBack = onBack)
-    var goal by rememberSaveable { mutableIntStateOf(current) }
+    var goal by rememberSaveable { mutableIntStateOf(pending ?: current) }
     Column(Modifier.fillMaxSize().background(StepqColors.White).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(4.dp))
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = StepqColors.Ink) }
         Text("Daily goal", style = StepqType.Title, color = StepqColors.Ink)
         Spacer(Modifier.height(6.dp))
-        Text("Your StepQ score is how much of this you walk each day.", style = StepqType.Body, color = StepqColors.Muted)
+        Text("Each day you reach it, your StepQ score goes up by 1.", style = StepqType.Body, color = StepqColors.Muted)
         Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             RoundButton(Icons.Outlined.Remove, "Fewer steps", goal > GOAL_MIN) { goal = (goal - GOAL_STEP).coerceAtLeast(GOAL_MIN) }
@@ -209,8 +213,23 @@ fun EditGoalScreen(current: Int, saving: Boolean, onSave: (Int) -> Unit, onBack:
                 }
             }
         }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            if (goal == current) "Today's goal is ${formatSteps(current)} steps."
+            else "Starts tomorrow. Today you're still aiming for ${formatSteps(current)} steps, so today still counts towards your StepQ score at that goal.",
+            style = StepqType.Small,
+            color = StepqColors.Muted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.weight(1f))
-        StepqButton("Save", { onSave(goal) }, Modifier.padding(vertical = 16.dp), enabled = goal != current, loading = saving)
+        StepqButton(
+            if (goal == current && pending != null) "Keep today's goal" else "Save",
+            { onSave(goal) },
+            Modifier.padding(vertical = 16.dp),
+            enabled = goal != (pending ?: current),
+            loading = saving,
+        )
     }
 }
 
@@ -265,23 +284,5 @@ const val GOAL_STEP = 500
 
 @Composable
 private fun ProfileSkeleton() {
-    Column(Modifier.padding(top = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            com.stepq.app.ui.components.SkeletonBlock(Modifier.size(84.dp), CircleShape)
-            Column(Modifier.padding(start = 16.dp)) {
-                com.stepq.app.ui.components.SkeletonBlock(Modifier.width(150.dp).height(20.dp))
-                Spacer(Modifier.height(8.dp))
-                com.stepq.app.ui.components.SkeletonBlock(Modifier.width(100.dp).height(14.dp))
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            repeat(3) { com.stepq.app.ui.components.SkeletonBlock(Modifier.weight(1f).height(64.dp), RoundedCornerShape(StepqDimens.RadiusM)) }
-        }
-        Spacer(Modifier.height(16.dp))
-        repeat(6) {
-            com.stepq.app.ui.components.SkeletonBlock(Modifier.fillMaxWidth().height(18.dp))
-            Spacer(Modifier.height(22.dp))
-        }
-    }
+    com.stepq.app.ui.components.PikoLoader(Modifier.padding(top = 60.dp), pikoSize = 120.dp)
 }

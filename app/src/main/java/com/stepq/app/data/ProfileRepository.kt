@@ -6,6 +6,13 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** The pending goal to switch to on [today], if one is due. */
+fun pendingGoalDue(p: Profile, today: java.time.LocalDate): Int? {
+    val next = p.nextDailyGoal ?: return null
+    val from = p.nextGoalFrom?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() } ?: return null
+    return next.takeIf { !from.isAfter(today) }
+}
+
 /** The signed-in user's row in app.profiles. RLS limits writes to their own row. */
 class ProfileRepository(private val client: SupabaseClient?) {
 
@@ -22,7 +29,21 @@ class ProfileRepository(private val client: SupabaseClient?) {
     suspend fun mine(): Result<Profile?> = runCatching {
         val c = requireClient()
         val id = currentUserId() ?: return@runCatching null
-        c.postgrest["profiles"].select { filter { eq("id", id) } }.decodeSingleOrNull<Profile>()
+        val p = c.postgrest["profiles"].select { filter { eq("id", id) } }.decodeSingleOrNull<Profile>()
+            ?: return@runCatching null
+        // A goal set yesterday (or earlier) takes over from today.
+        val due = pendingGoalDue(p, java.time.LocalDate.now())
+        if (due != null) {
+            runCatching {
+                c.postgrest["profiles"].update({
+                    set("daily_goal", due)
+                    set("next_daily_goal", null as Int?)
+                    set("next_goal_from", null as String?)
+                }) { filter { eq("id", id) } }
+            }.fold(onSuccess = { p.copy(dailyGoal = due, nextDailyGoal = null, nextGoalFrom = null) }, onFailure = { p })
+        } else {
+            p
+        }
     }
 
     suspend fun usernameAvailable(username: String): Result<Boolean> = runCatching {
@@ -47,9 +68,22 @@ class ProfileRepository(private val client: SupabaseClient?) {
         }) { filter { eq("id", id) } }
     }
 
-    suspend fun updateGoal(goal: Int): Result<Unit> = runCatching {
+    /**
+     * A26: change the daily goal from tomorrow, so today's score and streak are judged on the
+     * goal the day started with. Picking today's goal again cancels a pending change.
+     */
+    suspend fun updateGoal(goal: Int, current: Int): Result<Unit> = runCatching {
         val id = currentUserId() ?: throw NotConfiguredException()
-        requireClient().postgrest["profiles"].update({ set("daily_goal", goal) }) { filter { eq("id", id) } }
+        val tomorrow = java.time.LocalDate.now().plusDays(1).toString()
+        requireClient().postgrest["profiles"].update({
+            if (goal == current) {
+                set("next_daily_goal", null as Int?)
+                set("next_goal_from", null as String?)
+            } else {
+                set("next_daily_goal", goal)
+                set("next_goal_from", tomorrow)
+            }
+        }) { filter { eq("id", id) } }
     }
 
     /** All my saved days, newest first, for the streak, best day and total distance. */
@@ -59,6 +93,14 @@ class ProfileRepository(private val client: SupabaseClient?) {
             filter { eq("user_id", id) }
             order("day", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
         }.decodeList<DailySteps>()
+    }
+
+    /** My share streak and StepQ score; nulls until the Nov 20 migration is applied. */
+    suspend fun streakAndScore(today: java.time.LocalDate): Pair<Int?, Int?> {
+        val c = client ?: return null to null
+        val id = currentUserId() ?: return null to null
+        val db = c.postgrest
+        return StreakScore.streak(db, today)?.streak to StreakScore.scores(db, listOf(id))?.let { it[id] ?: 0 }
     }
 
     /** A27: is the user on the StepQ Pro waitlist? */

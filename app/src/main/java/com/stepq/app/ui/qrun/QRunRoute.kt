@@ -50,6 +50,11 @@ class QRunSection internal constructor(
     /** null for the list, "post" for A19, "planner" for A21. */
     val page: String? get() = pageState.value
 
+    fun close() {
+        if (pageState.value == PLANNER) vm.bannerShown()
+        pageState.value = null
+    }
+
     @Composable
     fun List() {
         QRunList(
@@ -63,21 +68,26 @@ class QRunSection internal constructor(
                 vm.clearFormError()
                 pageState.value = POST
             },
+            onSort = vm::setSort,
+            onPrice = vm::setPrice,
+            onCenter = vm::setCenter,
+            searchPlaces = { q -> places.search(q, state.value.here) },
         )
     }
 
     @Composable
-    fun Page() {
+    fun Page(which: String? = page) {
         val context = LocalContext.current
         val s = state.value
-        when (page) {
+        when (which) {
             POST -> PostQRunScreen(
                 places = places,
                 here = s.here,
                 busy = s.busy,
                 error = s.formError,
-                onPost = { title, place, date, time ->
-                    vm.post(title, place, date, time, java.time.ZoneId.systemDefault()) {
+                canSetPrice = s.data?.isAdmin == true,
+                onPost = { title, place, date, time, price ->
+                    vm.post(title, place, date, time, java.time.ZoneId.systemDefault(), price) {
                         askNotifications()
                         pageState.value = PLANNER
                     }
@@ -136,6 +146,7 @@ class QRunSection internal constructor(
     }
 
     companion object {
+        /** Leaves the open page (Post or Planner), as its back arrow does. */
         const val POST = "post"
         const val PLANNER = "planner"
     }

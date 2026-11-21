@@ -233,7 +233,7 @@ private fun WaterButton(name: String, reminded: Boolean, sending: Boolean, onCli
         contentAlignment = Alignment.Center,
     ) {
         when {
-            sending -> CircularProgressIndicator(Modifier.size(16.dp), color = StepqColors.Deep, strokeWidth = 2.dp)
+            sending -> com.stepq.app.ui.components.PikoSpinner(28.dp)
             reminded -> Icon(Icons.Outlined.Check, contentDescription = "Reminder sent", tint = StepqColors.Deep, modifier = Modifier.size(20.dp))
             else -> Icon(Icons.Outlined.WaterDrop, contentDescription = "Send a water reminder", tint = StepqColors.Deep, modifier = Modifier.size(20.dp))
         }

@@ -12,6 +12,9 @@ data class HomeData(
     val myDays: List<DailySteps>,
     /** Friends with their steps today (0 when they have no row yet). */
     val friendsToday: List<Pair<PersonSummary, Int>>,
+    /** Null until the Nov 20 migration is applied. */
+    val streak: ShareStreak? = null,
+    val score: Int? = null,
 )
 
 class HomeRepository(private val client: SupabaseClient?, private val profiles: ProfileRepository) {
@@ -44,7 +47,18 @@ class HomeRepository(private val client: SupabaseClient?, private val profiles: 
             }.decodeList<DailySteps>().associate { it.userId to it.steps }
             people.map { it to (steps[it.id] ?: 0) }
         }
-        HomeData(me, myDays, friendsToday)
+        HomeData(
+            me, myDays, friendsToday,
+            streak = StreakScore.streak(db, today),
+            score = StreakScore.scores(db, listOf(me.id))?.let { it[me.id] ?: 0 },
+        )
+    }
+
+    /** Shares today's step count with friends; this is what keeps the streak going. */
+    suspend fun shareSteps(friendIds: Collection<String>, steps: Int, day: LocalDate): Result<Pair<Int, ShareStreak?>> = runCatching {
+        val db = (client ?: throw NotConfiguredException()).postgrest
+        val sent = StreakScore.share(db, friendIds, steps, day)
+        sent to StreakScore.streak(db, day)
     }
 
     /** Saves days read from Health Connect. One upsert; RLS only lets the user write their own. */

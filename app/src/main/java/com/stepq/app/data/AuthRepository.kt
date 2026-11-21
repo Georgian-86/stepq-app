@@ -56,6 +56,15 @@ class AuthRepository(private val client: SupabaseClient?) {
         }
     }
 
+    /**
+     * Sign in with Apple through Supabase's web flow: opens Apple's page in the browser, which
+     * returns to stepq://auth-callback. Needs the Apple provider turned on in Supabase.
+     */
+    suspend fun logInWithApple(): Result<Unit> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.auth.signInWith(io.github.jan.supabase.auth.providers.Apple, redirectUrl = Supabase.AUTH_REDIRECT_URL)
+    }
+
     /** A03: the reset link opens the app, which then asks for a new password (see [PasswordRecovery]). */
     suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()

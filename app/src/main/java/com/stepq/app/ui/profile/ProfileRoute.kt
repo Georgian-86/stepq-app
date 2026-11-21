@@ -68,8 +68,13 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     fun open(uri: String) = runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri))) }
 
     Box(Modifier.fillMaxSize()) {
-        when (page) {
-            "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
+        com.stepq.app.ui.components.PageHost(
+            target = page,
+            depth = { when (it) { null -> 0; "password", "email" -> 2; else -> 1 } },
+            onBack = { go(if (page == "password" || page == "email") "account" else null) },
+        ) { shown ->
+        when (shown) {
+            "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, pending = state.profile?.nextDailyGoal, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
             "connect" -> ConnectStepsScreen(onBack = { page = null }, fromSettings = true) { page = null }
             "edit" -> state.profile?.let { p ->
                 EditProfileScreen(
@@ -80,7 +85,7 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                     onSave = { name, username, avatar, gender -> vm.saveProfile(name, username, avatar, gender) { go(null) } },
                     onBack = { go(null) },
                 )
-            } ?: run { page = null }
+            }
             "account" -> AccountScreen(
                 email = auth?.email(),
                 pendingEmail = auth?.pendingEmail(),
@@ -123,6 +128,7 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                     ProfileAction.Pro -> pro = true
                 }
             }
+        }
         }
         state.toast?.let { message ->
             LaunchedEffect(message) {

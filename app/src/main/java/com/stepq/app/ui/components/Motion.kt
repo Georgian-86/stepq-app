@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -114,16 +115,13 @@ fun SkeletonRow(modifier: Modifier = Modifier) {
     }
 }
 
-/** Loading state for list screens (Friends, Groups, Challenges, QRuns): a card and rows. */
+/**
+ * Loading state for list screens (Friends, Groups, Challenges, QRuns, search): walking Piko, the
+ * app's loader. Bigger lists get a bigger Piko.
+ */
 @Composable
 fun SkeletonList(rows: Int = 6, withCard: Boolean = true, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().semantics { contentDescription = "Loading" }) {
-        if (withCard) {
-            SkeletonBlock(Modifier.fillMaxWidth().height(96.dp), RoundedCornerShape(StepqDimens.RadiusM))
-            Spacer(Modifier.height(16.dp))
-        }
-        repeat(rows) { SkeletonRow() }
-    }
+    PikoLoader(modifier.padding(vertical = 12.dp), pikoSize = if (rows >= 4 || withCard) 110.dp else 80.dp)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -154,11 +152,11 @@ fun animatedProgress(target: Float, durationMs: Int = 1000, delayMs: Int = 0): F
 }
 
 /** Fades and slides a piece of content in when it first appears; [index] staggers lists. */
-fun Modifier.appear(index: Int = 0, offset: Dp = 16.dp): Modifier = composed {
+fun Modifier.appear(index: Int = 0, offset: Dp = 16.dp, delayMs: Int = 0): Modifier = composed {
     val motion = LocalMotionEnabled.current
     val progress = remember { Animatable(if (motion) 0f else 1f) }
     LaunchedEffect(Unit) {
-        if (motion) progress.animateTo(1f, tween(380, delayMillis = (index.coerceAtMost(10)) * 45, easing = FastOutSlowInEasing))
+        if (motion) progress.animateTo(1f, tween(380, delayMillis = delayMs + (index.coerceAtMost(10)) * 45, easing = FastOutSlowInEasing))
     }
     val px = with(androidx.compose.ui.platform.LocalDensity.current) { offset.toPx() }
     graphicsLayer {
@@ -205,6 +203,22 @@ fun Modifier.popIn(delayMs: Int = 0): Modifier = composed {
     graphicsLayer { scaleX = s.value; scaleY = s.value; alpha = ((s.value - 0.4f) / 0.6f).coerceIn(0f, 1f) }
 }
 
+/**
+ * Zooms in past full size and settles back, each time the composable appears. Used for Piko
+ * whenever Home opens.
+ */
+fun Modifier.zoomPulse(peak: Float = 1.22f): Modifier = composed {
+    val motion = LocalMotionEnabled.current
+    val s = remember { Animatable(if (motion) 0.55f else 1f) }
+    LaunchedEffect(Unit) {
+        if (motion) {
+            s.animateTo(peak, tween(300, easing = FastOutSlowInEasing))
+            s.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
+    graphicsLayer { scaleX = s.value; scaleY = s.value; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f) }
+}
+
 // ---------------------------------------------------------------------------------------
 // Lottie
 // ---------------------------------------------------------------------------------------
@@ -229,3 +243,38 @@ fun SuccessCheck(size: Dp = 96.dp, modifier: Modifier = Modifier) {
     LottieAnimation(composition, { progress }, modifier.size(size))
 }
 
+
+/**
+ * Full-screen green circle that grows from the bottom (where the Log in / Sign up button is)
+ * until it covers everything, holds a beat with Piko, then fades to show the next screen.
+ */
+@Composable
+fun SuccessReveal(onDone: () -> Unit) {
+    val grow = remember { Animatable(0f) }
+    val fade = remember { Animatable(1f) }
+    LaunchedEffect(Unit) {
+        grow.animateTo(1f, tween(520, easing = Emphasized))
+        kotlinx.coroutines.delay(260)
+        fade.animateTo(0f, tween(380, easing = LinearEasing))
+        onDone()
+    }
+    androidx.compose.foundation.Canvas(
+        Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .graphicsLayer { alpha = fade.value },
+    ) {
+        val origin = androidx.compose.ui.geometry.Offset(size.width / 2, size.height * 0.9f)
+        val far = kotlin.math.hypot(size.width / 2, size.height * 0.9f) * 1.05f
+        drawCircle(StepqColors.Leaf, radius = 26.dp.toPx() + (far - 26.dp.toPx()) * grow.value, center = origin)
+    }
+    if (grow.value > 0.85f) {
+        Box(Modifier.fillMaxWidth().fillMaxHeight().graphicsLayer { alpha = fade.value }, contentAlignment = androidx.compose.ui.Alignment.Center) {
+            androidx.compose.foundation.Image(
+                androidx.compose.ui.res.painterResource(com.stepq.app.R.drawable.piko_cheer),
+                contentDescription = null,
+                modifier = Modifier.size(150.dp).popIn(),
+            )
+        }
+    }
+}

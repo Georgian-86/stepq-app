@@ -87,11 +87,36 @@ fun goingLabel(n: Int) = "$n going"
  * A18 list: QRuns that haven't started, nearest first when we know where you are (those without
  * a location go last), soonest first otherwise.
  */
-fun listOrder(runs: List<QRun>, here: LatLng?, now: Instant): List<QRun> {
-    val open = runs.filter { it.startsAt.isAfter(now) }
-    if (here == null) return open.sortedBy { it.startsAt }
-    return open.sortedWith(compareBy<QRun>({ it.distanceFrom(here) ?: Double.MAX_VALUE }, { it.startsAt }))
+fun listOrder(
+    runs: List<QRun>,
+    here: LatLng?,
+    now: Instant,
+    sort: QRunSort = QRunSort.Nearest,
+    price: PriceFilter = PriceFilter.All,
+): List<QRun> {
+    val open = runs.filter { it.startsAt.isAfter(now) }.filter {
+        when (price) {
+            PriceFilter.All -> true
+            PriceFilter.Free -> it.priceInr <= 0
+            PriceFilter.Paid -> it.priceInr > 0
+        }
+    }
+    if (here == null || sort == QRunSort.Soonest) return open.sortedBy { it.startsAt }
+    // QRuns without a location go last either way.
+    val located = open.filter { it.distanceFrom(here) != null }
+    val unlocated = open.filter { it.distanceFrom(here) == null }.sortedBy { it.startsAt }
+    val byDistance = located.sortedWith(compareBy<QRun>({ it.distanceFrom(here) }, { it.startsAt }))
+    return (if (sort == QRunSort.Farthest) byDistance.sortedWith(compareByDescending<QRun> { it.distanceFrom(here) }.thenBy { it.startsAt }) else byDistance) + unlocated
 }
+
+/** A18 sort chips. */
+enum class QRunSort(val label: String) { Nearest("Nearest"), Farthest("Farthest"), Soonest("Soonest") }
+
+/** A18 price chips. */
+enum class PriceFilter(val label: String) { All("All"), Free("Free"), Paid("Paid") }
+
+/** "₹499" on paid QRuns. */
+fun priceLabel(priceInr: Int): String = if (priceInr <= 0) "Free" else "₹" + java.text.NumberFormat.getIntegerInstance(Locale("en", "IN")).format(priceInr)
 
 /** A21 tabs: the QRuns I host or joined, upcoming soonest first and past latest first. */
 fun plannerSplit(runs: List<QRun>, myId: String, now: Instant): Pair<List<QRun>, List<QRun>> {
@@ -124,6 +149,53 @@ fun postProblem(title: String, place: String, date: LocalDate?, time: LocalTime?
     time == null -> "Pick a time."
     !date.atTime(time).atZone(zone).toInstant().isAfter(now.plusSeconds(15 * 60)) -> "Pick a time at least 15 minutes from now."
     else -> null
+}
+
+/**
+ * The list after posting: the server's copy of the new QRun when the reload found it, otherwise a
+ * local copy, so a QRun that was saved always shows in the planner straight away.
+ */
+fun withPosted(
+    data: com.stepq.app.data.QRunsData?,
+    id: String,
+    title: String,
+    place: com.stepq.app.data.Place,
+    startsAt: Instant,
+    priceInr: Int,
+    now: Instant,
+): com.stepq.app.data.QRunsData {
+    val base = data ?: com.stepq.app.data.QRunsData(myId = "", runs = emptyList())
+    if (base.runs.any { it.id == id }) return base
+    val run = QRun(
+        id = id,
+        title = title.trim(),
+        placeName = place.name.trim(),
+        lat = place.lat,
+        lng = place.lng,
+        startsAtRaw = startsAt.toString(),
+        createdAtRaw = now.toString(),
+        createdBy = base.myId,
+        hostName = "You",
+        going = 1,
+        joined = true,
+        priceInr = priceInr,
+    )
+    return base.copy(runs = (base.runs + run).sortedBy { it.startsAt })
+}
+
+/** What to tell the host when a post is refused, from the server's message. */
+fun postErrorMessage(message: String?): String {
+    val m = message.orEmpty()
+    return when {
+        "paid QRuns" in m -> "Only StepQ can post paid QRuns. Set the price to 0."
+        "starts_at" in m || "row-level security" in m -> "Pick a time at least 15 minutes from now, then try again."
+        "check constraint" in m -> "Check the name and place, then try again."
+        "Unable to resolve host" in m || "timeout" in m.lowercase() || "failed to connect" in m.lowercase() ->
+            "You're offline. Connect to the internet and try again."
+        "schema" in m || "PGRST" in m || "does not exist" in m ->
+            "QRuns aren't set up on the server yet. Try again later."
+        else -> "Couldn't post your QRun. Check the time and try again."
+    }
 }
 
 /** Opens the maps app with directions; works with or without Google Maps installed. */

@@ -1,5 +1,6 @@
 package com.stepq.app.ui.components
 
+import androidx.compose.runtime.getValue
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -47,19 +48,26 @@ fun StepqButton(
     leading: (@Composable () -> Unit)? = null,
 ) {
     val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
+    // While busy the pill squeezes into a circle with the spinner inside, then opens back up.
+    val width by androidx.compose.animation.core.animateDpAsState(
+        if (loading && LocalMotionEnabled.current) 52.dp else maxWidth,
+        androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f),
+        label = "buttonWidth",
+    )
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
         interactionSource = interaction,
-        modifier = modifier.fillMaxWidth().height(52.dp).pressScale(interaction),
+        modifier = Modifier.width(width).height(52.dp).pressScale(interaction),
         shape = CircleShape,
         border = style.border?.let { BorderStroke(1.5.dp, it) },
-        contentPadding = PaddingValues(horizontal = 24.dp),
+        contentPadding = PaddingValues(horizontal = if (width < 120.dp) 0.dp else 24.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = style.container,
             contentColor = style.content,
-            disabledContainerColor = style.container.copy(alpha = 0.5f),
-            disabledContentColor = style.content.copy(alpha = 0.8f),
+            disabledContainerColor = if (loading) style.container else style.container.copy(alpha = 0.5f),
+            disabledContentColor = if (loading) style.content else style.content.copy(alpha = 0.8f),
         ),
     ) {
         androidx.compose.animation.AnimatedContent(
@@ -71,17 +79,19 @@ fun StepqButton(
             label = "buttonLoading",
         ) { busy ->
         if (busy) {
-            CircularProgressIndicator(Modifier.size(20.dp), color = style.content, strokeWidth = 2.dp)
+            // Walking Piko is the app's loader, here too.
+            PikoSpinner(44.dp)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                 if (leading != null) {
                     leading()
                     Spacer(Modifier.width(10.dp))
                 }
-                Text(text, style = StepqType.Button)
+                Text(text, style = StepqType.Button, maxLines = 1, softWrap = false)
             }
         }
         }
+    }
     }
 }
 

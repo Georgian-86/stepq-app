@@ -2,6 +2,11 @@ package com.stepq.app.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.ui.test.performClick
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -111,7 +116,11 @@ class ScreenshotTest {
             FriendRow(2, "Meera", AvatarConfig(skin = 1, outfit = 2, headband = 2), 7480, false),
             FriendRow(3, "You", AvatarConfig(), steps, true),
         ).sortedByDescending { it.steps }.mapIndexed { i, r -> r.copy(rank = i + 1) },
-        hasFriends = true, mood = mood,
+        hasFriends = true, mood = mood, score = 42, sharedToday = steps >= 8000,
+        shareTo = listOf(
+            com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 3, outfit = 3)),
+            com.stepq.app.data.PersonSummary("m", "Meera Iyer", "meera", AvatarConfig(skin = 1, outfit = 2, style = 1)),
+        ),
     )
 
     @Test fun a12Home() = snap("A12-home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
@@ -177,20 +186,42 @@ class ScreenshotTest {
         )
     }
 
+    private fun suggestion(id: String, name: String, user: String, skin: Int, style: Int, mutual: Long = 0) =
+        com.stepq.app.data.Suggestion(id, name, user, AvatarConfig(skin = skin, hair = 1, outfit = 1, style = style), mutual)
+
     @Test fun a13AddFriend() = snap("A13-add-friend") {
         com.stepq.app.ui.friends.AddFriendScreen(
             myUsername = "riya.walks",
-            result = com.stepq.app.ui.friends.SearchResult.Found(
-                com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 4, hair = 1, outfit = 1)),
-                com.stepq.app.ui.friends.Relation.None,
+            state = com.stepq.app.ui.friends.AddFriendState(
+                query = "ar",
+                results = listOf(
+                    suggestion("a", "Arjun Mehta", "arjun.m", 4, 0, mutual = 3),
+                    suggestion("b", "Aarav Shah", "aarav.walks", 2, 0),
+                    suggestion("c", "Sara Arora", "sara.runs", 1, 1, mutual = 1),
+                ),
             ),
-            onSearch = {}, onTyping = {}, onRequest = {}, onAccept = {}, onBack = {},
+            relationOf = { if (it == "b") com.stepq.app.ui.friends.Relation.Requested else com.stepq.app.ui.friends.Relation.None },
+            onType = {}, onFindContacts = {}, onRequest = {}, onAccept = {}, onInvite = {}, onBack = {},
+        )
+    }
+
+    @Test fun a13AddFriendSuggestions() = snap("A13-add-friend-suggestions") {
+        com.stepq.app.ui.friends.AddFriendScreen(
+            myUsername = "riya.walks",
+            state = com.stepq.app.ui.friends.AddFriendState(
+                mayKnow = listOf(
+                    suggestion("d", "Kabir Singh", "kabir.s", 3, 0, mutual = 4),
+                    suggestion("e", "Ananya Rao", "ananya", 0, 2, mutual = 2),
+                ),
+            ),
+            relationOf = { com.stepq.app.ui.friends.Relation.None },
+            onType = {}, onFindContacts = {}, onRequest = {}, onAccept = {}, onInvite = {}, onBack = {},
         )
     }
 
     private fun group(id: String, name: String, take: Int, extra: Int) = com.stepq.app.data.GroupToday(
         com.stepq.app.data.GroupRow(id, name, "me", "3f9a1c07b2de"),
-        friendsData.board.take(take).map { it.copy(steps = it.steps + extra) },
+        friendsData.board.take(take).mapIndexed { i, m -> m.copy(steps = m.steps + extra, score = 64 - i * 9) },
     )
     private val groupsData = com.stepq.app.data.GroupsData(
         me = friendsData.me,
@@ -245,6 +276,16 @@ class ScreenshotTest {
         )
     }
 
+    @Test fun a23YourRank() = snap("A23-challenges-your-rank") {
+        val board = com.stepq.app.data.ChallengesRepository.withRanks(
+            friendsData.board.map { com.stepq.app.data.Ranked(it.person, if (it.isMe) 21000 else it.steps * 12, it.isMe) },
+        )
+        com.stepq.app.ui.challenges.ChallengesScreen(
+            com.stepq.app.ui.challenges.ChallengesUiState(loading = false, data = challengesData.copy(monthly = board)),
+            monthly = true, onPeriod = {}, onRefresh = {}, onOpen = {}, today = LocalDate.of(2026, 11, 12),
+        )
+    }
+
     @Test fun a24Detail() = snap("A24-challenge-detail") {
         com.stepq.app.ui.challenges.ChallengeDetailScreen(shoes, joining = false, onJoin = {}, onLeave = {}, onBack = {})
     }
@@ -263,7 +304,7 @@ class ScreenshotTest {
     private val sunsetWalk = com.stepq.app.data.QRun(
         id = "q2", title = "Sunset walk by the sea", placeName = "Juhu Beach, near Gate 5", lat = 19.0988, lng = 72.8267,
         startsAtRaw = "2026-10-22T12:30:00Z", createdAtRaw = "2026-10-16T05:00:00Z", createdBy = "sana", hostName = "Sana Khan",
-        hostAvatar = AvatarConfig(skin = 1, hair = 2, headband = 1), going = 3,
+        hostAvatar = AvatarConfig(skin = 1, hair = 2, headband = 1, style = 1), going = 3, priceInr = 499,
     )
     private val qrunState = com.stepq.app.ui.qrun.QRunUiState(
         loading = false,
@@ -282,7 +323,7 @@ class ScreenshotTest {
     @Test fun a19PostQRun() = snap("A19-post-qrun") {
         com.stepq.app.ui.qrun.PostQRunScreen(
             places = com.stepq.app.ui.qrun.NoPlaceSearch, here = null, busy = false, error = null,
-            onPost = { _, _, _, _ -> }, onTyping = {}, onPickCustomTime = {}, onClose = {},
+            onPost = { _, _, _, _, _ -> }, onTyping = {}, onPickCustomTime = {}, onClose = {},
             today = LocalDate.of(2026, 10, 17),
             initialPlace = "Carter Road",
             initialSuggestions = listOf(
@@ -312,11 +353,38 @@ class ScreenshotTest {
     private val profileState = com.stepq.app.ui.profile.ProfileUiState(
         loading = false,
         profile = friendsData.me.copy(avatar = AvatarConfig(skin = 2)),
-        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186),
+        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186, score = 48),
     )
 
     @Test fun a26Profile() = snap("A26-profile") {
         com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter") {}
+    }
+
+    /** Frames of Profile -> Account -> back, with motion on, to check the page transitions. */
+    @Test fun pageTransitionFrames() {
+        var page by androidx.compose.runtime.mutableStateOf<String?>(null)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            StepqTheme {
+                com.stepq.app.ui.components.PageHost(page, { if (it == null) 0 else 1 }, onBack = { page = null }) { shown ->
+                    if (shown == null) {
+                        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter") {}
+                    } else {
+                        com.stepq.app.ui.profile.AccountScreen("riya@example.com", null, true, {}, {}, {}, {})
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(500)
+        var n = 0
+        fun frame() = compose.onRoot().captureRoboImage("build/outputs/roborazzi/frames/f${(n++).toString().padStart(2, '0')}.png")
+        frame()
+        page = "account"
+        repeat(10) { compose.mainClock.advanceTimeBy(48); frame() }
+        compose.mainClock.advanceTimeBy(400); frame()
+        page = null
+        repeat(10) { compose.mainClock.advanceTimeBy(48); frame() }
+        compose.mainClock.advanceTimeBy(400); frame()
     }
 
     @Test fun a27Pro() = snap("A27-stepq-pro") {
@@ -327,5 +395,90 @@ class ScreenshotTest {
 
     @Test fun a26Goal() = snap("A26-daily-goal") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
+    }
+
+    @Test fun a26GoalTomorrow() = snap("A26-goal-from-tomorrow") {
+        com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {}, pending = 10000)
+    }
+
+    // Frame-by-frame recordings of the new animations, turned into GIFs for review.
+    private fun recordFrames(dir: String, content: @Composable () -> Unit): (Long) -> Unit {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            StepqTheme {
+                androidx.compose.runtime.CompositionLocalProvider(com.stepq.app.ui.components.LocalMotionEnabled provides true, content)
+            }
+        }
+        var n = 0
+        return { step ->
+            compose.mainClock.advanceTimeBy(step)
+            compose.onRoot().captureRoboImage("build/outputs/roborazzi/anim/$dir/f${(n++).toString().padStart(3, '0')}.png")
+        }
+    }
+
+    @Test fun animSplash() {
+        val frame = recordFrames("splash") { SplashScreen({}, {}) }
+        repeat(96) { frame(40) }
+    }
+
+    /** Opening the app signed out: the launch screen, then Log in and Sign up slide up. */
+    @Test fun animLaunch() {
+        var ready by androidx.compose.runtime.mutableStateOf(false)
+        val frame = recordFrames("launch") {
+            if (ready) SplashScreen({}, {}, intro = false) else SplashScreen({}, {}, showButtons = false)
+        }
+        repeat(45) { frame(40) }
+        ready = true
+        repeat(30) { frame(40) }
+    }
+
+    @Test fun loaderList() {
+        compose.setContent { com.stepq.app.ui.theme.StepqTheme { com.stepq.app.ui.components.SkeletonList() } }
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/Z-loader-list.png")
+    }
+
+    @Test fun animLogin() {
+        var loading by androidx.compose.runtime.mutableStateOf(false)
+        var reveal by androidx.compose.runtime.mutableStateOf(false)
+        var home by androidx.compose.runtime.mutableStateOf(false)
+        val frame = recordFrames("login") {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                if (home) {
+                    HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {})
+                } else {
+                    androidx.compose.foundation.layout.Column(
+                        Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White).padding(24.dp),
+                    ) {
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(80.dp))
+                        androidx.compose.material3.Text("Welcome back", style = com.stepq.app.ui.theme.StepqType.Title, color = com.stepq.app.ui.theme.StepqColors.Ink)
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(28.dp))
+                        com.stepq.app.ui.components.UnderlineField(label = "Email", value = "riya@example.com", onValueChange = {})
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp))
+                        com.stepq.app.ui.components.UnderlineField(label = "Password", value = "walks2026", onValueChange = {}, password = true)
+                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                        com.stepq.app.ui.components.StepqButton("Log in", {}, loading = loading)
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(40.dp))
+                    }
+                }
+                if (reveal) com.stepq.app.ui.components.SuccessReveal { reveal = false }
+            }
+        }
+        repeat(6) { frame(80) }
+        loading = true
+        repeat(12) { frame(50) }
+        repeat(6) { frame(100) }
+        reveal = true
+        repeat(10) { frame(50) }
+        home = true
+        repeat(26) { frame(50) }
+        repeat(6) { frame(150) }
+    }
+
+    @Test fun animHomeWeekTap() {
+        val frame = recordFrames("home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
+        repeat(24) { frame(50) }
+        compose.onNode(androidx.compose.ui.test.hasContentDescription("Tuesday", substring = true)).performClick()
+        repeat(8) { frame(50) }
+        repeat(8) { frame(120) }
     }
 }

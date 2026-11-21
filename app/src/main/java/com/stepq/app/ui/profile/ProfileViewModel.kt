@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.stepq.app.data.DailySteps
 import com.stepq.app.data.Profile
 import com.stepq.app.data.ProfileRepository
-import com.stepq.app.ui.home.streak
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-data class ProfileStats(val streak: Int, val bestDay: Int, val kmSoFar: Int)
+data class ProfileStats(val streak: Int, val bestDay: Int, val kmSoFar: Int, val score: Int = 0)
 
 data class ProfileUiState(
     val loading: Boolean = true,
@@ -29,10 +28,12 @@ data class ProfileUiState(
     val emailSentTo: String? = null,
 )
 
-fun profileStats(days: List<DailySteps>, goal: Int, today: LocalDate): ProfileStats = ProfileStats(
-    streak = streak(days, goal, today),
+/** [streak] and [score] come from Postgres; before the Nov 20 migration they fall back to goal days. */
+fun profileStats(days: List<DailySteps>, goal: Int, today: LocalDate, streak: Int? = null, score: Int? = null): ProfileStats = ProfileStats(
+    streak = streak ?: 0,
     bestDay = days.maxOfOrNull { it.steps } ?: 0,
     kmSoFar = days.sumOf { it.distanceM } / 1000,
+    score = score ?: com.stepq.app.data.goalDays(days, goal),
 )
 
 class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
@@ -44,6 +45,7 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
             val profile = repo.mine()
             val days = repo.myDays().getOrDefault(emptyList())
             val waitlist = repo.onProWaitlist().getOrDefault(false)
+            val (streak, score) = repo.streakAndScore(LocalDate.now())
             profile
                 .onSuccess { p ->
                     _state.update {
@@ -51,7 +53,7 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
                             loading = false,
                             error = null,
                             profile = p,
-                            stats = profileStats(days, p?.dailyGoal ?: 8000, LocalDate.now()),
+                            stats = profileStats(days, p?.dailyGoal ?: 8000, LocalDate.now(), streak, score),
                             onWaitlist = waitlist,
                         )
                     }
@@ -63,9 +65,21 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
     fun saveGoal(goal: Int, onSaved: () -> Unit) {
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
-            repo.updateGoal(goal)
+            val current = _state.value.profile?.dailyGoal ?: goal
+            repo.updateGoal(goal, current)
                 .onSuccess {
-                    _state.update { s -> s.copy(saving = false, profile = s.profile?.copy(dailyGoal = goal), toast = "Daily goal set to ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps.") }
+                    val tomorrow = java.time.LocalDate.now().plusDays(1).toString()
+                    _state.update { s ->
+                        s.copy(
+                            saving = false,
+                            profile = s.profile?.copy(
+                                nextDailyGoal = goal.takeIf { it != current },
+                                nextGoalFrom = tomorrow.takeIf { goal != current },
+                            ),
+                            toast = if (goal == current) "Your goal stays at ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps."
+                            else "From tomorrow your goal is ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps.",
+                        )
+                    }
                     onSaved()
                 }
                 .onFailure { _state.update { it.copy(saving = false, toast = "Couldn't save your goal. Try again.") } }

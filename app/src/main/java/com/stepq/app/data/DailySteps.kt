@@ -28,4 +28,6 @@ data class PersonSummary(
     @SerialName("display_name") val displayName: String,
     val username: String,
     val avatar: AvatarConfig = AvatarConfig(),
+    /** For their StepQ score in groups. Absent from RPCs that only return public fields. */
+    @SerialName("daily_goal") val dailyGoal: Int = 8000,
 )

@@ -60,10 +60,32 @@ fun FriendsRoute(
     }
 
     Box(Modifier.fillMaxSize().background(StepqColors.White)) {
-        val openGroup = groups.data?.groups?.firstOrNull { it.group.id == groupPage }
-        if (qruns != null && qruns.page != null) {
-            qruns.Page()
-        } else if (groupPage == "create") {
+        // One key per full-screen page, so each page can still draw while it slides away.
+        val key = when {
+            qruns != null && qruns.page != null -> "qrun:${qruns.page}"
+            groupPage != null -> "group:$groupPage"
+            adding -> "add"
+            else -> "root"
+        }
+        com.stepq.app.ui.components.PageHost(
+            target = key,
+            depth = { if (it == "root") 0 else 1 },
+            onBack = {
+                when {
+                    key.startsWith("qrun:") -> qruns?.close()
+                    key.startsWith("group:") -> groupPage = null
+                    key == "add" -> {
+                        adding = false
+                        vm.clearSearch()
+                    }
+                }
+            },
+        ) { shown ->
+        val shownGroup = shown.removePrefix("group:")
+        val openGroup = groups.data?.groups?.firstOrNull { it.group.id == shownGroup }
+        if (shown.startsWith("qrun:")) {
+            qruns?.Page(shown.removePrefix("qrun:"))
+        } else if (shown == "group:create") {
             CreateGroupScreen(
                 friends = groups.data?.friends.orEmpty(),
                 busy = groups.busy,
@@ -73,7 +95,7 @@ fun FriendsRoute(
                 onInvite = { shareText(context, appInviteText(state.data?.me?.username)) },
                 onBack = { groupPage = null },
             )
-        } else if (groupPage == "join") {
+        } else if (shown == "group:join") {
             JoinGroupScreen(
                 busy = groups.busy,
                 error = groups.formError,
@@ -81,7 +103,8 @@ fun FriendsRoute(
                 onTyping = groupsVm::clearFormError,
                 onBack = { groupPage = null },
             )
-        } else if (openGroup != null) {
+        } else if (shown.startsWith("group:")) {
+            if (openGroup != null) {
             GroupScreen(
                 group = openGroup,
                 myId = groups.data?.me?.id.orEmpty(),
@@ -92,23 +115,45 @@ fun FriendsRoute(
                 onLeave = { groupsVm.leave(openGroup.group.id) { groupPage = null } },
                 onBack = { groupPage = null },
             )
-        } else if (adding) {
+            }
+        } else if (shown == "add") {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val loadContacts = { vm.loadContacts { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.stepq.app.data.Contacts.emailHashes(context) } } }
+            val contactsPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            ) { granted -> if (granted) loadContacts() }
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                vm.openAdd()
+                // Already allowed earlier: show contacts straight away.
+                if (state.add.contacts == null && androidx.core.content.ContextCompat.checkSelfPermission(
+                        context, android.Manifest.permission.READ_CONTACTS,
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) loadContacts()
+            }
             AddFriendScreen(
                 myUsername = state.data?.me?.username.orEmpty(),
-                result = state.search,
-                onSearch = vm::search,
-                onTyping = vm::clearSearch,
+                state = state.add,
+                relationOf = { id -> state.data?.let { relationTo(id, it) } ?: Relation.None },
+                onType = vm::type,
+                onFindContacts = { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) },
                 onRequest = vm::sendRequest,
                 onAccept = vm::accept,
+                onInvite = { shareText(context, appInviteText(state.data?.me?.username)) },
                 onBack = {
                     adding = false
-                    vm.clearSearch()
+                    vm.type("")
                 },
             )
         } else {
             Column(Modifier.fillMaxSize()) {
                 FriendsHeader(section, { section = it }, onAddFriend = { adding = true })
-                when (section) {
+                val motion = com.stepq.app.ui.components.LocalMotionEnabled.current
+                androidx.compose.animation.AnimatedContent(
+                    section,
+                    transitionSpec = { com.stepq.app.ui.components.lateralTransition(targetState.ordinal > initialState.ordinal, motion) },
+                    label = "friendsSection",
+                ) { sec ->
+                when (sec) {
                     FriendsSection.Friends -> FriendsList(
                         state,
                         onRefresh = vm::refresh,
@@ -128,7 +173,9 @@ fun FriendsRoute(
                     FriendsSection.QRun -> qruns?.List()
                         ?: SectionComingSoon("QRun", "Plan a walk or run with people near you. Coming soon.")
                 }
+                }
             }
+        }
         }
         (state.toast ?: groups.toast)?.let { message ->
             LaunchedEffect(message) {

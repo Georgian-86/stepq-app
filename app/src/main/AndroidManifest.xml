@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Add friends: find contacts already on StepQ. Asked only when the person taps "Find contacts". -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- QRuns near you (A18): a rough, city-block location only, asked for on the QRun tab. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Health Connect: read-only step, distance and active-calorie data (A10 Connect steps). -->
@@ -20,6 +22,7 @@
 
     <application
         android:name=".StepqApplication"
+        android:enableOnBackInvokedCallback="true"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
