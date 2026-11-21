@@ -178,38 +178,11 @@ fun HomeScreen(
     }
 }
 
-/** What Home looks like while today's steps load. */
+/** While today's steps load: walking Piko in the middle of the page. */
 @Composable
 private fun HomeSkeleton() {
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp).semantics { contentDescription = "Loading" }) {
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                SkeletonBlock(Modifier.width(110.dp).height(12.dp))
-                Spacer(Modifier.height(8.dp))
-                SkeletonBlock(Modifier.width(200.dp).height(22.dp))
-            }
-            SkeletonBlock(Modifier.width(56.dp).height(32.dp), CircleShape)
-            Spacer(Modifier.width(6.dp))
-            SkeletonBlock(Modifier.width(64.dp).height(32.dp), CircleShape)
-        }
-        Spacer(Modifier.height(26.dp))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            SkeletonBlock(Modifier.size(190.dp), CircleShape)
-            Box(Modifier.size(154.dp).clip(CircleShape).background(StepqColors.White))
-        }
-        Spacer(Modifier.height(30.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            repeat(3) { SkeletonBlock(Modifier.weight(1f).height(84.dp), RoundedCornerShape(StepqDimens.RadiusM)) }
-        }
-        Spacer(Modifier.height(24.dp))
-        SkeletonBlock(Modifier.width(100.dp).height(16.dp))
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-            listOf(0.5f, 0.8f, 0.4f, 0.9f, 0.7f, 0.6f, 0.3f).forEach { SkeletonBlock(Modifier.weight(1f).fillMaxHeight(it), RoundedCornerShape(6.dp)) }
-        }
-        Spacer(Modifier.height(24.dp))
-        repeat(3) { SkeletonRow() }
+    Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.Center) {
+        com.stepq.app.ui.components.PikoLoader(label = "Counting your steps…", pikoSize = 130.dp)
     }
 }
 

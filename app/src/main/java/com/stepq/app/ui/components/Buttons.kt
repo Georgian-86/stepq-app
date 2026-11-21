@@ -79,7 +79,8 @@ fun StepqButton(
             label = "buttonLoading",
         ) { busy ->
         if (busy) {
-            CircularProgressIndicator(Modifier.size(20.dp), color = style.content, strokeWidth = 2.dp)
+            // Walking Piko is the app's loader, here too.
+            PikoSpinner(44.dp)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                 if (leading != null) {

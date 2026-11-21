@@ -421,6 +421,22 @@ class ScreenshotTest {
         repeat(96) { frame(40) }
     }
 
+    /** Opening the app signed out: the launch screen, then Log in and Sign up slide up. */
+    @Test fun animLaunch() {
+        var ready by androidx.compose.runtime.mutableStateOf(false)
+        val frame = recordFrames("launch") {
+            if (ready) SplashScreen({}, {}, intro = false) else SplashScreen({}, {}, showButtons = false)
+        }
+        repeat(45) { frame(40) }
+        ready = true
+        repeat(30) { frame(40) }
+    }
+
+    @Test fun loaderList() {
+        compose.setContent { com.stepq.app.ui.theme.StepqTheme { com.stepq.app.ui.components.SkeletonList() } }
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/Z-loader-list.png")
+    }
+
     @Test fun animLogin() {
         var loading by androidx.compose.runtime.mutableStateOf(false)
         var reveal by androidx.compose.runtime.mutableStateOf(false)

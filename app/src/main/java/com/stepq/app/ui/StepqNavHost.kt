@@ -58,6 +58,9 @@ object Routes {
 /** Where a session lands: signed out, signed in without a profile yet, or ready. */
 private enum class Landing { Loading, SignedOut, Onboarding, Main }
 
+/** The shortest time the launch screen shows, so Piko and the wordmark are seen on every open. */
+const val LAUNCH_MIN_MS = 1800L
+
 @Composable
 fun StepqNavHost(
     auth: AuthRepository,
@@ -100,10 +103,15 @@ fun StepqNavHost(
         if (target != null && target != current) nav.navigate(target) { popUpTo(0) { inclusive = true } }
     }
 
-    if (landing == Landing.Loading) {
-        Box(Modifier.fillMaxSize().background(StepqColors.Leaf), contentAlignment = Alignment.Center) {
-            if (authState == AuthState.SignedIn) CircularProgressIndicator(color = StepqColors.White)
-        }
+    // Every launch opens on the green screen with Piko walking, while the session and profile
+    // load. It stays up at least long enough for the wordmark to rise in, so it never flashes.
+    var launchDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(LAUNCH_MIN_MS)
+        launchDone = true
+    }
+    if (landing == Landing.Loading || !launchDone) {
+        SplashScreen(onLogIn = {}, onSignUp = {}, showButtons = false)
         return
     }
 
@@ -160,7 +168,9 @@ fun StepqNavHost(
         popExitTransition = { com.stepq.app.ui.components.backTransition(motion).initialContentExit },
     ) {
         composable(Routes.SPLASH) {
-            SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) })
+            // After the launch screen the text is already in place; only the buttons slide up.
+            // Signing out later lands here too, also without replaying the intro.
+            SplashScreen(onLogIn = { nav.navigate(Routes.LOG_IN) }, onSignUp = { nav.navigate(Routes.SIGN_UP) }, intro = false)
         }
         composable(Routes.LOG_IN) {
             LoginScreen(

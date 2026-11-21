@@ -115,16 +115,13 @@ fun SkeletonRow(modifier: Modifier = Modifier) {
     }
 }
 
-/** Loading state for list screens (Friends, Groups, Challenges, QRuns): a card and rows. */
+/**
+ * Loading state for list screens (Friends, Groups, Challenges, QRuns, search): walking Piko, the
+ * app's loader. Bigger lists get a bigger Piko.
+ */
 @Composable
 fun SkeletonList(rows: Int = 6, withCard: Boolean = true, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().semantics { contentDescription = "Loading" }) {
-        if (withCard) {
-            SkeletonBlock(Modifier.fillMaxWidth().height(96.dp), RoundedCornerShape(StepqDimens.RadiusM))
-            Spacer(Modifier.height(16.dp))
-        }
-        repeat(rows) { SkeletonRow() }
-    }
+    PikoLoader(modifier.padding(vertical = 12.dp), pikoSize = if (rows >= 4 || withCard) 110.dp else 80.dp)
 }
 
 // ---------------------------------------------------------------------------------------
