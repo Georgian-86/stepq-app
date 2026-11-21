@@ -36,6 +36,22 @@ data class InboxShare(
 )
 
 /** "Arjun shared 9,120 steps with you", for shares that arrived since the last check. */
+/** One row of app.friend_requests(), for the notification. */
+@kotlinx.serialization.Serializable
+data class InboxRequest(
+    val id: String,
+    @kotlinx.serialization.SerialName("display_name") val displayName: String,
+    @kotlinx.serialization.SerialName("created_at") val createdAt: String,
+)
+
+/** "Meera wants to be your friend", or a count when several arrive at once. */
+fun requestMessage(requests: List<InboxRequest>): Pair<String, String>? {
+    if (requests.isEmpty()) return null
+    val first = requests.maxBy { it.createdAt }.displayName.substringBefore(' ')
+    val title = if (requests.size == 1) "$first wants to be your friend" else "$first and ${requests.size - 1} more want to be your friends"
+    return title to "Open Friends to accept."
+}
+
 fun shareMessage(shares: List<InboxShare>): Pair<String, String>? {
     if (shares.isEmpty()) return null
     val latest = shares.maxBy { it.sharedAt }
@@ -67,6 +83,7 @@ object WaterInbox {
     private const val PREFS = "stepq"
     private const val SEEN = "water_inbox_seen"
     private const val SHARES_SEEN = "share_inbox_seen"
+    private const val REQUESTS_SEEN = "friend_requests_seen"
 
     fun schedule(context: Context) {
         val request = PeriodicWorkRequestBuilder<WaterInboxWorker>(15, TimeUnit.MINUTES)
@@ -83,6 +100,7 @@ object WaterInbox {
         if (client.auth.currentSessionOrNull() == null) return
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         checkShares(context, client, prefs)
+        checkFriendRequests(context, client, prefs)
         val seen = prefs.getString(SEEN, null)
         if (seen == null) {
             // First run: start from now rather than replaying old reminders.
@@ -110,6 +128,22 @@ object WaterInbox {
         val (title, body) = shareMessage(shares) ?: return
         prefs.edit().putString(SHARES_SEEN, shares.maxOf { it.sharedAt }).apply()
         notify(context, title, body, id = SHARES_SEEN.hashCode())
+    }
+
+    /** New friend requests waiting for me. Needs migration 20261112000000; skipped without it. */
+    private suspend fun checkFriendRequests(context: Context, client: io.github.jan.supabase.SupabaseClient, prefs: android.content.SharedPreferences) {
+        val seen = prefs.getString(REQUESTS_SEEN, null)
+        val requests = runCatching { client.postgrest.rpc("friend_requests").decodeList<InboxRequest>() }.getOrNull() ?: return
+        if (seen == null) {
+            // First run: only tell them about requests that arrive from now on.
+            prefs.edit().putString(REQUESTS_SEEN, Instant.now().toString()).apply()
+            return
+        }
+        val since = runCatching { Instant.parse(seen) }.getOrDefault(Instant.EPOCH)
+        val fresh = requests.filter { com.stepq.app.data.ChallengesRepository.parseInstant(it.createdAt).isAfter(since) }
+        val (title, body) = requestMessage(fresh) ?: return
+        prefs.edit().putString(REQUESTS_SEEN, fresh.maxOf { com.stepq.app.data.ChallengesRepository.parseInstant(it.createdAt) }.toString()).apply()
+        notify(context, title, body, id = REQUESTS_SEEN.hashCode())
     }
 
     private fun notify(context: Context, title: String, body: String, id: Int = WORK.hashCode()) {
