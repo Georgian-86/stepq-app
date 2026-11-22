@@ -50,10 +50,10 @@ import com.stepq.app.ui.theme.StepqColors
 import com.stepq.app.ui.theme.StepqDimens
 import com.stepq.app.ui.theme.StepqType
 
-/** The three sections under the Friends tab (A13, A15, A18). */
-enum class FriendsSection(val label: String) { Friends("Friends"), Groups("Groups"), QRun("QRun") }
+/** The three sections under the Friends tab (A13, Community, A18). Community took Groups' place. */
+enum class FriendsSection(val label: String) { Friends("Friends"), Community("Community"), QRun("QRun") }
 
-/** Title, add-friend button and the Friends / Groups / QRun switch shared by all three sections. */
+/** Title, add-friend button and the Friends / Community / QRun switch shared by all three sections. */
 @Composable
 fun FriendsHeader(section: FriendsSection, onSection: (FriendsSection) -> Unit, onAddFriend: () -> Unit) {
     Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp)) {

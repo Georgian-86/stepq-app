@@ -59,6 +59,7 @@ fun MainShell(
     challenges: com.stepq.app.data.ChallengesRepository? = null,
     profiles: com.stepq.app.data.ProfileRepository? = null,
     qruns: com.stepq.app.data.QRunsRepository? = null,
+    community: com.stepq.app.data.CommunityRepository? = null,
 ) {
     var tab by rememberSaveable { mutableTabState() }
     val scope = rememberCoroutineScope()
@@ -109,10 +110,10 @@ fun MainShell(
                 } else {
                     ComingSoon("Home", "Your steps, streak and friends today.")
                 }
-                Tab.Friends -> if (friends != null && groups != null) {
-                    com.stepq.app.ui.friends.FriendsRoute(friends, groups, qruns)
+                Tab.Friends -> if (friends != null) {
+                    com.stepq.app.ui.friends.FriendsRoute(friends, community, qruns)
                 } else {
-                    ComingSoon("Friends", "Friends, groups and QRuns.")
+                    ComingSoon("Friends", "Friends, the community and QRuns.")
                 }
                 Tab.Challenges -> if (challenges != null) {
                     com.stepq.app.ui.challenges.ChallengesRoute(challenges)

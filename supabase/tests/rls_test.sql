@@ -324,6 +324,67 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select pg_temp.expect((select score from app.stepq_scores(array['00000000-0000-0000-0000-00000000000a']::uuid[])) = 2, 'score: friends see it');
 reset role;
 
+-- Community: everyone signed in sees posts with the author's public fields; you can only
+-- post, like and repost as yourself; achievements take steps from your own daily_steps row.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select set_config('test.post', app.create_post('Morning walk done!')::text, false);
+select set_config('test.win', app.create_post('Goal!', null, current_date)::text, false);
+select pg_temp.expect((select steps from app.posts where id = current_setting('test.win')::uuid) = (select steps from app.daily_steps where user_id = auth.uid() and day = current_date), 'community: achievement uses my real steps');
+select pg_temp.expect_error($$select app.create_post('   ')$$, 'community: empty post');
+select pg_temp.expect_error($$select app.create_post(repeat('x', 501))$$, 'community: post over 500 characters');
+select pg_temp.expect_error($$select app.create_post('x', null, current_date - 5)$$, 'community: sharing an old day');
+select pg_temp.expect_error($$insert into app.posts (author, body) values (auth.uid(), 'direct')$$, 'community: writing posts directly');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select count(*) from app.community_feed()) = 2, 'community: a stranger sees the feed');
+select pg_temp.expect((select author_name from app.community_feed() limit 1) = 'Riya', 'community: with the author''s name');
+select pg_temp.expect((select count(*) from app.community_feed('friends')) = 0, 'community: friends feed leaves out strangers');
+insert into app.post_likes (post_id, user_id) values (current_setting('test.post')::uuid, auth.uid());
+select pg_temp.expect_error($$insert into app.post_likes (post_id, user_id) values (current_setting('test.post')::uuid, '00000000-0000-0000-0000-00000000000b')$$, 'community: liking as someone else');
+select set_config('test.reply', app.create_post('Nice one', current_setting('test.post')::uuid)::text, false);
+select app.create_post('Thanks!', current_setting('test.reply')::uuid);
+select pg_temp.expect_error($$select app.create_post('x', current_setting('test.post')::uuid, current_date)$$, 'community: achievement as a reply');
+with d as (delete from app.posts where id = current_setting('test.post')::uuid returning 1)
+select pg_temp.expect((select count(*) from d) = 0, 'community: deleting someone else''s post');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+insert into app.post_reposts (post_id, user_id) values (current_setting('test.post')::uuid, auth.uid());
+select pg_temp.expect((select count(*) from app.community_feed('friends')) = 3, 'community: friends feed has Riya''s posts and my repost');
+select pg_temp.expect((select reposted_by from app.community_feed() limit 1) = 'Arjun', 'community: repost shows who reposted');
+select pg_temp.expect((select count(*) from app.post_likes) = 0, 'community: can''t see who else liked');
+select pg_temp.expect((select like_count from app.post_thread(current_setting('test.post')::uuid) where depth = 0) = 1, 'community: like count');
+select pg_temp.expect((select reply_count from app.post_thread(current_setting('test.post')::uuid) where depth = 0) = 1, 'community: reply count');
+select pg_temp.expect((select count(*) from app.post_thread(current_setting('test.reply')::uuid)) = 3, 'community: thread has parent, post and reply');
+select pg_temp.expect((select parent_username from app.post_thread(current_setting('test.reply')::uuid) where depth = 0) = 'riya.walks', 'community: reply shows who it answers');
+reset role;
+-- Three reports hide a post from everyone but its author.
+insert into auth.users values ('00000000-0000-0000-0000-00000000000e', 'meera@test');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'Meera', 'meera');
+select set_config('test.spam', app.create_post('Buy followers')::text, false);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into app.post_reports (post_id, reporter, reason) values (current_setting('test.spam')::uuid, auth.uid(), 'spam');
+select pg_temp.expect_error($$insert into app.post_reports (post_id, reporter) values (current_setting('test.spam')::uuid, '00000000-0000-0000-0000-00000000000b')$$, 'community: reporting as someone else');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+insert into app.post_reports (post_id, reporter) values (current_setting('test.spam')::uuid, auth.uid());
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+insert into app.post_reports (post_id, reporter) values (current_setting('test.spam')::uuid, auth.uid());
+select pg_temp.expect(not exists (select 1 from app.community_feed() where id = current_setting('test.spam')::uuid), 'community: reported post hidden');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
+select pg_temp.expect(exists (select 1 from app.community_feed() where id = current_setting('test.spam')::uuid), 'community: author still sees it');
+delete from app.posts where id = current_setting('test.spam')::uuid;
+select pg_temp.expect(not exists (select 1 from app.posts where id = current_setting('test.spam')::uuid), 'community: deleting own post');
+reset role;
+insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@test') on conflict do nothing;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select pg_temp.expect((select count(*) from app.post_likes) = 1, 'admin: reads all likes');
+select pg_temp.expect((select count(*) from app.post_reports) = 0, 'admin: reports went with the deleted post');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
@@ -333,6 +394,9 @@ select pg_temp.expect_error($$select * from app.search_people('ri')$$, 'anon sea
 select pg_temp.expect_error($$select * from app.match_contacts(array['x'])$$, 'anon matching contacts');
 select pg_temp.expect_error($$select app.share_steps(array[]::uuid[], 1, current_date)$$, 'anon sharing steps');
 select pg_temp.expect_error($$select * from app.stepq_scores(array[]::uuid[])$$, 'anon reading scores');
+select pg_temp.expect_error($$select * from app.community_feed()$$, 'anon reading the community');
+select pg_temp.expect_error($$select * from app.posts$$, 'anon reading posts');
+select pg_temp.expect_error($$select app.create_post('hi')$$, 'anon posting');
 reset role;
 
 \echo 'All RLS checks passed.'

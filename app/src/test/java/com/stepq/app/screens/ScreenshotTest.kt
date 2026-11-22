@@ -230,11 +230,53 @@ class ScreenshotTest {
         friendIds = friendsData.board.filterNot { it.isMe }.map { it.person.id }.toSet(),
     )
 
-    @Test fun a15Groups() = snap("A15-groups") {
-        androidx.compose.foundation.layout.Column {
-            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Groups, {}, {})
-            com.stepq.app.ui.friends.GroupsList(com.stepq.app.ui.friends.GroupsUiState(loading = false, data = groupsData), {}, {}, {}, {}, {})
+    private fun ago(minutes: Long) = java.time.Instant.now().minusSeconds(minutes * 60).toString()
+    private val posts = listOf(
+        com.stepq.app.data.Post(
+            id = "p1", authorId = "b", authorName = "Meera", authorUsername = "meera_walks",
+            authorAvatar = AvatarConfig(skin = 1, hair = 2, outfit = 2, style = 1), kind = "achievement",
+            body = "Took the long way home and the sunset was worth every step 🌇", day = LocalDate.now().toString(),
+            steps = 11_240, goal = 10_000, createdAt = ago(12), likeCount = 24, replyCount = 5, repostCount = 2, liked = true,
+        ),
+        com.stepq.app.data.Post(
+            id = "p2", authorId = "c", authorName = "Kabir", authorUsername = "kabir.k",
+            authorAvatar = AvatarConfig(skin = 3, hair = 1, outfit = 3), body = "Who's up for a 6 AM walk at Cubbon Park tomorrow? First round of chai is on me ☕",
+            createdAt = ago(95), likeCount = 8, replyCount = 3, repostedBy = "Sana", repostCount = 1,
+        ),
+        com.stepq.app.data.Post(
+            id = "p3", authorId = "me", authorName = "Riya Sharma", authorUsername = "riya.walks",
+            authorAvatar = AvatarConfig(skin = 2, hair = 1, outfit = 2), kind = "achievement",
+            body = "Halfway there before lunch!", day = LocalDate.now().toString(), steps = 6_240, goal = 8_000,
+            createdAt = ago(60 * 26), likeCount = 3, reposted = true, repostCount = 1,
+        ),
+    )
+    private val communityState = com.stepq.app.ui.community.CommunityUiState(
+        me = me,
+        feeds = mapOf(com.stepq.app.data.FeedScope.Everyone to com.stepq.app.ui.community.FeedState(posts = posts, loading = false, loaded = true)),
+    )
+    private val noActions = com.stepq.app.ui.community.PostActions({}, {}, {}, {}, {}, {})
+
+    @Test fun a15Community() = snap("A15-community") {
+        androidx.compose.foundation.layout.Column(Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Community, {}, {})
+            com.stepq.app.ui.community.CommunityFeed(communityState, noActions, {}, {}, {}, {})
         }
+    }
+
+    @Test fun a15CommunityThread() = snap("A15-community-thread") {
+        val main = posts[0].copy(depth = 0)
+        val replies = listOf(
+            com.stepq.app.data.Post(id = "r1", authorId = "me", authorName = "Riya Sharma", authorUsername = "riya.walks", authorAvatar = AvatarConfig(skin = 2, hair = 1, outfit = 2), body = "That's a huge day, well done! 👏", createdAt = ago(8), likeCount = 2, depth = 1, parentId = "p1", parentUsername = "meera_walks"),
+            com.stepq.app.data.Post(id = "r2", authorId = "c", authorName = "Kabir", authorUsername = "kabir.k", authorAvatar = AvatarConfig(skin = 3, hair = 1, outfit = 3), body = "Which route? I need a new one.", createdAt = ago(5), replyCount = 1, depth = 1, parentId = "p1", parentUsername = "meera_walks"),
+        )
+        com.stepq.app.ui.community.ThreadScreen(
+            com.stepq.app.ui.community.ThreadState("p1", listOf(main) + replies, loading = false),
+            me, noActions, posting = false, error = null, onReply = { _, _ -> }, onTyping = {}, onBack = {},
+        )
+    }
+
+    @Test fun a15CommunityCompose() = snap("A15-community-compose") {
+        com.stepq.app.ui.community.ComposeScreen(me, stepsToday = 8_420, startWithSteps = true, posting = false, error = null, onPost = { _, _ -> }, onTyping = {}, onCancel = {})
     }
 
     @Test fun a16CreateGroup() = snap("A16-create-group") {
