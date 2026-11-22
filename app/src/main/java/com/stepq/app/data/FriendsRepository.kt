@@ -86,10 +86,14 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
             FriendToday(it, d?.steps ?: 0, d?.distanceM ?: 0, isMe = it.id == me.id)
         }.sortedWith(compareByDescending<FriendToday> { it.steps }.thenBy { it.person.displayName })
 
-        // Needs migration 20261112000000; until it's applied the rest of the tab still works.
+        // Names come from app.friend_requests() (migration 20261112000000). Without it the
+        // request still shows, from my own friendships rows, so it can be accepted; the sender's
+        // name stays hidden by RLS until then.
+        val incoming = links.filter { it.status == "pending" && it.addressee == me.id }.map { it.requester }
         val requests = runCatching { db.rpc("friend_requests").decodeList<PersonSummary>() }
             .onFailure { android.util.Log.w("StepqFriends", "friend_requests unavailable", it) }
-            .getOrDefault(emptyList())
+            .getOrNull()
+            .let { named -> requestsWithFallback(named, incoming) }
 
         val startOfDay = today.atStartOfDay(IST).toInstant().toString()
         val reminded = db["water_reminders"].select(io.github.jan.supabase.postgrest.query.Columns.list("to_user")) {
@@ -185,6 +189,18 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
     }
 
     companion object {
+        /**
+         * Requests waiting for me: the named list from the server, plus any pending row it
+         * missed (or all of them when the names couldn't load), so a request never goes unseen.
+         */
+        fun requestsWithFallback(named: List<PersonSummary>?, incomingIds: List<String>): List<PersonSummary> {
+            val list = named.orEmpty()
+            val known = list.map { it.id }.toSet()
+            return list + incomingIds.filter { it !in known }.distinct().map { PersonSummary(it, UNKNOWN_SENDER, "") }
+        }
+
+        const val UNKNOWN_SENDER = "Someone on StepQ"
+
         /** Matches app.check_water_reminder(): the free plan's day is India time. */
         val IST: ZoneId = ZoneId.of("Asia/Kolkata")
         const val FREE_REMINDERS_PER_DAY = 5

@@ -254,7 +254,7 @@ private fun RequestRow(person: PersonSummary, onAccept: (PersonSummary) -> Unit,
         StepqAvatar(person.avatar, 40.dp)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Text(person.displayName, style = StepqType.BodyStrong, color = StepqColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("@${person.username}", style = StepqType.Small, color = StepqColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (person.username.isEmpty()) "Wants to be your friend" else "@${person.username}", style = StepqType.Small, color = StepqColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         SmallPill("Decline", filled = false) { onDecline(person) }
         Spacer(Modifier.width(8.dp))
