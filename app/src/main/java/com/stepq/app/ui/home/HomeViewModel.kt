@@ -102,7 +102,7 @@ class HomeViewModel(
             reader.phone.counterUpdates().collect { counter ->
                 val current = data ?: return@collect
                 val today = LocalDate.now()
-                val rows = reader.phoneRows(current.me.id, reader.phone.record(counter, today))
+                val rows = reader.phoneRows(current.me.id, reader.phone.record(current.me.id, counter, today))
                 val merged = current.copy(myDays = overlayDays(current.myDays, rows))
                 data = merged
                 _state.value = build(merged, today, connected)
@@ -136,8 +136,9 @@ class HomeViewModel(
         val week = weekBars(data.myDays, today)
         val mood = when {
             steps < goal -> PikoMood.Nudge
-            prefs.getString(KEY_CELEBRATED, null) != today.toString() -> {
-                prefs.edit().putString(KEY_CELEBRATED, today.toString()).apply()
+            // Kept per account, so a second account on the phone still gets its own cheer.
+            prefs.getString("${KEY_CELEBRATED}_${data.me.id}", null) != today.toString() -> {
+                prefs.edit().putString("${KEY_CELEBRATED}_${data.me.id}", today.toString()).apply()
                 PikoMood.Cheer
             }
             else -> PikoMood.Happy
