@@ -30,32 +30,29 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stepq.app.data.FriendsRepository
 import com.stepq.app.ui.qrun.QRunSection
+import com.stepq.app.ui.community.CommunitySection
 import com.stepq.app.ui.theme.StepqColors
 import com.stepq.app.ui.theme.StepqType
 import kotlinx.coroutines.delay
 
-/** The Friends tab: Friends leaderboard (A13/A14), Groups and QRun sections. */
+/** The Friends tab: Friends leaderboard (A13/A14), the Community feed and QRun sections. */
 @Composable
 fun FriendsRoute(
     repo: FriendsRepository,
-    groupsRepo: com.stepq.app.data.GroupsRepository,
+    communityRepo: com.stepq.app.data.CommunityRepository? = null,
     qrunsRepo: com.stepq.app.data.QRunsRepository? = null,
 ) {
     val vm: FriendsViewModel = viewModel { FriendsViewModel(repo) }
     val state by vm.state.collectAsState()
-    val groupsVm: GroupsViewModel = viewModel { GroupsViewModel(groupsRepo) }
-    val groups by groupsVm.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
-    // Which full-screen page of the Groups section is open: null, "create", "join" or a group id.
-    var groupPage by rememberSaveable { mutableStateOf<String?>(null) }
     var section by rememberSaveable { mutableStateOf(FriendsSection.Friends) }
     var adding by rememberSaveable { mutableStateOf(false) }
 
     val qruns = qrunsRepo?.let { QRunSection(it, section == FriendsSection.QRun) }
+    val community = communityRepo?.let { CommunitySection(it, section == FriendsSection.Community) }
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
-        groupsVm.refresh()
         onPauseOrDispose { }
     }
 
@@ -63,7 +60,7 @@ fun FriendsRoute(
         // One key per full-screen page, so each page can still draw while it slides away.
         val key = when {
             qruns != null && qruns.page != null -> "qrun:${qruns.page}"
-            groupPage != null -> "group:$groupPage"
+            community != null && community.page != null -> "community:${community.page}"
             adding -> "add"
             else -> "root"
         }
@@ -73,7 +70,7 @@ fun FriendsRoute(
             onBack = {
                 when {
                     key.startsWith("qrun:") -> qruns?.close()
-                    key.startsWith("group:") -> groupPage = null
+                    key.startsWith("community:") -> community?.back()
                     key == "add" -> {
                         adding = false
                         vm.clearSearch()
@@ -81,41 +78,10 @@ fun FriendsRoute(
                 }
             },
         ) { shown ->
-        val shownGroup = shown.removePrefix("group:")
-        val openGroup = groups.data?.groups?.firstOrNull { it.group.id == shownGroup }
         if (shown.startsWith("qrun:")) {
             qruns?.Page(shown.removePrefix("qrun:"))
-        } else if (shown == "group:create") {
-            CreateGroupScreen(
-                friends = groups.data?.friends.orEmpty(),
-                busy = groups.busy,
-                error = groups.formError,
-                onCreate = { name, ids -> groupsVm.create(name, ids) { groupPage = it } },
-                onTyping = groupsVm::clearFormError,
-                onInvite = { shareText(context, appInviteText(state.data?.me?.username)) },
-                onBack = { groupPage = null },
-            )
-        } else if (shown == "group:join") {
-            JoinGroupScreen(
-                busy = groups.busy,
-                error = groups.formError,
-                onJoin = { code -> groupsVm.join(code) { groupPage = it } },
-                onTyping = groupsVm::clearFormError,
-                onBack = { groupPage = null },
-            )
-        } else if (shown.startsWith("group:")) {
-            if (openGroup != null) {
-            GroupScreen(
-                group = openGroup,
-                myId = groups.data?.me?.id.orEmpty(),
-                friendIds = groups.data?.friendIds.orEmpty(),
-                remindedToday = state.data?.remindedToday.orEmpty(),
-                onRemind = vm::remind,
-                onInvite = { shareText(context, groupInvite(openGroup)) },
-                onLeave = { groupsVm.leave(openGroup.group.id) { groupPage = null } },
-                onBack = { groupPage = null },
-            )
-            }
+        } else if (shown.startsWith("community:")) {
+            community?.Page(shown.removePrefix("community:"))
         } else if (shown == "add") {
             val context = androidx.compose.ui.platform.LocalContext.current
             val loadContacts = { vm.loadContacts { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.stepq.app.data.Contacts.emailHashes(context) } } }
@@ -162,14 +128,8 @@ fun FriendsRoute(
                         onDecline = vm::decline,
                         onAddFriend = { adding = true },
                     )
-                    FriendsSection.Groups -> GroupsList(
-                        groups,
-                        onRefresh = groupsVm::refresh,
-                        onCreate = { groupPage = "create" },
-                        onJoin = { groupPage = "join" },
-                        onOpen = { groupPage = it },
-                        onInviteApp = { shareText(context, appInviteText(state.data?.me?.username)) },
-                    )
+                    FriendsSection.Community -> community?.Feed()
+                        ?: SectionComingSoon("Community", "Share your walks and wins with everyone on StepQ.")
                     FriendsSection.QRun -> qruns?.List()
                         ?: SectionComingSoon("QRun", "Plan a walk or run with people near you. Coming soon.")
                 }
@@ -177,15 +137,15 @@ fun FriendsRoute(
             }
         }
         }
-        (state.toast ?: groups.toast)?.let { message ->
+        state.toast?.let { message ->
             LaunchedEffect(message) {
                 delay(3_000)
                 vm.toastShown()
-                groupsVm.toastShown()
             }
             Toast(message, Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp))
         }
         qruns?.Overlays(Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp))
+        community?.Overlays(Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp))
     }
 }
 

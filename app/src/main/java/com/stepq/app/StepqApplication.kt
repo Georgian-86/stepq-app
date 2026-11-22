@@ -35,6 +35,8 @@ class StepqApplication : Application() {
         private set
     lateinit var challenges: com.stepq.app.data.ChallengesRepository
         private set
+    lateinit var community: com.stepq.app.data.CommunityRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -47,6 +49,7 @@ class StepqApplication : Application() {
         groups = com.stepq.app.data.GroupsRepository(Supabase.client, profiles)
         qruns = com.stepq.app.data.QRunsRepository(Supabase.client)
         challenges = com.stepq.app.data.ChallengesRepository(Supabase.client, profiles)
+        community = com.stepq.app.data.CommunityRepository(Supabase.client, profiles)
         createNotificationChannel()
         com.stepq.app.push.WaterInbox.schedule(this)
         registerForPush()
