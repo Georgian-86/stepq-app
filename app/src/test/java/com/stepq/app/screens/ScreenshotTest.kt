@@ -74,7 +74,11 @@ class ScreenshotTest {
     @Test fun a06Name() = snap("A06-sign-up-name") { NameScreen(riya, null, {}, {}) }
     @Test fun a07About() = snap("A07-sign-up-about-you") { AboutYouScreen(riya, {}, {}) }
     @Test fun a07AboutNotAgreed() = snap("A07-sign-up-about-you-consent") {
-        AboutYouScreen(OnboardingViewModel().apply { gender = Gender.Female; birthdate = LocalDate.of(2001, 3, 14) }, {}, {})
+        AboutYouScreen(notAgreed, {}, {})
+    }
+    private val notAgreed = OnboardingViewModel().apply {
+        gender = Gender.Female
+        birthdate = LocalDate.of(2001, 3, 14)
     }
     @Test fun a07bParentConsent() = snap("A07b-parent-consent") {
         com.stepq.app.ui.onboarding.ParentConsentScreen("none", null, busy = false, error = null, onSend = { _, _ -> }, onCheckAgain = {}, onLogOut = {})
