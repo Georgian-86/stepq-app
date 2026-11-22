@@ -362,7 +362,7 @@ fun DeleteAccountDialog(busy: Boolean, error: String?, onConfirm: () -> Unit, on
         text = {
             Column {
                 Text(
-                    "This permanently deletes your profile, step history, friends, groups, QRuns and challenge entries. It can't be undone.",
+                    "This permanently deletes your profile, step history, friends, groups, QRuns, challenge entries and posts. It can't be undone. As Indian law requires, we keep only your email, name and username for 180 days, then delete them too.",
                     style = StepqType.Body,
                 )
                 Spacer(Modifier.height(16.dp))

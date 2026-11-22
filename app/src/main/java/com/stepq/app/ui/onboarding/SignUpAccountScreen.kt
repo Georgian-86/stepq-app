@@ -79,7 +79,7 @@ fun SignUpAccountScreen(
         onBack = onBack,
         bottom = {
             Text(
-                "By continuing you agree to our Terms and Privacy Policy.",
+                com.stepq.app.ui.components.legalText("StepQ is for people 13 and older (under 18s need a parent's OK). Read our ", " before you create an account."),
                 style = StepqType.Small, color = StepqColors.Muted, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 10.dp),
             )

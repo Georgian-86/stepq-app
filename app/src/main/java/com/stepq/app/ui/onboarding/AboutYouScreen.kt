@@ -30,7 +30,10 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.stepq.app.data.Gender
+import com.stepq.app.data.MIN_AGE
 import com.stepq.app.data.parseBirthdate
+import com.stepq.app.ui.components.ConsentCheckbox
+import com.stepq.app.ui.components.legalText
 import com.stepq.app.ui.components.FieldHint
 import com.stepq.app.ui.components.OnboardingFrame
 import com.stepq.app.ui.components.SectionLabel
@@ -60,7 +63,7 @@ fun AboutYouScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: (
             StepqButton("Continue", {
                 state.birthdate = parsed
                 onContinue()
-            }, enabled = state.gender != null && parsed != null)
+            }, enabled = state.gender != null && parsed != null && state.agreed)
         },
     ) {
         SectionLabel("Gender")
@@ -81,7 +84,7 @@ fun AboutYouScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: (
             placeholder = "DD / MM / YYYY",
         )
         if (digits.length == 8 && parsed == null) {
-            FieldHint("Enter a real date. You need to be 13 or older.", ok = false)
+            FieldHint("Enter a real date. You need to be $MIN_AGE or older to use StepQ.", ok = false)
         }
         Spacer(Modifier.height(20.dp))
         Row(
@@ -95,6 +98,15 @@ fun AboutYouScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: (
                 style = StepqType.Small, color = StepqColors.Ink, modifier = Modifier.padding(start = 12.dp),
             )
         }
+        Spacer(Modifier.height(20.dp))
+        ConsentCheckbox(
+            checked = state.agreed,
+            onChange = { state.agreed = it },
+            text = legalText(
+                "I'm $MIN_AGE or older and I agree to StepQ's ",
+                ". StepQ uses my profile, step totals and posts to run the app and show them to the people I walk with. I can withdraw by deleting my account. If I'm under 18, a parent or guardian must agree too.",
+            ),
+        )
     }
 }
 

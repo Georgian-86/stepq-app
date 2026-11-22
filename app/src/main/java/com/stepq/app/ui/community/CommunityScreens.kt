@@ -41,6 +41,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.IosShare
@@ -548,7 +549,20 @@ private fun CharacterRing(length: Int) {
     }
 }
 
-/** The "…" menu: copy, share, and delete for my posts or report for others'. */
+/** Report reasons, covering what the IT Rules 2021 (rule 3(1)(b)) ask platforms to act on. */
+val REPORT_REASONS = listOf(
+    "Spam or scam",
+    "Harassment or bullying",
+    "Hate speech or violence",
+    "Nudity or sexual content",
+    "Involves a child",
+    "Self-harm or suicide",
+    "Pretending to be someone else",
+    "False or misleading",
+    "Something else",
+)
+
+/** The "…" menu: copy, share, and delete for my posts, or report and block for others'. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostOptionsSheet(
@@ -558,18 +572,23 @@ fun PostOptionsSheet(
     onShare: () -> Unit,
     onDelete: () -> Unit,
     onReport: (String) -> Unit,
+    onBlock: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmBlock by remember { mutableStateOf(false) }
     var reporting by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = StepqColors.White) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             if (reporting) {
                 Text("Why are you reporting this post?", style = StepqType.Heading, color = StepqColors.Ink)
                 Spacer(Modifier.height(4.dp))
-                Text("Your report is private. Posts reported by several people are hidden.", style = StepqType.Small, color = StepqColors.Muted)
+                Text(
+                    "Your report is private. Our team reviews reports and removes posts that break the community rules. Posts reported by several people are hidden straight away.",
+                    style = StepqType.Small, color = StepqColors.Muted,
+                )
                 Spacer(Modifier.height(12.dp))
-                listOf("Spam", "Harassment or bullying", "Hate or violence", "Something else").forEach { reason ->
+                REPORT_REASONS.forEach { reason ->
                     SheetRow(Icons.Outlined.Flag, reason) { onReport(reason); onDismiss() }
                 }
                 return@Column
@@ -590,6 +609,13 @@ fun PostOptionsSheet(
                     }
                 } else {
                     SheetRow(Icons.Outlined.Flag, "Report", danger = true) { reporting = true }
+                    SheetRow(
+                        Icons.Outlined.Block,
+                        if (confirmBlock) "Tap again to block @${post.authorUsername}" else "Block @${post.authorUsername}",
+                        danger = true,
+                    ) {
+                        if (confirmBlock) { onBlock(); onDismiss() } else confirmBlock = true
+                    }
                 }
             }
         }

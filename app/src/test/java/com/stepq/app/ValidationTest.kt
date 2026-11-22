@@ -48,6 +48,19 @@ class ValidationTest {
         assertEquals(LocalDate.of(2013, 11, 2), parseBirthdate("02112013", today)) // 13 today
     }
 
+    @Test fun siteErrors() {
+        assertEquals("Use your parent's email, not your own.", com.stepq.app.data.siteErrorMessage("""{"error":{"code":"invalid-argument","message":"x","details":{"fields":{"parentEmail":"Use your parent's email, not your own."}}}}"""))
+        assertEquals("Too many tries.", com.stepq.app.data.siteErrorMessage("""{"error":{"code":"resource-exhausted","message":"Too many tries."}}"""))
+        assertEquals("Couldn't send the email. Check your connection and try again.", com.stepq.app.data.siteErrorMessage("<html>"))
+    }
+
+    @Test fun minors() {
+        val today = LocalDate.of(2026, 11, 2)
+        assertTrue(com.stepq.app.data.isMinor(LocalDate.of(2008, 11, 3), today)) // 17
+        assertFalse(com.stepq.app.data.isMinor(LocalDate.of(2008, 11, 2), today)) // 18 today
+        assertFalse(com.stepq.app.data.isMinor(null, today))
+    }
+
     @Test fun goalDistance() {
         assertEquals(6.1, stepsToKm(8000), 0.05)
     }

@@ -56,6 +56,70 @@ class ProfileRepository(private val client: SupabaseClient?) {
         requireClient().postgrest["profiles"].insert(profile)
     }
 
+    /** Logs that I agreed to (or withdrew) a purpose at a policy version, in app.consents. */
+    suspend fun recordConsent(purpose: String, version: String, granted: Boolean = true): Result<Unit> = runCatching {
+        requireClient().postgrest.rpc(
+            "record_consent",
+            buildJsonObject {
+                put("p_purpose", purpose)
+                put("p_version", version)
+                put("p_granted", granted)
+            },
+        )
+    }
+
+    /** Everything StepQ holds about me, as JSON (app.export_my_data). */
+    suspend fun exportMyData(): Result<String> = runCatching {
+        requireClient().postgrest.rpc("export_my_data").data
+    }
+
+    /**
+     * Where my parental consent stands: "not_needed" (18+), "none" (no parent asked yet),
+     * "pending", "granted", "declined" or "withdrawn". Before the migration is live: not_needed.
+     */
+    suspend fun parentalConsent(): Result<String> = runCatching {
+        requireClient().postgrest.rpc("my_parental_consent").decodeAs<String>()
+    }
+
+    /**
+     * Asks stepq.in to email [parentEmail] a consent link. The site checks my session with
+     * Supabase Auth, so only my own account can ask. Fails with the site's message.
+     */
+    suspend fun requestParentalConsent(parentName: String, parentEmail: String): Result<Unit> = runCatching {
+        val token = requireClient().auth.currentSessionOrNull()?.accessToken ?: throw IllegalStateException("Log in again first.")
+        val body = buildJsonObject {
+            put("accessToken", token)
+            put("parentName", parentName.trim())
+            put("parentEmail", parentEmail.trim())
+        }.toString()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val conn = java.net.URL("${com.stepq.app.ui.components.Legal.SITE_URL}/api/requestParentConsent").openConnection() as java.net.HttpURLConnection
+            try {
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 20_000
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.outputStream.use { it.write(body.toByteArray()) }
+                val ok = conn.responseCode in 200..299
+                val text = (if (ok) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (!ok) throw IllegalStateException(siteErrorMessage(text))
+            } finally {
+                conn.disconnect()
+            }
+        }
+    }
+
+    /** People I've blocked, newest first. */
+    suspend fun myBlocks(): Result<List<BlockedUser>> = runCatching {
+        requireClient().postgrest.rpc("my_blocks").decodeList<BlockedUser>()
+    }
+
+    suspend fun unblock(userId: String): Result<Unit> = runCatching {
+        val me = currentUserId() ?: throw IllegalStateException("Not signed in")
+        requireClient().postgrest["user_blocks"].delete { filter { eq("blocker", me); eq("blocked", userId) } }
+    }
+
     /** A26: change the daily goal. The check constraint keeps it between 1,000 and 100,000. */
     /** A26 Edit profile. Birthdate isn't here: it's locked once set. */
     suspend fun updateProfile(displayName: String, username: String, avatar: AvatarConfig, gender: String?): Result<Unit> = runCatching {
@@ -118,3 +182,12 @@ class ProfileRepository(private val client: SupabaseClient?) {
         }
     }
 }
+
+/** The message in a stepq.in API error (`{"error":{"message":…}}`), or a generic one. */
+fun siteErrorMessage(body: String): String = runCatching {
+    val error = kotlinx.serialization.json.Json.parseToJsonElement(body)
+        .let { (it as kotlinx.serialization.json.JsonObject)["error"] as kotlinx.serialization.json.JsonObject }
+    val fields = error["details"]?.let { (it as kotlinx.serialization.json.JsonObject)["fields"] as? kotlinx.serialization.json.JsonObject }
+    val first = fields?.values?.firstOrNull()?.let { (it as kotlinx.serialization.json.JsonPrimitive).content }
+    first ?: (error["message"] as kotlinx.serialization.json.JsonPrimitive).content
+}.getOrNull()?.takeIf { it.isNotBlank() } ?: "Couldn't send the email. Check your connection and try again."

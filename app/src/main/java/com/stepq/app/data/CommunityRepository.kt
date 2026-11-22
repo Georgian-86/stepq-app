@@ -140,6 +140,14 @@ class CommunityRepository(private val client: SupabaseClient?, private val profi
         }
     }
 
+    /** Blocks [userId]: their posts leave my feed and threads, and mine leave theirs. */
+    suspend fun block(userId: String): Result<Unit> = runCatching {
+        c().postgrest["user_blocks"].upsert(buildJsonObject { put("blocker", myId()); put("blocked", userId) }) {
+            onConflict = "blocker,blocked"
+            ignoreDuplicates = true
+        }
+    }
+
     companion object {
         const val PAGE = 25
         const val MAX_LENGTH = 500

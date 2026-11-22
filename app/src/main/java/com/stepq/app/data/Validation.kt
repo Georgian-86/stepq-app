@@ -31,14 +31,26 @@ fun suggestUsernames(fullName: String): List<String> {
 
 /**
  * A07 birthdate typed as DD / MM / YYYY. Returns null unless it is a real date, in the past,
- * and the person is at least 13 (Play's minimum age for accounts without parental consent).
+ * and the person is at least [MIN_AGE].
  */
+/**
+ * StepQ is for 13 and older (app.check_min_age enforces it too). India's DPDP Act treats anyone
+ * under [ADULT_AGE] as a child, whose data may only be processed with verifiable parental
+ * consent, so 13 to 17 year olds wait for a parent to agree on stepq.in before using the app.
+ */
+const val MIN_AGE = 13
+const val ADULT_AGE = 18
+
+/** True when someone born on [birthdate] is under 18 today. */
+fun isMinor(birthdate: LocalDate?, today: LocalDate = LocalDate.now()): Boolean =
+    birthdate != null && birthdate.isAfter(today.minusYears(ADULT_AGE.toLong()))
+
 fun parseBirthdate(digits: String, today: LocalDate = LocalDate.now()): LocalDate? {
     if (digits.length != 8 || !digits.all(Char::isDigit)) return null
     val date = runCatching {
         LocalDate.of(digits.substring(4).toInt(), digits.substring(2, 4).toInt(), digits.substring(0, 2).toInt())
     }.getOrNull() ?: return null
-    if (date.isAfter(today.minusYears(13)) || date.isBefore(LocalDate.of(1900, 1, 1))) return null
+    if (date.isAfter(today.minusYears(MIN_AGE.toLong())) || date.isBefore(LocalDate.of(1900, 1, 1))) return null
     return date
 }
 

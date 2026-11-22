@@ -51,15 +51,21 @@ object Routes {
     const val CONNECT = "onboarding/connect"
     const val ALL_SET = "onboarding/all-set"
     const val MAIN = "main"
+    /** 13 to 17 year olds wait here until a parent agrees on stepq.in. */
+    const val PARENT = "onboarding/parent"
 
     fun checkEmail(email: String) = "check-email/${android.net.Uri.encode(email)}"
 }
 
 /** Where a session lands: signed out, signed in without a profile yet, or ready. */
-private enum class Landing { Loading, SignedOut, Onboarding, Main }
+private enum class Landing { Loading, SignedOut, Onboarding, ParentConsent, Main }
 
 /** The shortest time the launch screen shows, so Piko and the wordmark are seen on every open. */
 const val LAUNCH_MIN_MS = 1800L
+
+/** Signed in with a profile, under 18 and no parent has agreed yet. Offline: let them in. */
+private suspend fun needsParent(profiles: ProfileRepository): Boolean =
+    profiles.parentalConsent().getOrNull()?.let { it != "granted" && it != "not_needed" } ?: false
 
 @Composable
 fun StepqNavHost(
@@ -86,7 +92,13 @@ fun StepqNavHost(
             AuthState.Loading -> Landing.Loading
             AuthState.SignedOut -> Landing.SignedOut
             AuthState.SignedIn -> profiles.mine().fold(
-                onSuccess = { if (it == null) Landing.Onboarding else Landing.Main },
+                onSuccess = {
+                    when {
+                        it == null -> Landing.Onboarding
+                        needsParent(profiles) -> Landing.ParentConsent
+                        else -> Landing.Main
+                    }
+                },
                 // Offline or the schema isn't live yet: let them in; tabs show their own errors.
                 onFailure = { Landing.Main },
             )
@@ -98,6 +110,7 @@ fun StepqNavHost(
         val target = when (landing) {
             Landing.Main -> Routes.MAIN
             Landing.Onboarding -> Routes.NAME
+            Landing.ParentConsent -> Routes.PARENT
             Landing.SignedOut -> if (current == Routes.MAIN || current.startsWith("onboarding/")) Routes.SPLASH else null
             Landing.Loading -> null
         }
@@ -119,6 +132,7 @@ fun StepqNavHost(
     val start = when (landing) {
         Landing.Main -> Routes.MAIN
         Landing.Onboarding -> Routes.NAME
+        Landing.ParentConsent -> Routes.PARENT
         else -> Routes.SPLASH
     }
 
@@ -213,8 +227,10 @@ fun StepqNavHost(
         }
         composable(Routes.GOAL) {
             GoalScreen(onboarding, profiles, onBack = { nav.popBackStack() }) {
-                // The profile exists now, so there's no going back into A06–A09.
-                nav.navigate(Routes.CONNECT) { popUpTo(0) { inclusive = true } }
+                // The profile exists now, so there's no going back into A06–A09. Under-18s
+                // first need a parent's consent.
+                val next = if (com.stepq.app.data.isMinor(onboarding.birthdate)) Routes.PARENT else Routes.CONNECT
+                nav.navigate(next) { popUpTo(0) { inclusive = true } }
             }
         }
         composable(Routes.CONNECT) {
@@ -224,6 +240,51 @@ fun StepqNavHost(
             AllSetScreen(onboarding.firstName, onboarding.dailyGoal) {
                 nav.navigate(Routes.MAIN) { popUpTo(0) { inclusive = true } }
             }
+        }
+        composable(Routes.PARENT) {
+            var status by remember { mutableStateOf("none") }
+            var sentTo by remember { mutableStateOf<String?>(null) }
+            var busy by remember { mutableStateOf(false) }
+            var error by remember { mutableStateOf<String?>(null) }
+            fun refresh() {
+                busy = true
+                error = null
+                scope.launch {
+                    profiles.parentalConsent()
+                        .onSuccess {
+                            status = it
+                            if (it == "granted" || it == "not_needed") {
+                                nav.navigate(Routes.CONNECT) { popUpTo(0) { inclusive = true } }
+                            } else if (it == "pending" && sentTo != null) {
+                                error = "Not yet. Ask them to open the link in the email."
+                            }
+                        }
+                        .onFailure { error = "Couldn't check. Check your connection and try again." }
+                    busy = false
+                }
+            }
+            LaunchedEffect(Unit) { refresh() }
+            com.stepq.app.ui.onboarding.ParentConsentScreen(
+                status = status,
+                sentTo = sentTo,
+                busy = busy,
+                error = error,
+                onSend = { name, email ->
+                    busy = true
+                    error = null
+                    scope.launch {
+                        profiles.requestParentalConsent(name, email)
+                            .onSuccess {
+                                sentTo = email.trim()
+                                status = "pending"
+                            }
+                            .onFailure { error = it.message }
+                        busy = false
+                    }
+                },
+                onCheckAgain = ::refresh,
+                onLogOut = { scope.launch { auth.logOut() } },
+            )
         }
         composable(Routes.MAIN) { MainShell(auth, home, friends, groups, challenges, profiles, qruns, community) }
     }

@@ -119,6 +119,10 @@ class CommunitySection internal constructor(
                     if (page?.postId() == post.id) back()
                 },
                 onReport = { vm.report(post, it) },
+                onBlock = {
+                    vm.block(post)
+                    if (page?.postId() == post.id) back()
+                },
                 onDismiss = { options.value = null },
             )
         }

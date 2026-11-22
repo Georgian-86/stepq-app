@@ -179,6 +179,10 @@ select pg_temp.expect(not exists (select 1 from app.profiles where id = '0000000
 select pg_temp.expect((select created_by from app.groups where name = 'Shared walk') = '00000000-0000-0000-0000-00000000000b', 'delete: shared group handed to a member');
 select pg_temp.expect(not exists (select 1 from app.groups where name = 'Solo walk'), 'delete: solo group removed');
 select pg_temp.expect((select count(*) from app.profiles) = 3, 'delete: other accounts untouched');
+select pg_temp.expect((select email from app.deleted_accounts where user_id = '00000000-0000-0000-0000-00000000000d') = 'leaver@test', 'delete: registration details kept for the IT Rules 180 days');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.deleted_accounts) = 0, 'delete: archived details hidden from users');
+reset role;
 select set_config('request.jwt.claims', '', false);
 set role anon;
 select pg_temp.expect_error($$select app.delete_my_account()$$, 'anon deleting an account');
@@ -385,6 +389,70 @@ select pg_temp.expect((select count(*) from app.post_likes) = 1, 'admin: reads a
 select pg_temp.expect((select count(*) from app.post_reports) = 0, 'admin: reports went with the deleted post');
 reset role;
 
+-- Compliance: 13+ for new accounts; 13 to 17 need a parent's consent before doing anything.
+insert into auth.users values ('00000000-0000-0000-0000-00000000000f', 'teen@test') on conflict do nothing;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000f');
+select pg_temp.expect_error($$insert into app.profiles (id, display_name, username, birthdate) values (auth.uid(), 'Kid', 'kid', current_date - interval '12 years')$$, 'compliance: under-13 sign-up');
+insert into app.profiles (id, display_name, username, birthdate) values (auth.uid(), 'Teen', 'teen', current_date - interval '15 years');
+select pg_temp.expect(app.my_parental_consent() = 'none', 'parental: teen needs a parent');
+select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date, 100)$$, 'parental: teen saving steps before consent');
+select pg_temp.expect_error($$select app.create_post('hi')$$, 'parental: teen posting before consent');
+select pg_temp.expect_error($$select app.record_consent('parental', 'x')$$, 'parental: teen consenting for their parent');
+select pg_temp.expect_error($$insert into app.parental_consents (child_id, parent_name, parent_email, token_hash, status) values (auth.uid(), 'Me', 'me@test', 'x', 'granted')$$, 'parental: teen writing their own consent');
+reset role;
+-- What the stepq.in server does when the parent says yes.
+insert into app.parental_consents (child_id, parent_name, parent_email, token_hash, status) values ('00000000-0000-0000-0000-00000000000f', 'Parent', 'parent@test', 'hash', 'granted');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000f');
+select pg_temp.expect(app.my_parental_consent() = 'granted', 'parental: status visible to the teen');
+insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date, 100);
+select pg_temp.expect((select count(*) from app.daily_steps where user_id = auth.uid()) = 1, 'parental: teen can walk once a parent agrees');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.parental_consents) = 0, 'parental: others cannot read it');
+select pg_temp.expect(app.my_parental_consent() = 'not_needed', 'parental: adults need nothing');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select app.record_consent('terms_privacy', '2026-11-24');
+select pg_temp.expect((select count(*) from app.consents where withdrawn_at is null) = 1, 'consent: recorded and readable by me');
+select pg_temp.expect_error($$insert into app.consents (user_id, purpose, version) values (auth.uid(), 'health', 'x')$$, 'consent: writing the log directly');
+select pg_temp.expect_error($$select app.record_consent('ads', 'x')$$, 'consent: unknown purpose');
+select app.record_consent('community', 'v1');
+select app.record_consent('community', 'v1', false);
+select pg_temp.expect((select withdrawn_at is not null from app.consents where purpose = 'community'), 'consent: withdrawn');
+select pg_temp.expect((app.export_my_data() -> 'profile' ->> 'username') = 'riya.walks', 'export: my profile');
+select pg_temp.expect(jsonb_array_length(app.export_my_data() -> 'posts') >= 1, 'export: my posts');
+select pg_temp.expect(jsonb_array_length(app.export_my_data() -> 'consents') = 2, 'export: my consents');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.consents) = 0, 'consent: others cannot read mine');
+select pg_temp.expect(jsonb_array_length(app.export_my_data() -> 'posts') = 0, 'export: only my own rows');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect(exists (select 1 from app.community_feed() where id = current_setting('test.post')::uuid), 'block: post visible before blocking');
+insert into app.user_blocks (blocker, blocked) values (auth.uid(), '00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect(not exists (select 1 from app.community_feed() where id = current_setting('test.post')::uuid), 'block: blocked author hidden from me');
+select pg_temp.expect((select count(*) from app.my_blocks()) = 1, 'block: listed in my blocks');
+select pg_temp.expect_error($$insert into app.user_blocks (blocker, blocked) values ('00000000-0000-0000-0000-00000000000b', auth.uid())$$, 'block: blocking on someone else''s behalf');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select count(*) from app.user_blocks) = 0, 'block: the blocked person cannot see the block');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+delete from app.user_blocks where blocked = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect(exists (select 1 from app.community_feed() where id = current_setting('test.post')::uuid), 'block: unblocking shows posts again');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+delete from app.posts where id = current_setting('test.post')::uuid;
+select pg_temp.expect(exists (select 1 from app.posts where id = current_setting('test.post')::uuid), 'moderation: others cannot delete my post');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+delete from app.posts where id = current_setting('test.post')::uuid;
+select pg_temp.expect(not exists (select 1 from app.posts where id = current_setting('test.post')::uuid), 'moderation: admin removes a post');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
@@ -397,6 +465,9 @@ select pg_temp.expect_error($$select * from app.stepq_scores(array[]::uuid[])$$,
 select pg_temp.expect_error($$select * from app.community_feed()$$, 'anon reading the community');
 select pg_temp.expect_error($$select * from app.posts$$, 'anon reading posts');
 select pg_temp.expect_error($$select app.create_post('hi')$$, 'anon posting');
+select pg_temp.expect_error($$select app.export_my_data()$$, 'anon exporting data');
+select pg_temp.expect_error($$select app.record_consent('terms_privacy', 'x')$$, 'anon recording consent');
+select pg_temp.expect_error($$select * from app.user_blocks$$, 'anon reading blocks');
 reset role;
 
 \echo 'All RLS checks passed.'

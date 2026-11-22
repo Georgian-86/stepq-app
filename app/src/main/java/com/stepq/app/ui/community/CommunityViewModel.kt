@@ -219,6 +219,22 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
         }
     }
 
+    fun block(post: Post) {
+        viewModelScope.launch {
+            repo.block(post.authorId)
+                .onSuccess {
+                    _state.update { s ->
+                        s.copy(
+                            feeds = s.feeds.mapValues { (_, f) -> f.copy(posts = f.posts.filterNot { it.authorId == post.authorId }) },
+                            thread = s.thread?.copy(posts = s.thread.posts.filterNot { it.authorId == post.authorId }),
+                            toast = "Blocked @${post.authorUsername}. Unblock in Profile → Privacy and data.",
+                        )
+                    }
+                }
+                .onFailure { _state.update { s -> s.copy(toast = "Couldn't block. Try again.") } }
+        }
+    }
+
     fun clearComposeError() = _state.update { it.copy(composeError = null) }
     fun toastShown() = _state.update { it.copy(toast = null) }
     fun showToast(message: String) = _state.update { it.copy(toast = message) }

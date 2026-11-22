@@ -54,3 +54,11 @@ data class Profile(
     /** ISO country code for the country rankings, e.g. "IN". */
     val country: String? = null,
 )
+
+/** Someone I've blocked in the community (app.my_blocks). */
+@Serializable
+data class BlockedUser(
+    @SerialName("user_id") val userId: String,
+    @SerialName("display_name") val displayName: String,
+    val username: String,
+)

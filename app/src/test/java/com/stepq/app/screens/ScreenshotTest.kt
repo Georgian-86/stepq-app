@@ -66,12 +66,29 @@ class ScreenshotTest {
         fullName = "Riya Sharma"
         gender = Gender.Female
         birthdate = LocalDate.of(2001, 3, 14)
+        agreed = true
         avatar = AvatarConfig(skin = 2, hair = 0, outfit = 0, headband = 0)
     }
 
     @Test fun a05SignUp() = snap("A05-sign-up-account") { SignUpAccountScreen(null, {}, {}, {}) }
     @Test fun a06Name() = snap("A06-sign-up-name") { NameScreen(riya, null, {}, {}) }
     @Test fun a07About() = snap("A07-sign-up-about-you") { AboutYouScreen(riya, {}, {}) }
+    @Test fun a07AboutNotAgreed() = snap("A07-sign-up-about-you-consent") {
+        AboutYouScreen(OnboardingViewModel().apply { gender = Gender.Female; birthdate = LocalDate.of(2001, 3, 14) }, {}, {})
+    }
+    @Test fun a07bParentConsent() = snap("A07b-parent-consent") {
+        com.stepq.app.ui.onboarding.ParentConsentScreen("none", null, busy = false, error = null, onSend = { _, _ -> }, onCheckAgain = {}, onLogOut = {})
+    }
+    @Test fun a07bParentConsentWaiting() = snap("A07b-parent-consent-waiting") {
+        com.stepq.app.ui.onboarding.ParentConsentScreen("pending", "sunita@example.com", busy = false, error = null, onSend = { _, _ -> }, onCheckAgain = {}, onLogOut = {})
+    }
+    @Test fun a26Privacy() = snap("A26-privacy-and-data") {
+        com.stepq.app.ui.profile.PrivacyScreen(
+            exporting = false,
+            blocks = listOf(com.stepq.app.data.BlockedUser("x", "Spam Account", "cheap.followers")),
+            onExport = {}, onPermissions = {}, onAccount = {}, onUnblock = {}, onOpen = {}, onBack = {},
+        )
+    }
     @Test fun a08Avatar() = snap("A08-avatar") { AvatarScreen(riya, {}, {}) }
     @Test fun a09Goal() = snap("A09-daily-goal") { GoalScreen(riya, null, {}, {}) }
     @Test fun a10Connect() = snap("A10-connect-steps") { ConnectStepsScreen(onBack = {}) {} }
