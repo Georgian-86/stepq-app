@@ -81,6 +81,7 @@ fun HomeScreen(
     onSeeAllFriends: () -> Unit,
     onShare: (Set<String>) -> Unit = {},
     onToastShown: () -> Unit = {},
+    onOpenStreaks: () -> Unit = {},
 ) {
     var sharing by remember { mutableStateOf(false) }
     val goalReached = !state.loading && state.goal > 0 && state.steps >= state.goal
@@ -113,7 +114,7 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
             Ring(state)
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.appear(1)) { ShareCard(state, onOpen = { sharing = true }, onAddFriends = onSeeAllFriends) }
+            Box(Modifier.appear(1)) { ShareCard(state, onOpen = { sharing = true }, onAddFriends = onSeeAllFriends, onOpenStreaks = onOpenStreaks) }
             if (!state.healthConnected) {
                 Spacer(Modifier.height(16.dp))
                 ConnectCard(onConnectSteps)
@@ -250,13 +251,14 @@ private fun Ring(state: HomeUiState) {
  * friend's streak shows next to them. Once shared, it says so and offers to share again.
  */
 @Composable
-private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -> Unit) {
+private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -> Unit, onOpenStreaks: () -> Unit = {}) {
     val noFriends = state.shareTo.isEmpty()
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(StepqDimens.RadiusM))
             .background(if (state.sharedToday) StepqColors.LeafSoft else StepqColors.MangoSoft)
+            .clickable(enabled = !noFriends, onClickLabel = "See your streaks", onClick = onOpenStreaks)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -280,6 +282,9 @@ private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -
                 style = StepqType.Small,
                 color = StepqColors.Muted,
             )
+            if (!noFriends) {
+                Text("See your streaks ›", style = StepqType.SmallStrong, color = StepqColors.Deep, modifier = Modifier.padding(top = 4.dp))
+            }
         }
         com.stepq.app.ui.friends.SmallPill(
             when {
@@ -294,10 +299,10 @@ private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -
     }
 }
 
-/** Pick friends to share today's steps with. Everyone is picked to start with. */
+/** Pick friends to share today's steps with. Everyone in [preselected] (default: all) is picked to start with. */
 @Composable
-private fun ShareSheet(state: HomeUiState, onSend: (Set<String>) -> Unit) {
-    var picked by remember(state.shareTo) { mutableStateOf(state.shareTo.map { it.id }.toSet()) }
+internal fun ShareSheet(state: HomeUiState, preselected: Set<String>? = null, onSend: (Set<String>) -> Unit) {
+    var picked by remember(state.shareTo, preselected) { mutableStateOf(preselected ?: state.shareTo.map { it.id }.toSet()) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp)) {
         Text("Share today's steps", style = StepqType.Heading, color = StepqColors.Ink)
         Text(

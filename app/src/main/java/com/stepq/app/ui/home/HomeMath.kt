@@ -104,3 +104,33 @@ fun shareToast(names: List<String>, steps: Int, streak: Int, firstToday: Boolean
     }
     return "Shared ${com.stepq.app.ui.onboarding.formatSteps(steps)} steps with $who.$tail"
 }
+
+/** One friend on the Streaks page. [streak] is my streak with them; [sharedToday] means today already counts. */
+data class StreakRow(val person: com.stepq.app.data.PersonSummary, val streak: Int, val sharedToday: Boolean) {
+    /** Snapchat's hourglass: the streak ends tonight unless I share with them. */
+    val endsTonight: Boolean get() = streak > 0 && !sharedToday
+}
+
+/** The Streaks page, in three groups: ending tonight first, then going (longest first), then none yet. */
+data class StreakGroups(val endingTonight: List<StreakRow>, val going: List<StreakRow>, val notStarted: List<StreakRow>)
+
+fun streakGroups(
+    friends: List<com.stepq.app.data.PersonSummary>,
+    streaks: Map<String, Int>,
+    sharedToday: Set<String>,
+): StreakGroups {
+    val rows = friends.map { StreakRow(it, streaks[it.id] ?: 0, it.id in sharedToday) }
+    val byStreak = compareByDescending<StreakRow> { it.streak }.thenBy { it.person.displayName }
+    return StreakGroups(
+        endingTonight = rows.filter { it.endsTonight }.sortedWith(byStreak),
+        going = rows.filter { it.sharedToday }.sortedWith(byStreak),
+        notStarted = rows.filter { it.streak == 0 && !it.sharedToday }.sortedBy { it.person.displayName },
+    )
+}
+
+/** Snapchat-style marks next to a streak: 💯 at 100 days, ⏳ when it ends tonight. */
+fun streakBadge(row: StreakRow): String = buildString {
+    append("🔥 ").append(row.streak)
+    if (row.streak >= 100) append(" 💯")
+    if (row.endsTonight) append(" ⏳")
+}

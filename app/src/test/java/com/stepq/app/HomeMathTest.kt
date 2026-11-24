@@ -40,6 +40,17 @@ class HomeMathTest {
         assertEquals(listOf(4, 0, 0, 12), withStreaks.map { it.streak })
     }
 
+    @Test fun streaksPageGroupsEachFriendOnTheirOwn() {
+        val a = AvatarConfig()
+        val people = listOf("Arjun", "Meera", "Kabir", "Zoya").map { com.stepq.app.data.PersonSummary(it.lowercase(), it, it.lowercase(), a) }
+        val g = com.stepq.app.ui.home.streakGroups(people, mapOf("arjun" to 12, "meera" to 4, "zoya" to 104), setOf("arjun"))
+        assertEquals(listOf("Zoya", "Meera"), g.endingTonight.map { it.person.displayName })
+        assertEquals(listOf("Arjun"), g.going.map { it.person.displayName })
+        assertEquals(listOf("Kabir"), g.notStarted.map { it.person.displayName })
+        assertEquals("🔥 104 💯 ⏳", com.stepq.app.ui.home.streakBadge(g.endingTonight[0]))
+        assertEquals("🔥 12", com.stepq.app.ui.home.streakBadge(g.going[0]))
+    }
+
     @Test fun greetings() {
         assertEquals("Good morning", greeting(LocalTime.of(7, 0)))
         assertEquals("Good afternoon", greeting(LocalTime.of(13, 0)))

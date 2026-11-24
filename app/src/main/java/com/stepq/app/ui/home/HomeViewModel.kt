@@ -29,6 +29,8 @@ data class HomeUiState(
      * there is no overall streak, and several can be going at once.
      */
     val streaks: Map<String, Int> = emptyMap(),
+    /** Friends I've already shared with today. */
+    val sharedTodayWith: Set<String> = emptySet(),
     /** One point per day the goal was reached. */
     val score: Int = 0,
     val steps: Int = 0,
@@ -154,6 +156,7 @@ class HomeViewModel(
             firstName = data.me.displayName.substringBefore(' '),
             sharedToday = data.streaks.orEmpty().values.any { it.sharedToday },
             streaks = streakCounts(data),
+            sharedTodayWith = sharedWith(data),
             score = data.score ?: com.stepq.app.data.goalDays(data.myDays, goal),
             steps = steps,
             goal = goal,
@@ -177,6 +180,9 @@ class HomeViewModel(
         size = 5,
         streaks = data.friendsToday.map { (p, _) -> data.streaks?.get(p.id)?.streak ?: 0 },
     )
+
+    private fun sharedWith(data: com.stepq.app.data.HomeData): Set<String> =
+        data.streaks.orEmpty().values.filter { it.sharedToday }.map { it.friendId }.toSet()
 
     private fun streakCounts(data: com.stepq.app.data.HomeData): Map<String, Int> =
         data.streaks.orEmpty().mapValues { it.value.streak }.filterValues { it > 0 }
@@ -202,6 +208,8 @@ class HomeViewModel(
                         sharing = false,
                         sharedToday = sent > 0 || s.sharedToday,
                         streaks = updated?.let { streakCounts(it) } ?: s.streaks,
+                        // Without the migration there are no streak rows, so remember who got it.
+                        sharedTodayWith = (updated?.let { sharedWith(it) } ?: emptySet()) + s.sharedTodayWith + (if (sent > 0) friendIds else emptySet()),
                         friends = updated?.let { friendRows(it, _state.value.steps) } ?: s.friends,
                         toast = shareToast(names, s.steps, withThem, firstToday = firstToThemToday),
                     )

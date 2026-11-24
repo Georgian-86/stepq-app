@@ -123,6 +123,24 @@ class ScreenshotTest {
         ),
     )
 
+    private val streakFriends = listOf(
+        com.stepq.app.data.PersonSummary("a", "Arjun Mehta", "arjun.m", AvatarConfig(skin = 3, outfit = 3)),
+        com.stepq.app.data.PersonSummary("m", "Meera Iyer", "meera", AvatarConfig(skin = 1, outfit = 2, style = 1)),
+        com.stepq.app.data.PersonSummary("k", "Kabir Singh", "kabir", AvatarConfig(skin = 2, outfit = 1)),
+        com.stepq.app.data.PersonSummary("z", "Zoya Khan", "zoya", AvatarConfig(skin = 4, outfit = 4, headband = 1)),
+        com.stepq.app.data.PersonSummary("r", "Rohan Das", "rohan", AvatarConfig(skin = 1, outfit = 3)),
+    )
+    @Test fun a12dStreaks() = snap("A12d-streaks") {
+        com.stepq.app.ui.home.StreaksScreen(
+            home(6240, PikoMood.Nudge).copy(
+                shareTo = streakFriends,
+                streaks = mapOf("a" to 12, "m" to 4, "z" to 104, "k" to 1),
+                sharedTodayWith = setOf("a", "k"),
+            ),
+            onBack = {}, onShare = {},
+        )
+    }
+
     @Test fun a12Home() = snap("A12-home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
     @Test fun a12Loading() = snap("A12-home-loading") { HomeScreen(home(0, PikoMood.Nudge).copy(loading = true), {}, {}, {}) }
     @Test fun a12bGoalReached() = snap("A12b-home-goal-reached") { HomeScreen(home(8000, PikoMood.Cheer), {}, {}, {}) }
