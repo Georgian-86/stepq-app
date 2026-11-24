@@ -62,6 +62,8 @@ fun MainShell(
     community: com.stepq.app.data.CommunityRepository? = null,
 ) {
     var tab by rememberSaveable { mutableTabState() }
+    // Set when Home's streak card is tapped: the Friends tab opens on its Streaks section.
+    var friendsStart by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.stepq.app.ui.friends.FriendsSection?>(null) }
     val scope = rememberCoroutineScope()
     AskForNotificationsOnce()
     val pushRoute by com.stepq.app.push.PushRoute.pending.collectAsState()
@@ -106,12 +108,24 @@ fun MainShell(
             ) { current ->
             when (current) {
                 Tab.Home -> if (home != null) {
-                    com.stepq.app.ui.home.HomeRoute(home, onSeeAllFriends = { tab = Tab.Friends })
+                    com.stepq.app.ui.home.HomeRoute(
+                        home,
+                        onSeeAllFriends = { tab = Tab.Friends },
+                        onOpenStreaks = {
+                            friendsStart = com.stepq.app.ui.friends.FriendsSection.Streaks
+                            tab = Tab.Friends
+                        },
+                    )
                 } else {
                     ComingSoon("Home", "Your steps, streak and friends today.")
                 }
                 Tab.Friends -> if (friends != null) {
-                    com.stepq.app.ui.friends.FriendsRoute(friends, community, qruns)
+                    com.stepq.app.ui.friends.FriendsRoute(
+                        friends, community, qruns,
+                        homeRepo = home,
+                        startSection = friendsStart,
+                        onStartSectionUsed = { friendsStart = null },
+                    )
                 } else {
                     ComingSoon("Friends", "Friends, the community and QRuns.")
                 }

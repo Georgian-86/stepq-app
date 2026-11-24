@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,8 +63,11 @@ fun StreaksScreen(
     onBack: () -> Unit,
     onShare: (Set<String>) -> Unit,
     onToastShown: () -> Unit = {},
+    /** False inside the Friends tab, which has its own title and no back. */
+    showHeader: Boolean = true,
+    onAddFriend: () -> Unit = {},
 ) {
-    BackHandler(onBack = onBack)
+    if (showHeader) BackHandler(onBack = onBack)
     val groups = streakGroups(state.shareTo, state.streaks, state.sharedTodayWith)
     // null: no sheet; otherwise who's picked when it opens.
     var sheetFor by remember { mutableStateOf<Set<String>?>(null) }
@@ -72,16 +76,18 @@ fun StreaksScreen(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
+                .then(if (showHeader) Modifier.statusBarsPadding() else Modifier)
                 .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(4.dp))
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = StepqColors.Ink)
+            if (showHeader) {
+                Spacer(Modifier.height(4.dp))
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = StepqColors.Ink)
+                }
+                Text("Streaks", style = StepqType.Title, color = StepqColors.Ink)
             }
-            Text("Streaks", style = StepqType.Title, color = StepqColors.Ink)
             Spacer(Modifier.height(12.dp))
-            Hero(groups, onKeepAll = { sheetFor = groups.endingTonight.map { it.person.id }.toSet() })
+            Hero(groups, noFriends = state.shareTo.isEmpty() && !state.loading, onAddFriend = onAddFriend, onKeepAll = { sheetFor = groups.endingTonight.map { it.person.id }.toSet() })
             if (groups.endingTonight.isNotEmpty()) {
                 Section("Ends tonight ⏳", "Share with them today or the streak goes back to 0.")
                 groups.endingTonight.forEach { Line(it, state.sharing) { onShare(setOf(it.person.id)) } }
@@ -126,7 +132,7 @@ fun StreaksScreen(
 
 /** Piko and one line on what needs doing today. */
 @Composable
-private fun Hero(groups: StreakGroups, onKeepAll: () -> Unit) {
+private fun Hero(groups: StreakGroups, noFriends: Boolean = false, onAddFriend: () -> Unit = {}, onKeepAll: () -> Unit) {
     val ending = groups.endingTonight.size
     Column(
         Modifier
@@ -146,6 +152,7 @@ private fun Hero(groups: StreakGroups, onKeepAll: () -> Unit) {
                     when {
                         ending == 1 -> "1 streak ends tonight"
                         ending > 1 -> "$ending streaks end tonight"
+                        noFriends -> "Add a friend to start a streak"
                         groups.going.isNotEmpty() -> "All your streaks are kept today"
                         else -> "No streaks yet"
                     },
@@ -162,6 +169,9 @@ private fun Hero(groups: StreakGroups, onKeepAll: () -> Unit) {
         if (ending > 0) {
             Spacer(Modifier.height(12.dp))
             StepqButton(if (ending == 1) "Keep it going" else "Keep all $ending going", onKeepAll)
+        } else if (noFriends) {
+            Spacer(Modifier.height(12.dp))
+            StepqButton("Add a friend", onAddFriend)
         }
     }
 }
@@ -224,4 +234,23 @@ private fun HowItWorks() {
         Text("💯  Reach 100 days in a row together.", style = StepqType.Small, color = StepqColors.Muted)
         Text("Each friend's streak is separate, so you can keep many going at once.", style = StepqType.Small, color = StepqColors.Muted)
     }
+}
+
+/** The Streaks section of the Friends tab: loads friends and streaks, and shares from here. */
+@Composable
+fun StreaksSection(repo: com.stepq.app.data.HomeRepository, onAddFriend: () -> Unit) {
+    val vm: StreaksViewModel = androidx.lifecycle.viewmodel.compose.viewModel(key = "streaks") { StreaksViewModel(repo) }
+    val state by vm.state.collectAsState()
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        vm.refresh()
+        onPauseOrDispose { }
+    }
+    StreaksScreen(
+        state,
+        onBack = {},
+        onShare = vm::share,
+        onToastShown = vm::toastShown,
+        showHeader = false,
+        onAddFriend = onAddFriend,
+    )
 }

@@ -131,14 +131,17 @@ class ScreenshotTest {
         com.stepq.app.data.PersonSummary("r", "Rohan Das", "rohan", AvatarConfig(skin = 1, outfit = 3)),
     )
     @Test fun a12dStreaks() = snap("A12d-streaks") {
-        com.stepq.app.ui.home.StreaksScreen(
-            home(6240, PikoMood.Nudge).copy(
-                shareTo = streakFriends,
-                streaks = mapOf("a" to 12, "m" to 4, "z" to 104, "k" to 1),
-                sharedTodayWith = setOf("a", "k"),
-            ),
-            onBack = {}, onShare = {},
-        )
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Streaks, {}, {})
+            com.stepq.app.ui.home.StreaksScreen(
+                home(6240, PikoMood.Nudge).copy(
+                    shareTo = streakFriends,
+                    streaks = mapOf("a" to 12, "m" to 4, "z" to 104, "k" to 1),
+                    sharedTodayWith = setOf("a", "k"),
+                ),
+                onBack = {}, onShare = {}, showHeader = false,
+            )
+        }
     }
 
     @Test fun a12Home() = snap("A12-home") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
