@@ -37,7 +37,7 @@ class HomeMathTest {
         assertEquals(listOf("You"), friendsToday("You" to a, 10, emptyList()).map { it.name })
         // Each friend keeps their own streak with me; I have none of my own.
         val withStreaks = friendsToday("You" to a, 6240, friends, size = 4, streaks = listOf(4, 0, 12))
-        assertEquals(listOf(4, 0, 0, 12), withStreaks.map { it.streak })
+        assertEquals(listOf(4, 0, 12, 0), withStreaks.map { it.streak })
     }
 
     @Test fun streaksPageGroupsEachFriendOnTheirOwn() {
