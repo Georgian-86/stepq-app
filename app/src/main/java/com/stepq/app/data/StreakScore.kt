@@ -9,23 +9,30 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.LocalDate
 
-/** A row of app.share_streak(): days in a row I shared my steps, and whether today counts yet. */
+/** A row of app.friend_streaks(): days in a row I shared my steps with one friend. */
 @Serializable
-data class ShareStreak(val streak: Int = 0, @SerialName("shared_today") val sharedToday: Boolean = false)
+data class FriendStreak(
+    @SerialName("friend_id") val friendId: String,
+    val streak: Int = 0,
+    @SerialName("shared_today") val sharedToday: Boolean = false,
+)
 
 @Serializable
 private data class UserScore(@SerialName("user_id") val userId: String, val score: Int = 0)
 
 /**
- * Streak and StepQ score (Nov 20 rules):
- * - Streak: days in a row on which I shared my step count with at least one friend.
+ * Streaks and StepQ score:
+ * - Streaks are per friend (Nov 24 rule): days in a row on which I shared my step count with
+ *   that friend. There is no overall streak; several can be going on the same day.
  * - StepQ score: one point for every day I reached that day's goal.
- * Both live in Postgres (migration 20261120000000); every call returns null until it's applied.
+ * Both live in Postgres (migrations 20261120000000 and 20261125000000); calls return null
+ * until they're applied.
  */
 object StreakScore {
-    suspend fun streak(db: Postgrest, today: LocalDate): ShareStreak? = runCatching {
-        db.rpc("share_streak", buildJsonObject { put("p_today", today.toString()) })
-            .decodeList<ShareStreak>().firstOrNull() ?: ShareStreak()
+    /** My streak with each friend, by friend id. */
+    suspend fun friendStreaks(db: Postgrest, today: LocalDate): Map<String, FriendStreak>? = runCatching {
+        db.rpc("friend_streaks", buildJsonObject { put("p_today", today.toString()) })
+            .decodeList<FriendStreak>().associateBy { it.friendId }
     }.getOrNull()
 
     /** StepQ scores by user id, for people I can see (me, friends, group mates). */

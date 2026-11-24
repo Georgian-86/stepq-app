@@ -41,7 +41,7 @@ fun AllSetScreen(firstName: String, dailyGoal: Int, onStart: () -> Unit) {
         Spacer(Modifier.height(10.dp))
         Text(modifier = Modifier.appear(3),
             text = 
-            "Your goal is ${formatSteps(dailyGoal)} steps a day. Walk with friends, keep your streak alive and climb the weekly leaderboard.",
+            "Your goal is ${formatSteps(dailyGoal)} steps a day. Walk with friends, keep a streak going with each of them and climb the weekly leaderboard.",
             style = StepqType.Body, color = StepqColors.Muted, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.weight(1.4f))

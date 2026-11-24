@@ -22,9 +22,13 @@ data class HomeUiState(
     val dateLabel: String = "",
     val greeting: String = "",
     val firstName: String = "",
-    /** Days in a row I shared my steps with a friend. */
-    val streak: Int = 0,
+    /** I've shared my steps with at least one friend today. */
     val sharedToday: Boolean = false,
+    /**
+     * My streak with each friend, by friend id (only those above 0). Streaks are per friend:
+     * there is no overall streak, and several can be going at once.
+     */
+    val streaks: Map<String, Int> = emptyMap(),
     /** One point per day the goal was reached. */
     val score: Int = 0,
     val steps: Int = 0,
@@ -148,8 +152,8 @@ class HomeViewModel(
             dateLabel = today.format(DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.ENGLISH)),
             greeting = greeting(LocalTime.now()),
             firstName = data.me.displayName.substringBefore(' '),
-            streak = data.streak?.streak ?: 0,
-            sharedToday = data.streak?.sharedToday ?: false,
+            sharedToday = data.streaks.orEmpty().values.any { it.sharedToday },
+            streaks = streakCounts(data),
             score = data.score ?: com.stepq.app.data.goalDays(data.myDays, goal),
             steps = steps,
             goal = goal,
@@ -158,12 +162,7 @@ class HomeViewModel(
             activeMinutes = todayRow?.activeMinutes ?: 0,
             week = week,
             weekAverage = weekAverage(week),
-            friends = friendsToday(
-                me = "You" to data.me.avatar,
-                mySteps = steps,
-                friends = data.friendsToday.map { (p, s) -> Triple(p.displayName.substringBefore(' '), p.avatar, s) },
-                size = 5,
-            ),
+            friends = friendRows(data, steps),
             hasFriends = data.friendsToday.isNotEmpty(),
             mood = mood,
             healthConnected = connected,
@@ -171,7 +170,18 @@ class HomeViewModel(
         )
     }
 
-    /** Shares today's steps with [friendIds]; the first share of the day grows the streak. */
+    private fun friendRows(data: com.stepq.app.data.HomeData, mySteps: Int): List<FriendRow> = friendsToday(
+        me = "You" to data.me.avatar,
+        mySteps = mySteps,
+        friends = data.friendsToday.map { (p, s) -> Triple(p.displayName.substringBefore(' '), p.avatar, s) },
+        size = 5,
+        streaks = data.friendsToday.map { (p, _) -> data.streaks?.get(p.id)?.streak ?: 0 },
+    )
+
+    private fun streakCounts(data: com.stepq.app.data.HomeData): Map<String, Int> =
+        data.streaks.orEmpty().mapValues { it.value.streak }.filterValues { it > 0 }
+
+    /** Shares today's steps with [friendIds]; the first share of the day to a friend grows my streak with them. */
     fun share(friendIds: Set<String>) {
         val s = _state.value
         if (friendIds.isEmpty() || s.sharing) return
@@ -179,15 +189,21 @@ class HomeViewModel(
         viewModelScope.launch {
             val today = LocalDate.now()
             repo.shareSteps(friendIds, s.steps, today)
-                .onSuccess { (sent, streak) ->
+                .onSuccess { (sent, streaks) ->
                     val names = s.shareTo.filter { it.id in friendIds }.map { it.displayName.substringBefore(' ') }
-                    val newStreak = streak?.streak ?: s.streak
-                    data = data?.copy(streak = streak ?: data?.streak)
+                    val before = data?.streaks
+                    val updated = data?.let { it.copy(streaks = streaks ?: it.streaks) }
+                    data = updated
+                    // Only one friend picked: name my streak with them.
+                    val only = friendIds.singleOrNull()
+                    val withThem = only?.let { streaks?.get(it)?.streak } ?: 0
+                    val firstToThemToday = only != null && sent > 0 && streaks != null && before?.get(only)?.sharedToday != true
                     _state.value = _state.value.copy(
                         sharing = false,
                         sharedToday = sent > 0 || s.sharedToday,
-                        streak = newStreak,
-                        toast = shareToast(names, s.steps, newStreak, firstToday = !s.sharedToday && sent > 0),
+                        streaks = updated?.let { streakCounts(it) } ?: s.streaks,
+                        friends = updated?.let { friendRows(it, _state.value.steps) } ?: s.friends,
+                        toast = shareToast(names, s.steps, withThem, firstToday = firstToThemToday),
                     )
                 }
                 .onFailure {

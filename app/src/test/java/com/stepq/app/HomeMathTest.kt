@@ -5,7 +5,6 @@ import com.stepq.app.data.DailySteps
 import com.stepq.app.ui.home.friendsToday
 import com.stepq.app.ui.home.greeting
 import com.stepq.app.ui.home.stepqScore
-import com.stepq.app.ui.home.streak
 import com.stepq.app.ui.home.weekAverage
 import com.stepq.app.ui.home.weekBars
 import org.junit.Assert.assertEquals
@@ -16,13 +15,6 @@ import java.time.LocalTime
 class HomeMathTest {
     private val today = LocalDate.of(2026, 10, 17) // a Saturday
     private fun day(daysAgo: Long, steps: Int) = DailySteps("me", today.minusDays(daysAgo).toString(), steps)
-
-    @Test fun streakCountsFromYesterdayUntilTodayIsMet() {
-        val days = listOf(day(0, 3000), day(1, 9000), day(2, 8000), day(3, 7000))
-        assertEquals(2, streak(days, 8000, today))
-        assertEquals(3, streak(days.map { if (it.day == today.toString()) it.copy(steps = 8000) else it }, 8000, today))
-        assertEquals(0, streak(emptyList(), 8000, today))
-    }
 
     @Test fun scoreIsPercentOfGoalCapped() {
         assertEquals(78, stepqScore(6240, 8000))
@@ -43,6 +35,9 @@ class HomeMathTest {
         assertEquals(listOf("Arjun", "Meera", "You"), rows.map { it.name })
         assertEquals(4, rows.last().rank)
         assertEquals(listOf("You"), friendsToday("You" to a, 10, emptyList()).map { it.name })
+        // Each friend keeps their own streak with me; I have none of my own.
+        val withStreaks = friendsToday("You" to a, 6240, friends, size = 4, streaks = listOf(4, 0, 12))
+        assertEquals(listOf(4, 0, 0, 12), withStreaks.map { it.streak })
     }
 
     @Test fun greetings() {

@@ -108,12 +108,12 @@ class ScreenshotTest {
     }
     @Test fun a11AllSet() = snap("A11-all-set") { AllSetScreen("Riya", 8000) {} }
     private fun home(steps: Int, mood: PikoMood, greeting: String = "Good morning") = HomeUiState(
-        loading = false, dateLabel = "Saturday, 17 Oct", greeting = greeting, firstName = "Riya", streak = 12,
+        loading = false, dateLabel = "Saturday, 17 Oct", greeting = greeting, firstName = "Riya", streaks = mapOf("a" to 12, "m" to 4),
         steps = steps, goal = 8000, km = steps * 0.000762, kcal = steps * 38 / 1000, activeMinutes = steps / 120,
         week = listOf(6100, 7800, 4300, 8600, 7100, 5600, steps), weekAverage = 7420,
         friends = listOf(
-            FriendRow(1, "Arjun", AvatarConfig(skin = 3, outfit = 3), 9120, false),
-            FriendRow(2, "Meera", AvatarConfig(skin = 1, outfit = 2, headband = 2), 7480, false),
+            FriendRow(1, "Arjun", AvatarConfig(skin = 3, outfit = 3), 9120, false, streak = 12),
+            FriendRow(2, "Meera", AvatarConfig(skin = 1, outfit = 2, headband = 2), 7480, false, streak = 4),
             FriendRow(3, "You", AvatarConfig(), steps, true),
         ).sortedByDescending { it.steps }.mapIndexed { i, r -> r.copy(rank = i + 1) },
         hasFriends = true, mood = mood, score = 42, sharedToday = steps >= 8000,
@@ -395,7 +395,7 @@ class ScreenshotTest {
     private val profileState = com.stepq.app.ui.profile.ProfileUiState(
         loading = false,
         profile = friendsData.me.copy(avatar = AvatarConfig(skin = 2)),
-        stats = com.stepq.app.ui.profile.ProfileStats(streak = 12, bestDay = 11830, kmSoFar = 186, score = 48),
+        stats = com.stepq.app.ui.profile.ProfileStats(bestDay = 11830, kmSoFar = 186, score = 48),
     )
 
     @Test fun a26Profile() = snap("A26-profile") {

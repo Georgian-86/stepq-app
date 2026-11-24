@@ -126,11 +126,7 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat(state.stats.streak.toString(), "day streak", Modifier.weight(1f))
                 Stat(formatSteps(state.stats.score), "StepQ score", Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Stat(formatSteps(state.stats.bestDay), "best day", Modifier.weight(1f))
                 Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
             }
