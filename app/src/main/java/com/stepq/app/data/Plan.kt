@@ -281,6 +281,22 @@ object Pro {
         refresh()
     }
 
+    /**
+     * Before deleting the account: removes every file in my folder of the photo bucket,
+     * including any left over from an earlier failed delete. Best effort: an account with no
+     * photos, or a project without the bucket yet, just has nothing to remove.
+     */
+    suspend fun deleteAllMyPhotos() {
+        val c = client ?: return
+        val me = myId() ?: return
+        runCatching {
+            val bucket = c.storage.from(BUCKET)
+            val paths = bucket.list(me).map { "$me/${it.name}" }
+            if (paths.isNotEmpty()) bucket.delete(paths)
+        }.onFailure { android.util.Log.w("StepqPro", "Couldn't remove profile photos", it) }
+        photos.evictAll()
+    }
+
     private fun shrink(raw: ByteArray): ByteArray {
         val bmp = BitmapFactory.decodeByteArray(raw, 0, raw.size) ?: throw IllegalArgumentException("Not an image")
         val side = minOf(bmp.width, bmp.height)

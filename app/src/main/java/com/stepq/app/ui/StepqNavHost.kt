@@ -53,15 +53,20 @@ object Routes {
     const val MAIN = "main"
     /** 13 to 17 year olds wait here until a parent agrees on stepq.in. */
     const val PARENT = "onboarding/parent"
+    const val RECONSENT = "onboarding/reconsent"
 
     fun checkEmail(email: String) = "check-email/${android.net.Uri.encode(email)}"
 }
 
 /** Where a session lands: signed out, signed in without a profile yet, or ready. */
-private enum class Landing { Loading, SignedOut, Onboarding, ParentConsent, Main }
+private enum class Landing { Loading, SignedOut, Onboarding, ParentConsent, Reconsent, Main }
 
 /** The shortest time the launch screen shows, so Piko and the wordmark are seen on every open. */
 const val LAUNCH_MIN_MS = 1800L
+
+/** Signed in with a profile but no record of agreeing to the current policy. Offline: let them in. */
+private suspend fun needsReconsent(profiles: ProfileRepository): Boolean =
+    profiles.hasConsent(com.stepq.app.ui.components.Legal.POLICY_VERSION).getOrNull() == false
 
 /** Signed in with a profile, under 18 and no parent has agreed yet. Offline: let them in. */
 private suspend fun needsParent(profiles: ProfileRepository): Boolean =
@@ -96,6 +101,7 @@ fun StepqNavHost(
                     when {
                         it == null -> Landing.Onboarding
                         needsParent(profiles) -> Landing.ParentConsent
+                        needsReconsent(profiles) -> Landing.Reconsent
                         else -> Landing.Main
                     }
                 },
@@ -111,6 +117,7 @@ fun StepqNavHost(
             Landing.Main -> Routes.MAIN
             Landing.Onboarding -> Routes.NAME
             Landing.ParentConsent -> Routes.PARENT
+            Landing.Reconsent -> Routes.RECONSENT
             Landing.SignedOut -> if (current == Routes.MAIN || current.startsWith("onboarding/")) Routes.SPLASH else null
             Landing.Loading -> null
         }
@@ -133,6 +140,7 @@ fun StepqNavHost(
         Landing.Main -> Routes.MAIN
         Landing.Onboarding -> Routes.NAME
         Landing.ParentConsent -> Routes.PARENT
+        Landing.Reconsent -> Routes.RECONSENT
         else -> Routes.SPLASH
     }
 
@@ -283,6 +291,25 @@ fun StepqNavHost(
                     }
                 },
                 onCheckAgain = ::refresh,
+                onLogOut = { scope.launch { auth.logOut() } },
+            )
+        }
+        composable(Routes.RECONSENT) {
+            var busy by remember { mutableStateOf(false) }
+            var error by remember { mutableStateOf<String?>(null) }
+            com.stepq.app.ui.onboarding.ReconsentScreen(
+                busy = busy,
+                error = error,
+                onAgree = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        profiles.recordConsent("terms_privacy", com.stepq.app.ui.components.Legal.POLICY_VERSION)
+                            .onSuccess { nav.navigate(Routes.MAIN) { popUpTo(0) { inclusive = true } } }
+                            .onFailure { error = "Couldn't save that. Check your connection and try again." }
+                        busy = false
+                    }
+                },
                 onLogOut = { scope.launch { auth.logOut() } },
             )
         }

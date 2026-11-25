@@ -101,6 +101,9 @@ class AuthRepository(private val client: SupabaseClient?) {
     /** Deletes the account and everything in it (app.delete_my_account), then signs out. */
     suspend fun deleteAccount(): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
+        // Profile photos live in Storage, which the database function can't reach: remove
+        // them first so nothing of the account is left behind (DPDP s.8(7), s.12).
+        Pro.deleteAllMyPhotos()
         c.postgrest.rpc("delete_my_account")
         runCatching { c.auth.signOut() }
         runCatching { c.auth.clearSession() }
@@ -144,10 +147,25 @@ object PasswordRecovery {
     private val _active = kotlinx.coroutines.flow.MutableStateFlow(false)
     val active: kotlinx.coroutines.flow.StateFlow<Boolean> = _active
 
-    /** When a reset was last requested on this phone, to recognise the link if it carries no type. */
+    /**
+     * When a reset was last requested on this phone, to recognise the link: with PKCE the link
+     * carries only `?code=`, no type. Kept on disk, because Android often stops the app while
+     * the person is in their email app.
+     */
     @Volatile private var requestedAt: Long = 0
+    private var prefs: android.content.SharedPreferences? = null
+    private const val KEY = "reset_requested_at"
 
-    fun requested() { requestedAt = System.currentTimeMillis() }
+    /** Called once at start-up. */
+    fun init(context: android.content.Context) {
+        prefs = context.applicationContext.getSharedPreferences("stepq_auth_flags", android.content.Context.MODE_PRIVATE)
+        requestedAt = prefs?.getLong(KEY, 0L) ?: 0L
+    }
+
+    fun requested() {
+        requestedAt = System.currentTimeMillis()
+        prefs?.edit()?.putLong(KEY, requestedAt)?.apply()
+    }
 
     /** Called with what the opened link said about itself. */
     fun linkOpened(url: String?, sessionType: String?) {
@@ -155,7 +173,11 @@ object PasswordRecovery {
         if (isRecovery(url, sessionType) || (recent && url?.contains("code=") == true)) _active.value = true
     }
 
-    fun done() { _active.value = false; requestedAt = 0 }
+    fun done() {
+        _active.value = false
+        requestedAt = 0
+        prefs?.edit()?.remove(KEY)?.apply()
+    }
 
     fun isRecovery(url: String?, sessionType: String?): Boolean =
         sessionType == "recovery" || url?.contains("type=recovery") == true

@@ -576,6 +576,15 @@ select pg_temp.expect_error($$select app.my_plan()$$, 'anon reading a plan');
 select pg_temp.expect_error($$select * from app.plan_features$$, 'anon reading the feature list');
 reset role;
 
+-- Launch audit: contact matching is rate limited; the export covers Pro data.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+do $$ begin for i in 1..10 loop perform * from app.match_contacts(array['00']); end loop; end $$;
+select pg_temp.expect_error($$select * from app.match_contacts(array['00'])$$, 'contacts: 11th lookup in a day');
+select pg_temp.expect_error($$select * from app.contact_lookups$$, 'contacts: lookups log is private');
+select pg_temp.expect((select app.export_my_data() ? 'plan' and app.export_my_data() ? 'streak_restores'
+                         and (app.export_my_data() ->> 'contact_lookups')::int = 10), 'export: includes Pro data and lookups');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
@@ -591,6 +600,7 @@ select pg_temp.expect_error($$select app.create_post('hi')$$, 'anon posting');
 select pg_temp.expect_error($$select app.export_my_data()$$, 'anon exporting data');
 select pg_temp.expect_error($$select app.record_consent('terms_privacy', 'x')$$, 'anon recording consent');
 select pg_temp.expect_error($$select * from app.user_blocks$$, 'anon reading blocks');
+select pg_temp.expect_error($$select * from app.match_contacts(array['00'])$$, 'anon matching contacts after audit');
 reset role;
 
 \echo 'All RLS checks passed.'

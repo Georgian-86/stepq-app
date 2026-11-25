@@ -68,6 +68,23 @@ class ProfileRepository(private val client: SupabaseClient?) {
         )
     }
 
+    /**
+     * True when I have agreed to the Terms and Privacy policy at [version] and not withdrawn.
+     * Fails (and the caller lets me in) when offline or before the consent log exists.
+     */
+    suspend fun hasConsent(version: String, purpose: String = "terms_privacy"): Result<Boolean> = runCatching {
+        val me = currentUserId() ?: throw IllegalStateException("Not signed in")
+        requireClient().postgrest["consents"].select(io.github.jan.supabase.postgrest.query.Columns.list("id")) {
+            filter {
+                eq("user_id", me)
+                eq("purpose", purpose)
+                eq("version", version)
+                exact("withdrawn_at", null)
+            }
+            limit(1)
+        }.data.trim().let { it != "[]" && it.isNotEmpty() }
+    }
+
     /** Everything StepQ holds about me, as JSON (app.export_my_data). */
     suspend fun exportMyData(): Result<String> = runCatching {
         requireClient().postgrest.rpc("export_my_data").data

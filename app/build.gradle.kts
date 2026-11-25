@@ -35,7 +35,7 @@ android {
         minSdk = 28
         targetSdk = 37
         versionCode = config("VERSION_CODE", "1").toInt()
-        versionName = "1.0.0"
+        versionName = config("VERSION_NAME", "1.0.0")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${config("SUPABASE_URL", "https://koagkmedvsplbgmltehk.supabase.co")}\"")

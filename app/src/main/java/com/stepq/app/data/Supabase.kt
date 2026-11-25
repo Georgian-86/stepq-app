@@ -5,6 +5,7 @@ import android.content.Context
 import com.russhwolf.settings.SharedPreferencesSettings
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.SettingsCodeVerifierCache
 import io.github.jan.supabase.auth.SettingsSessionManager
 import io.github.jan.supabase.createSupabaseClient
@@ -35,12 +36,21 @@ object Supabase {
                 // commit = true writes each refreshed session to disk before going on. With the
                 // default (apply) a process killed right after a refresh could start next time
                 // with the old refresh token, which Supabase treats as reuse and revokes.
-                val settings = SharedPreferencesSettings(
-                    appContext.getSharedPreferences("supabase_auth", Context.MODE_PRIVATE),
-                    commit = true,
+                // The tokens are encrypted with a Keystore key before they reach the disk
+                // (EncryptedSettings); sessions saved by older versions are upgraded on read.
+                val settings = EncryptedSettings(
+                    SharedPreferencesSettings(
+                        appContext.getSharedPreferences("supabase_auth", Context.MODE_PRIVATE),
+                        commit = true,
+                    ),
                 )
                 sessionManager = SettingsSessionManager(settings)
                 codeVerifierCache = SettingsCodeVerifierCache(settings)
+                // PKCE: an emailed link (confirm, reset password, change email) carries a one-time
+                // code that only works together with a secret kept on this phone, never the
+                // session itself. With the implicit flow the tokens were in the stepq:// link,
+                // which any other app claiming the same scheme could read.
+                flowType = FlowType.PKCE
                 // Email confirmation links come back into the app (see AndroidManifest).
                 scheme = DEEPLINK_SCHEME
                 host = DEEPLINK_HOST
