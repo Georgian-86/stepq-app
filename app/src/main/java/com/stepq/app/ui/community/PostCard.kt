@@ -146,6 +146,18 @@ fun PostRow(
                         Icon(Icons.Outlined.MoreHoriz, contentDescription = "More options", tint = StepqColors.Muted, modifier = Modifier.size(20.dp))
                     }
                 }
+                if (post.pending) {
+                    Text(
+                        "Waiting for approval · only you can see it",
+                        style = StepqType.SmallStrong,
+                        color = com.stepq.app.ui.theme.ProColors.GoldText,
+                        modifier = Modifier
+                            .padding(top = 2.dp, bottom = 2.dp)
+                            .clip(CircleShape)
+                            .background(com.stepq.app.ui.theme.ProColors.Champagne2)
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
                 if (showReplyingTo && post.parentUsername != null) {
                     Text(
                         buildAnnotatedString {

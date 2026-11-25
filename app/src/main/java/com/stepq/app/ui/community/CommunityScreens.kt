@@ -650,12 +650,14 @@ private fun SheetRow(icon: ImageVector, label: String, danger: Boolean = false, 
 private fun postsLeftLine(): String? {
     val plan by com.stepq.app.data.Pro.plan.collectAsState()
     val p = plan ?: return null
-    val limit = p.limit(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS) ?: return null
     if (p.feature(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS) == null) return null
-    val left = p.postsLeft ?: return null
+    val limit = p.limit(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS)
+    val left = p.postsLeft
+    val review = if (p.has(com.stepq.app.data.MyPlan.F.POST_APPROVAL)) "StepQ checks new posts before they go live." else null
     return when {
-        limit == 0 -> "Posting new threads is a Pro feature. You can still like and reply."
+        limit == 0 -> "Starting posts is for StepQ Pro members. You can still like and reply."
+        limit == null -> review
         left == 0 -> "No new threads left this month. You can still like and reply."
-        else -> "$left of $limit new threads left this month"
+        else -> listOfNotNull("$left of $limit new threads left this month.", review).joinToString(" ")
     }
 }

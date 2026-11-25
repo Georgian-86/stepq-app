@@ -40,6 +40,8 @@ data class Post(
     @SerialName("reposted_by") val repostedBy: String? = null,
     /** Thread only: below 0 for the posts it replies to, 0 for the post, 1 for replies. */
     val depth: Int = 0,
+    /** Mine and still waiting for an admin to approve it (from app.my_pending_posts()). */
+    @kotlinx.serialization.Transient val pending: Boolean = false,
 ) {
     val isAchievement: Boolean get() = kind == "achievement"
     val goalReached: Boolean get() = steps != null && goal != null && steps >= goal
@@ -89,12 +91,19 @@ class CommunityRepository(private val client: SupabaseClient?, private val profi
                 if (before != null) put("p_before", before) else put("p_before", JsonNull)
                 put("p_limit", limit)
             },
-        ).decodeList<Post>()
+        ).decodeList<Post>().markPending()
+    }
+
+    /** Marks my posts that are waiting for approval. Before the approval migration there are none. */
+    private suspend fun List<Post>.markPending(): List<Post> {
+        if (none { it.parentId == null }) return this
+        val waiting = runCatching { c().postgrest.rpc("my_pending_posts").decodeList<String>().toSet() }.getOrDefault(emptySet())
+        return if (waiting.isEmpty()) this else map { if (it.id in waiting) it.copy(pending = true) else it }
     }
 
     /** A post with what it replies to above it and its replies below. */
     suspend fun thread(postId: String): Result<List<Post>> = runCatching {
-        c().postgrest.rpc("post_thread", buildJsonObject { put("p_post", postId) }).decodeList<Post>()
+        c().postgrest.rpc("post_thread", buildJsonObject { put("p_post", postId) }).decodeList<Post>().markPending()
     }
 
     /** Posts a thought, a reply ([parentId]) or, with [shareDay], my steps for that day. Returns its id. */

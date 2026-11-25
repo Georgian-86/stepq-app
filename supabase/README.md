@@ -40,3 +40,10 @@ admin change goes to `app.admin_log`.
 The migration also creates the private `avatars` storage bucket (1 MB, JPEG/PNG/WebP). A photo
 is readable only by its owner and by people who can see their profile (friends and group mates).
 There are no payments: members become Pro when an admin sets them.
+
+### Round 2 (`20261127100000_pro_tier_round2.sql`)
+
+Free members can't start Community posts (they like and reply), and new posts from anyone whose
+plan has `post_approval` (Free and Pro by default) wait for an admin: only the author sees them
+until an admin approves them in the admin panel (`app.admin_review_post`). Replies are never held.
+Free members' Insights history is one year.

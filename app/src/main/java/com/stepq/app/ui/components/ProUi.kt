@@ -48,21 +48,20 @@ import com.stepq.app.ui.theme.ProColors
 import com.stepq.app.ui.theme.StepqColors
 import com.stepq.app.ui.theme.StepqType
 
-/** The gold "PRO" pill with a crown. */
+/** The Pro mark: a small gold coin with a crown. No text, so it reads the same in any language. */
 @Composable
 fun ProBadge(modifier: Modifier = Modifier, small: Boolean = false) {
-    Row(
+    val size = if (small) 18.dp else 24.dp
+    Box(
         modifier
+            .size(size)
             .shadow(3.dp, CircleShape, ambientColor = ProColors.Gold3, spotColor = ProColors.Gold3)
             .clip(CircleShape)
-            .background(ProColors.goldFlat)
-            .padding(start = if (small) 6.dp else 8.dp, end = if (small) 7.dp else 10.dp, top = 2.dp, bottom = 2.dp)
-            .semantics(mergeDescendants = true) { contentDescription = "StepQ Pro member" },
-        verticalAlignment = Alignment.CenterVertically,
+            .background(ProColors.gold)
+            .semantics { contentDescription = "StepQ Pro member" },
+        contentAlignment = Alignment.Center,
     ) {
-        Crown(if (small) 9.dp else 11.dp, StepqColors.Ink)
-        Spacer(Modifier.width(3.dp))
-        Text("PRO", style = StepqType.Label, color = StepqColors.Ink)
+        Crown(size * 0.62f, StepqColors.Ink)
     }
 }
 
@@ -254,7 +253,7 @@ fun PlanLimitSheet(
         if (actionLabel != null && onAction != null) {
             GoldButton(actionLabel, onAction)
         } else if (plan?.isPro != true) {
-            GoldButton("See StepQ Pro", onSeePro)
+            GoldButton("Upgrade to StepQ Pro", onSeePro)
         }
         TextButton(onClick = onDismiss) { Text(if (plan?.isPro == true) "OK" else "Not now", style = StepqType.SmallStrong, color = StepqColors.Deep) }
     }
@@ -280,7 +279,7 @@ fun limitCopy(key: String, limit: Int?, isPro: Boolean): Pair<String, String> = 
     else -> "A StepQ Pro feature" to "Upgrade to StepQ Pro to use it."
 }
 
-/** A small "PRO" tag for locked rows and chips. */
+/** A small crown mark for locked rows and chips. */
 @Composable
 fun ProTag(modifier: Modifier = Modifier) = ProBadge(modifier, small = true)
 
