@@ -465,8 +465,9 @@ delete from app.posts where id = current_setting('test.post')::uuid;
 select pg_temp.expect(exists (select 1 from app.posts where id = current_setting('test.post')::uuid), 'moderation: others cannot delete my post');
 reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
-delete from app.posts where id = current_setting('test.post')::uuid;
-select pg_temp.expect(not exists (select 1 from app.posts where id = current_setting('test.post')::uuid), 'moderation: admin removes a post');
+-- Removes Riya's achievement post; test.post stays for the Pro checks further down.
+delete from app.posts where id = current_setting('test.win')::uuid;
+select pg_temp.expect(not exists (select 1 from app.posts where id = current_setting('test.win')::uuid), 'moderation: admin removes a post');
 reset role;
 
 -- StepQ Pro: plans, limits from app.plan_features, admin-only changes.
