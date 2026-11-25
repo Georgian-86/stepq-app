@@ -562,6 +562,75 @@ class ScreenshotTest {
         }
     })
 
+    // ------------------------------------------------------------------ More of a Pro account
+    private fun themed(theme: String, name: String, content: @Composable () -> Unit) {
+        com.stepq.app.ui.theme.StepqColors.apply(theme)
+        try { snap(name, content) } finally { com.stepq.app.ui.theme.StepqColors.apply("leaf") }
+    }
+
+    @Test fun q01ProMembershipOcean() = themed("ocean", "Q01-pro-membership-ocean-theme", withPlan(proPlan.copy(theme = "ocean"), "me") {
+        com.stepq.app.ui.pro.ProScreen(proPlan.copy(theme = "ocean"), profileState.profile, onWaitlist = false, onJoinWaitlist = {}, onInsights = {}, onBack = {}, onMessage = {})
+    })
+    @Test fun q02ProProfileGrape() = themed("grape", "Q02-profile-grape-theme", withPlan(proPlan.copy(theme = "grape"), "me") {
+        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter", plan = proPlan.copy(theme = "grape")) {}
+    })
+    @Test fun q03HomeSunset() = themed("sunset", "Q03-home-sunset-theme", withPlan(proPlan.copy(theme = "sunset"), "a") {
+        HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {})
+    })
+    @Test fun q04HomeOcean() = themed("ocean", "Q04-home-ocean-theme", withPlan(proPlan.copy(theme = "ocean"), "a") {
+        HomeScreen(home(9450, PikoMood.Happy, "Good evening"), {}, {}, {})
+    })
+    @Test fun q05FriendsPro() = snap("Q05-friends-pro-unlimited-water", withPlan(proPlan, "me", "a", "c") {
+        friends(
+            com.stepq.app.ui.friends.FriendsUiState(
+                loading = false,
+                data = friendsData.copy(me = friendsData.me.copy(plan = "pro"), remindersLeft = null, reminderLimit = null),
+            ),
+        )
+    })
+    @Test fun q06CommunityPro() = snap("Q06-community-pro-unlimited-posts", withPlan(proPlan, "me", "b") {
+        androidx.compose.foundation.layout.Column(Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Community, {}, {})
+            com.stepq.app.ui.community.CommunityFeed(communityState, noActions, {}, {}, {}, {})
+        }
+    })
+    @Test fun q07ChallengesMonthlyPro() = snap("Q07-challenges-monthly-pro", withPlan(proPlan, "me", "a") {
+        val board = com.stepq.app.data.ChallengesRepository.withRanks(
+            friendsData.board.map { com.stepq.app.data.Ranked(it.person, if (it.isMe) 121000 else it.steps * 12, it.isMe) },
+        )
+        com.stepq.app.ui.challenges.ChallengesScreen(
+            com.stepq.app.ui.challenges.ChallengesUiState(
+                loading = false,
+                data = challengesData.copy(monthly = board, challenges = challengesData.challenges.map { it.copy(challenge = it.challenge.copy(proOnly = true)) }),
+            ),
+            monthly = true, onPeriod = {}, onRefresh = {}, onOpen = {}, today = LocalDate.of(2026, 11, 12),
+        )
+    })
+    @Test fun q08ProOnlyChallengeDetail() = snap("Q08-pro-only-challenge-detail", withPlan(proPlan) {
+        com.stepq.app.ui.challenges.ChallengeDetailScreen(shoes.copy(challenge = shoes.challenge.copy(proOnly = true)), joining = false, onJoin = {}, onLeave = {}, onBack = {})
+    })
+    @Test fun q09ProOnlyChallengeFree() = snap("Q09-pro-only-challenge-free-view", withPlan(freePlan) {
+        com.stepq.app.ui.challenges.ChallengeDetailScreen(shoes.copy(challenge = shoes.challenge.copy(proOnly = true)), joining = false, onJoin = {}, onLeave = {}, onBack = {})
+    })
+    @Test fun q10QRunsPro() = snap("Q10-qruns-pro-host", withPlan(proPlan.copy(qrunHost = true), "me") {
+        androidx.compose.foundation.layout.Column {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.QRun, {}, {})
+            com.stepq.app.ui.qrun.QRunList(qrunState, locationAllowed = true, onRefresh = {}, onAllowLocation = {}, onJoin = {}, onOpenPlanner = {}, onPost = {}, now = qrunNow, zone = ist)
+        }
+    })
+    @Test fun q11AskToHost() = snap("Q11-pro-ask-to-host-qruns", withPlan(proPlan) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.components.PlanLimitSheet(com.stepq.app.data.MyPlan.F.PLAN_QRUN, proPlan, onSeePro = {}, onDismiss = {}, actionLabel = "Ask to host QRuns", onAction = {})
+        }
+    })
+    @Test fun q12RestoresUsedUp() = snap("Q12-pro-restores-used-up", withPlan(proPlan) {
+        val used = proPlan.copy(usage = com.stepq.app.data.PlanUsage(streakRestores = 8))
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.components.PlanLimitSheet(com.stepq.app.data.MyPlan.F.STREAK_RESTORES, used, onSeePro = {}, onDismiss = {})
+        }
+    })
+    @Test fun q13StreaksGoldTheme() = themed("gold", "Q13-streaks-gold-theme", withPlan(proPlan.copy(theme = "gold"), "z", "a", content = streaksWith(proPlan)))
+
     @Test fun a26Goal() = snap("A26-daily-goal") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
     }
