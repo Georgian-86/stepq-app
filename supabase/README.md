@@ -47,3 +47,10 @@ Free members can't start Community posts (they like and reply), and new posts fr
 plan has `post_approval` (off for Pro by default; Free can't start posts anyway) wait for an admin: only the author sees them
 until an admin approves them in the admin panel (`app.admin_review_post`). Replies are never held.
 Free members' Insights history is one year.
+
+### Upgrade page
+
+Free members see a full-screen "Upgrade to StepQ Pro" page from every limit sheet and from
+Streaks when restores run out. It also pops up on its own when the app opens, at most once
+every `upgrade_popup_days` days (admin panel, Free column; 0 turns it off), never on the first
+day and never once they've asked for Pro. The perks it lists come from `app.plan_features`.

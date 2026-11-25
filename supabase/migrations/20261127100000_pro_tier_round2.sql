@@ -4,6 +4,7 @@
 --     only the author sees them. Replies are never held. Off for Pro by default (Pro posts go
 --     live straight away); an admin can switch it on per plan from the admin panel.
 --   * Insights history for Free: 1 year.
+--   * A setting for how often the upgrade page pops up for Free members.
 -- Additive and safe to re-run. Apply after 20261126000000_pro_tier.sql.
 
 -- ---------------------------------------------------------------------------------------
@@ -13,6 +14,11 @@ update app.plan_features set free_value = 0, updated_at = now() where key = 'com
 update app.plan_features set free_value = 365, updated_at = now() where key = 'analysis_days' and free_value is distinct from 365;
 insert into app.plan_features (key, label, kind, free_value, pro_value, unit, sort) values
   ('post_approval', 'New Community posts wait for admin approval', 'switch', 1, 0, null, 135)
+on conflict (key) do nothing;
+-- How often the full-screen "Upgrade to StepQ Pro" page pops up for Free members, in days
+-- (0 = never). The Pro value is unused. The app also opens the page from every limit.
+insert into app.plan_features (key, label, kind, free_value, pro_value, unit, sort) values
+  ('upgrade_popup_days', 'Upgrade page pops up every (0 = never)', 'limit', 3, 0, 'days', 140)
 on conflict (key) do nothing;
 -- Pro posts go live without approval (requested 25 Nov, after the first draft of this file).
 update app.plan_features set pro_value = 0, updated_at = now() where key = 'post_approval' and pro_value = 1
