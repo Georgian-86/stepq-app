@@ -537,6 +537,12 @@ select pg_temp.expect_error($$select app.admin_post_qrun('Old', 'X', now() - int
 reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
 select pg_temp.expect((app.my_plan() ->> 'is_pro')::boolean, 'pro: Freya is pro');
+select set_config('test.live', app.create_post('pro posts go live')::text, false);
+select pg_temp.expect((select status from app.posts where id = current_setting('test.live')::uuid) = 'approved', 'approval: off for Pro by default');
+reset role;
+-- An admin can still switch approval on for Pro; the rest checks that path.
+update app.plan_features set pro_value = 1 where key = 'post_approval';
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
 select set_config('test.pending', app.create_post('four')::text, false);
 select app.create_post('five, unlimited on pro');
 select pg_temp.expect((select status from app.posts where id = current_setting('test.pending')::uuid) = 'pending', 'approval: a Pro post waits for an admin');
