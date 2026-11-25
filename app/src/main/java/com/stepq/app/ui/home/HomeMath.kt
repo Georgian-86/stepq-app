@@ -134,3 +134,13 @@ fun streakBadge(row: StreakRow): String = buildString {
     if (row.streak >= 100) append(" 💯")
     if (row.endsTonight) append(" ⏳")
 }
+
+/**
+ * The friend at the top of Streaks: my pinned BFF when my plan allows pinning and they're still a
+ * friend, otherwise the friend I have the longest streak with. Null when no streak is going.
+ */
+fun topStreakFriend(groups: StreakGroups, bffId: String?, canPin: Boolean): Pair<StreakRow, Boolean>? {
+    val all = groups.endingTonight + groups.going + groups.notStarted
+    if (canPin && bffId != null) all.firstOrNull { it.person.id == bffId }?.let { return it to true }
+    return (groups.endingTonight + groups.going).maxByOrNull { it.streak }?.let { it to false }
+}

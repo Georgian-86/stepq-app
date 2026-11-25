@@ -50,6 +50,12 @@ import org.robolectric.annotation.GraphicsMode
 class ScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
+    /** Pro state is app-wide; start every screen on no plan and the Leaf theme. */
+    @org.junit.Before fun resetPro() {
+        com.stepq.app.data.Pro.preview(null)
+        com.stepq.app.ui.theme.StepqColors.apply("leaf")
+    }
+
     private fun snap(name: String, content: @Composable () -> Unit) {
         compose.setContent {
             StepqTheme {
@@ -450,11 +456,111 @@ class ScreenshotTest {
         compose.mainClock.advanceTimeBy(400); frame()
     }
 
-    @Test fun a27Pro() = snap("A27-stepq-pro") {
-        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
-            com.stepq.app.ui.profile.ProSheet(onWaitlist = false, onNotify = {}, onDismiss = {})
+    // ------------------------------------------------------------------ StepQ Pro (Figma "4 · StepQ Pro")
+    private val freePlan = com.stepq.app.data.MyPlan.FREE_DEFAULTS.copy(
+        usage = com.stepq.app.data.PlanUsage(communityPosts = 2, streakRestores = 1, waterReminders = 1),
+        monthResetsAt = "2026-12-01",
+    )
+    private val proPlan = com.stepq.app.data.MyPlan.FREE_DEFAULTS.let { f ->
+        f.copy(
+            plan = "pro", isPro = true, proSince = "2026-11-01T00:00:00Z", qrunHost = false, theme = "leaf", bffId = "z",
+            features = f.features.map { it.copy(mine = it.pro) },
+            usage = com.stepq.app.data.PlanUsage(communityPosts = 9, streakRestores = 3, waterReminders = 6),
+            monthResetsAt = "2026-12-01",
+        )
+    }
+    private fun withPlan(plan: com.stepq.app.data.MyPlan?, vararg pro: String, content: @Composable () -> Unit): @Composable () -> Unit {
+        com.stepq.app.data.Pro.preview(plan, pro.associateWith { com.stepq.app.data.PlanBadge(it, pro = true) })
+        return content
+    }
+
+    @Test fun p1ProProfile() = snap("P1-profile-pro-member", withPlan(proPlan, "me") {
+        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter", plan = proPlan) {}
+    })
+
+    @Test fun p1FreeProfile() = snap("P1b-profile-free", withPlan(freePlan) {
+        com.stepq.app.ui.profile.ProfileScreen(profileState, "Phone step counter", plan = freePlan) {}
+    })
+
+    @Test fun p2ProMembership() = snap("P2-your-pro-membership", withPlan(proPlan, "me") {
+        com.stepq.app.ui.pro.ProScreen(proPlan, profileState.profile, onWaitlist = false, onJoinWaitlist = {}, onInsights = {}, onBack = {}, onMessage = {})
+    })
+
+    @Test fun p3FreeVsPro() = snap("P3-free-vs-pro", withPlan(freePlan) {
+        com.stepq.app.ui.pro.ProScreen(freePlan, profileState.profile, onWaitlist = false, onJoinWaitlist = {}, onInsights = {}, onBack = {}, onMessage = {})
+    })
+
+    @Test fun p4PostLimit() = snap("P4-community-post-limit", withPlan(freePlan.copy(usage = com.stepq.app.data.PlanUsage(communityPosts = 3))) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.components.PlanLimitSheet(
+                com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS,
+                freePlan.copy(usage = com.stepq.app.data.PlanUsage(communityPosts = 3)),
+                onSeePro = {}, onDismiss = {},
+            )
+        }
+    })
+
+    private fun streaksWith(plan: com.stepq.app.data.MyPlan): @Composable () -> Unit = {
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Streaks, {}, {})
+            com.stepq.app.ui.home.StreaksScreen(
+                home(6240, PikoMood.Nudge).copy(
+                    shareTo = streakFriends,
+                    streaks = mapOf("a" to 12, "m" to 4, "z" to 104, "k" to 1),
+                    sharedTodayWith = setOf("a", "k"),
+                ),
+                onBack = {}, onShare = {}, showHeader = false,
+                plan = plan,
+                lost = listOf(com.stepq.app.data.LostStreak("r", 23)),
+            )
         }
     }
+
+    @Test fun p5ProStreaks() = snap("P5-streaks-bff-restore", withPlan(proPlan, "z", "a", content = streaksWith(proPlan)))
+    @Test fun p5FreeStreaks() = snap("P5b-streaks-free", withPlan(freePlan, "a", content = streaksWith(freePlan)))
+
+    private fun fakeHistory(days: Int): List<com.stepq.app.data.HistoryDay> {
+        val today = LocalDate.now()
+        return (0 until days).map { i ->
+            val d = today.minusDays(i.toLong())
+            val steps = 4200 + ((i * 7919) % 7000) + if (d.dayOfWeek == java.time.DayOfWeek.SATURDAY) 2500 else 0
+            com.stepq.app.data.HistoryDay(d.toString(), steps, 8000, (steps * 0.76).toInt())
+        }
+    }
+
+    @Test fun p6Insights() = snap("P6-insights", withPlan(proPlan) {
+        com.stepq.app.ui.pro.InsightsScreen(proPlan, 8000, onBack = {}, onLocked = {}, load = { fakeHistory(it) })
+    })
+
+    @Test fun p6InsightsFree() = snap("P6b-insights-free", withPlan(freePlan) {
+        com.stepq.app.ui.pro.InsightsScreen(freePlan, 8000, onBack = {}, onLocked = {}, load = { fakeHistory(it) })
+    })
+
+    @Test fun p7GoldTheme() {
+        com.stepq.app.ui.theme.StepqColors.apply("gold")
+        try {
+            snap("P7-home-gold-theme") { HomeScreen(home(6240, PikoMood.Nudge), {}, {}, {}) }
+        } finally {
+            com.stepq.app.ui.theme.StepqColors.apply("leaf")
+        }
+    }
+
+    @Test fun p8MonthlyFree() = snap("P8-challenges-monthly-free", withPlan(freePlan, "a") {
+        com.stepq.app.ui.challenges.ChallengesScreen(
+            com.stepq.app.ui.challenges.ChallengesUiState(
+                loading = false,
+                data = challengesData.copy(challenges = challengesData.challenges.map { it.copy(challenge = it.challenge.copy(proOnly = true)) }),
+            ),
+            monthly = true, onPeriod = {}, onRefresh = {}, onOpen = {}, today = LocalDate.of(2026, 11, 12),
+        )
+    })
+
+    @Test fun p9CommunityBadges() = snap("P9-community-pro-badges", withPlan(freePlan.copy(usage = com.stepq.app.data.PlanUsage(communityPosts = 1)), "b") {
+        androidx.compose.foundation.layout.Column(Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Community, {}, {})
+            com.stepq.app.ui.community.CommunityFeed(communityState, noActions, {}, {}, {}, {})
+        }
+    })
 
     @Test fun a26Goal() = snap("A26-daily-goal") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})

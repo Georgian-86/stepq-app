@@ -299,7 +299,7 @@ private fun QRunCard(run: QRun, km: Double?, hosting: Boolean, now: Instant, zon
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(36.dp).clip(CircleShape).background(StepqColors.Mint), contentAlignment = Alignment.Center) {
-                StepqAvatar(run.hostAvatar, 34.dp)
+                com.stepq.app.ui.components.PersonAvatar(run.hostAvatar, 34.dp, run.createdBy)
             }
             Column(Modifier.padding(start = 10.dp).weight(1f)) {
                 Text(

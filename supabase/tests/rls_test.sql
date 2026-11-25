@@ -67,8 +67,8 @@ select pg_temp.expect((select count(*) from app.daily_steps) = 2, 'friends: sees
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date - 1, 99999)$$, 'writing a friend''s steps');
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date, 99999) on conflict (user_id, day) do update set steps = excluded.steps$$, 'upserting over a friend''s steps');
 insert into app.water_reminders (from_user, to_user)
-  select auth.uid(), '00000000-0000-0000-0000-00000000000b' from generate_series(1, 5);
-select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_user) values (auth.uid(), '00000000-0000-0000-0000-00000000000b')$$, '6th water reminder on free plan');
+  select auth.uid(), '00000000-0000-0000-0000-00000000000b' from generate_series(1, 3);
+select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_user) values (auth.uid(), '00000000-0000-0000-0000-00000000000b')$$, '4th water reminder on free plan');
 insert into app.groups (name, created_by) values ('Morning walkers', auth.uid());
 insert into app.group_members (group_id, user_id) select id, auth.uid() from app.groups;
 insert into app.group_members (group_id, user_id) select id, '00000000-0000-0000-0000-00000000000b' from app.groups;
@@ -105,6 +105,11 @@ select pg_temp.expect_error($$insert into app.challenges (title, starts_at, ends
 reset role;
 
 -- QRuns: anyone signed in sees the feed with the host's name, but can only post and join as themselves.
+-- Posting needs Pro and an admin's OK (see the Pro checks below); the stranger has both here.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Free run', 'X', now() + interval '1 day')$$, 'free member posting a QRun');
+reset role;
+update app.profiles set plan = 'pro', qrun_host = true where id = '00000000-0000-0000-0000-00000000000c';
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Morning run', 'Carter Road', now() + interval '1 day');
 insert into app.qrun_participants (qrun_id, user_id) select id, auth.uid() from app.qruns;
@@ -155,7 +160,7 @@ reset role;
 
 -- Water reminders reach the friend they were sent to, with the sender's name.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
-select pg_temp.expect((select count(*) from app.water_inbox(now() - interval '1 hour')) = 5, 'inbox: reminders sent to me');
+select pg_temp.expect((select count(*) from app.water_inbox(now() - interval '1 hour')) = 3, 'inbox: reminders sent to me');
 select pg_temp.expect((select bool_and(from_name = 'Riya') from app.water_inbox(now() - interval '1 hour')), 'inbox: sender name');
 select pg_temp.expect((select count(*) from app.water_inbox(now() + interval '1 minute')) = 0, 'inbox: nothing newer than since');
 reset role;
@@ -189,7 +194,7 @@ insert into auth.users values ('00000000-0000-0000-0000-0000000000ad', 'admin@te
 insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
 select pg_temp.expect((select count(*) from app.profiles) = 3, 'admin: reads all profiles');
-select pg_temp.expect((select count(*) from app.water_reminders) = 5, 'admin: reads all reminders');
+select pg_temp.expect((select count(*) from app.water_reminders) = 3, 'admin: reads all reminders');
 with u as (update app.profiles set display_name = 'x' returning 1)
 select pg_temp.expect((select count(*) from u) = 0, 'admin: cannot edit profiles');
 reset role;
@@ -389,6 +394,118 @@ insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
 select pg_temp.expect((select count(*) from app.post_likes) = 1, 'admin: reads all likes');
 select pg_temp.expect((select count(*) from app.post_reports) = 0, 'admin: reports went with the deleted post');
+reset role;
+
+-- StepQ Pro: plans, limits from app.plan_features, admin-only changes.
+insert into auth.users values
+  ('00000000-0000-0000-0000-0000000000f1', 'free@test'),
+  ('00000000-0000-0000-0000-0000000000f2', 'pal@test');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'Pal', 'pal');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'Freya', 'freya');
+insert into app.friendships (requester, addressee) values (auth.uid(), '00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((app.my_plan() ->> 'plan') = 'free', 'pro: new members are free');
+select pg_temp.expect((select (f ->> 'mine')::int from jsonb_array_elements(app.my_plan() -> 'features') f where f ->> 'key' = 'community_posts') = 3, 'pro: my plan lists my limits');
+select pg_temp.expect((select count(*) from app.plan_features) >= 13, 'pro: members read the feature list');
+select pg_temp.expect_error($$update app.plan_features set free_value = 99 where key = 'community_posts'$$, 'pro: member editing a limit');
+select pg_temp.expect_error($$select app.admin_set_feature('community_posts', 99, null)$$, 'pro: member calling the admin limit editor');
+select pg_temp.expect_error($$select app.admin_set_member(auth.uid(), 'pro')$$, 'pro: member making themselves pro');
+select pg_temp.expect_error($$update app.profiles set qrun_host = true where id = auth.uid()$$, 'pro: member making themselves a QRun host');
+select pg_temp.expect_error($$update app.profiles set theme = 'gold' where id = auth.uid()$$, 'pro: free member changing theme');
+select pg_temp.expect_error($$update app.profiles set photo_path = auth.uid()::text || '/me.jpg' where id = auth.uid()$$, 'pro: free member setting a photo');
+select pg_temp.expect_error($$select app.request_qrun_host()$$, 'pro: free member asking to host');
+select app.create_post('one'); select app.create_post('two'); select app.create_post('three');
+select pg_temp.expect_error($$select app.create_post('four')$$, 'pro: 4th community post this month on free');
+select app.create_post('a reply is fine', (select id from app.posts where body = 'one'));
+delete from app.posts where author = auth.uid() and body = 'three';
+select pg_temp.expect_error($$select app.create_post('four')$$, 'pro: deleting a post doesn''t give it back');
+select pg_temp.expect(((app.my_plan() -> 'usage') ->> 'community_posts')::int = 3, 'pro: usage shows posts used');
+reset role;
+update app.friendships set status = 'accepted' where requester = '00000000-0000-0000-0000-0000000000f1';
+-- Freya shared with Pal on each of the 3 days before yesterday, then missed yesterday.
+insert into app.step_shares (from_user, to_user, day, steps)
+  select '00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', current_date - d, 5000 from generate_series(2, 4) d;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect((select streak from app.lost_streaks(current_date)) = 3, 'restore: lost streak listed with its length');
+select pg_temp.expect(coalesce((select streak from app.friend_streaks(current_date)), 0) = 0, 'restore: streak is broken before restoring');
+select pg_temp.expect(app.restore_streak('00000000-0000-0000-0000-0000000000f2', current_date) = 1, 'restore: one of two left');
+select pg_temp.expect((select streak from app.friend_streaks(current_date)) = 4, 'restore: streak is back, with the restored day');
+select pg_temp.expect((select count(*) from app.lost_streaks(current_date)) = 0, 'restore: nothing left to restore');
+select pg_temp.expect_error($$select app.restore_streak('00000000-0000-0000-0000-0000000000f2', current_date)$$, 'restore: same streak twice');
+select pg_temp.expect_error($$insert into app.streak_restores (user_id, friend_id, day) values (auth.uid(), '00000000-0000-0000-0000-0000000000f2', current_date - 5)$$, 'restore: writing the table directly');
+update app.profiles set bff_id = null where id = auth.uid();
+select pg_temp.expect_error($$update app.profiles set bff_id = '00000000-0000-0000-0000-0000000000f2' where id = auth.uid()$$, 'bff: free member pinning');
+select pg_temp.expect((select count(*) from app.step_history(365)) <= 7, 'insights: free history is capped');
+reset role;
+-- Free gets 2 restores a month: with 2 used, the next one is refused.
+delete from app.streak_restores where user_id = '00000000-0000-0000-0000-0000000000f1';
+insert into app.streak_restores (user_id, friend_id, day) values
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', current_date - 30),
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', current_date - 31);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select app.restore_streak('00000000-0000-0000-0000-0000000000f2', current_date)$$, 'restore: over the monthly limit');
+reset role;
+
+-- The admin edits limits and makes Freya Pro; everything is logged.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_feature('community_posts', 5, null);
+select pg_temp.expect((select free_value from app.plan_features where key = 'community_posts') = 5, 'admin: changes a limit');
+select pg_temp.expect_error($$select app.admin_set_feature('change_theme', 2, 1)$$, 'admin: a switch is 0 or 1');
+select pg_temp.expect_error($$select app.admin_set_feature('community_posts', -1, null)$$, 'admin: no negative limits');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f1', 'pro');
+select pg_temp.expect((select count(*) from app.admin_log) = 2, 'admin: changes are logged');
+select pg_temp.expect(app.admin_post_qrun('StepQ Sunday walk', 'Juhu Beach', now() + interval '3 days') is not null, 'admin: posts a QRun from the dashboard');
+select pg_temp.expect((select official from app.qruns where title = 'StepQ Sunday walk'), 'admin: dashboard QRuns are official');
+select pg_temp.expect_error($$select app.admin_post_qrun('Old', 'X', now() - interval '1 day')$$, 'admin: QRun in the past');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect((app.my_plan() ->> 'is_pro')::boolean, 'pro: Freya is pro');
+select app.create_post('four');
+select app.create_post('five, unlimited on pro');
+update app.profiles set theme = 'gold', photo_path = auth.uid()::text || '/me.jpg', bff_id = '00000000-0000-0000-0000-0000000000f2' where id = auth.uid();
+select pg_temp.expect((select theme from app.profiles where id = auth.uid()) = 'gold', 'pro: changes theme');
+select pg_temp.expect_error($$update app.profiles set photo_path = '00000000-0000-0000-0000-0000000000f2/x.jpg' where id = auth.uid()$$, 'pro: photo path in someone else''s folder');
+select pg_temp.expect_error($$update app.profiles set bff_id = '00000000-0000-0000-0000-00000000000c' where id = auth.uid()$$, 'pro: pinning a non-friend');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Mine', 'X', now() + interval '1 day')$$, 'pro: posting a QRun before an admin approves');
+select app.request_qrun_host();
+select pg_temp.expect((select qrun_host_requested_at is not null from app.profiles where id = auth.uid()), 'pro: asks to host QRuns');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select pro from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])), 'badge: friends see the Pro badge');
+select pg_temp.expect((select photo_path from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])) is not null, 'badge: friends see the photo');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select photo_path from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])) is null, 'badge: strangers don''t see the photo');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f1', 'pro', true);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Freya''s walk', 'Bandra Fort', now() + interval '1 day');
+select pg_temp.expect(not (select official from app.qruns where title = 'Freya''s walk'), 'pro: approved host posts a QRun');
+reset role;
+insert into app.challenges (title, starts_at, ends_at, pro_only) values ('Pro 100K', now() - interval '1 day', now() + interval '20 days', true);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect_error($$insert into app.challenge_entries (challenge_id, user_id) select id, auth.uid() from app.challenges where title = 'Pro 100K'$$, 'challenge: free member joining a Pro-only challenge');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+insert into app.challenge_entries (challenge_id, user_id) select id, auth.uid() from app.challenges where title = 'Pro 100K';
+select pg_temp.expect(app.reward_eligible(auth.uid(), 'monthly'), 'reward: pro is eligible monthly');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect(not app.reward_eligible(auth.uid(), 'monthly') and app.reward_eligible(auth.uid(), 'weekly'), 'reward: free is weekly only');
+reset role;
+-- Back to Free: theme, photo, BFF and hosting go; data stays.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f1', 'free');
+reset role;
+select pg_temp.expect((select theme = 'leaf' and photo_path is null and bff_id is null and not qrun_host and pro_since is null from app.profiles where id = '00000000-0000-0000-0000-0000000000f1'), 'admin: downgrade resets Pro-only settings');
+select set_config('request.jwt.claims', '', false);
+set role anon;
+select pg_temp.expect_error($$select app.my_plan()$$, 'anon reading a plan');
+select pg_temp.expect_error($$select * from app.plan_features$$, 'anon reading the feature list');
 reset role;
 
 -- Anonymous (no sign-in) gets nothing at all.

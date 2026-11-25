@@ -129,7 +129,7 @@ fun FriendsList(
                     color = StepqColors.TomatoText,
                 )
                 else -> {
-                    WaterBanner(remindersBanner(data.remindersLeft))
+                    WaterBanner(remindersBanner(data.remindersLeft, data.reminderLimit, data.me.plan == "pro"))
                     state.error?.let {
                         Text(it, style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(top = 8.dp))
                     }
@@ -189,15 +189,19 @@ private fun BoardRow(rank: Int, row: FriendToday, reminded: Boolean, sending: Bo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(rank.toString(), style = StepqType.BodyStrong, color = StepqColors.Muted, modifier = Modifier.width(22.dp))
-        StepqAvatar(row.person.avatar, 40.dp)
+        com.stepq.app.ui.components.PersonAvatar(row.person.avatar, 40.dp, row.person.id)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(
-                if (row.isMe) "You" else row.person.displayName,
-                style = StepqType.BodyStrong,
-                color = StepqColors.Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (row.isMe) "You" else row.person.displayName,
+                    style = StepqType.BodyStrong,
+                    color = StepqColors.Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                com.stepq.app.ui.components.ProBadgeFor(row.person.id, Modifier.padding(start = 6.dp))
+            }
             val (d, unit) = distanceLabel(row.distanceM / 1000.0)
             Text(
                 "@${row.person.username} · $d $unit",
@@ -251,7 +255,7 @@ private fun RequestRow(person: PersonSummary, onAccept: (PersonSummary) -> Unit,
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepqAvatar(person.avatar, 40.dp)
+        com.stepq.app.ui.components.PersonAvatar(person.avatar, 40.dp, person.id)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Text(person.displayName, style = StepqType.BodyStrong, color = StepqColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(if (person.username.isEmpty()) "Wants to be your friend" else "@${person.username}", style = StepqType.Small, color = StepqColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)

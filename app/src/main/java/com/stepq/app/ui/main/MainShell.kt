@@ -145,6 +145,10 @@ fun MainShell(
             }
         }
     }
+    com.stepq.app.ui.components.ProSheetHost(onSeePro = {
+        com.stepq.app.ui.components.ProSheets.openHub = true
+        tab = Tab.Profile
+    })
 }
 
 private fun mutableTabState() = androidx.compose.runtime.mutableStateOf(Tab.Home)

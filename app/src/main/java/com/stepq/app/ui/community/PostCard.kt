@@ -114,7 +114,7 @@ fun PostRow(
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Column(Modifier.width(AVATAR), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (lineAbove) ThreadLine(Modifier.height(10.dp)) else Spacer(Modifier.height(0.dp))
-                StepqAvatar(post.authorAvatar, AVATAR, Modifier.semantics { contentDescription = post.authorName })
+                com.stepq.app.ui.components.PersonAvatar(post.authorAvatar, AVATAR, post.authorId, Modifier.semantics { contentDescription = post.authorName })
                 if (lineBelow) {
                     Spacer(Modifier.height(6.dp))
                     ThreadLine(Modifier.weight(1f))
@@ -133,6 +133,7 @@ fun PostRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
+                        com.stepq.app.ui.components.ProBadgeFor(post.authorId, Modifier.padding(start = 4.dp))
                         Text(" · ${timeAgo(post.createdAt)}", style = StepqType.Small, color = StepqColors.Muted, maxLines = 1)
                     }
                     Box(

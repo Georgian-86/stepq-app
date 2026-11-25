@@ -88,7 +88,7 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
         viewModelScope.launch {
             repo.joinProWaitlist()
                 .onSuccess {
-                    _state.update { it.copy(onWaitlist = true, toast = "We'll let you know when Pro launches.") }
+                    _state.update { it.copy(onWaitlist = true, toast = "Asked. We'll let you know when Pro is yours.") }
                     onDone()
                 }
                 .onFailure { _state.update { it.copy(toast = "Couldn't add you to the list. Try again.") } }
@@ -151,6 +151,8 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
     fun clearForm() = _state.update { it.copy(formError = null, emailSentTo = null) }
 
     fun toastShown() = _state.update { it.copy(toast = null) }
+
+    fun showToast(message: String) = _state.update { it.copy(toast = message) }
 }
 
 /** A friendly message for a Supabase Auth error. */

@@ -23,3 +23,20 @@ Do these in order, in the Supabase dashboard for project `koagkmedvsplbgmltehk`:
 5. Put the anon key in the app's `local.properties` (see the main README).
 
 Undo, if ever needed: remove `app` from Exposed schemas and turn sign-ups off again.
+
+## StepQ Pro (`20261126000000_pro_tier.sql`)
+
+Free vs Pro lives in `app.plan_features`: one row per feature, a Free value and a Pro value
+(0/1 for switches, a number for limits, empty for unlimited). Admins change them in the admin
+panel ("Pro & limits"), which calls `app.admin_set_feature`; the app reads them with
+`app.my_plan()`. Every limit is enforced in Postgres (triggers and security-definer functions),
+so an old or modified app can't get around it. Errors carry `hint = 'plan_limit:<key>'` so the
+app can show the right sheet.
+
+Admins also make people Pro (`app.admin_set_member`), approve Pro members to host QRuns
+(`qrun_host`), post official QRuns (`app.admin_post_qrun`) and mark challenges Pro-only. Every
+admin change goes to `app.admin_log`.
+
+The migration also creates the private `avatars` storage bucket (1 MB, JPEG/PNG/WebP). A photo
+is readable only by its owner and by people who can see their profile (friends and group mates).
+There are no payments: members become Pro when an admin sets them.

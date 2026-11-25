@@ -53,6 +53,21 @@ class StepqApplication : Application() {
         createNotificationChannel()
         com.stepq.app.push.WaterInbox.schedule(this)
         registerForPush()
+        trackPlan()
+    }
+
+    /** Loads my StepQ Pro plan (limits, theme, badge) on sign-in and forgets it on sign-out. */
+    private fun trackPlan() {
+        val client = Supabase.client ?: return
+        appScope.launch {
+            client.auth.sessionStatus
+                .map { it is SessionStatus.Authenticated }
+                .distinctUntilChanged()
+                .collect { signedIn ->
+                    if (signedIn) com.stepq.app.data.Pro.refresh()
+                    else kotlinx.coroutines.withContext(Dispatchers.Main) { com.stepq.app.data.Pro.clear() }
+                }
+        }
     }
 
     /**

@@ -47,14 +47,22 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var page by rememberSaveable { mutableStateOf<String?>(null) }
-    var pro by rememberSaveable { mutableStateOf(false) }
+    val plan by com.stepq.app.data.Pro.plan.collectAsState()
+    var limitSheet by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmLogOut by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     fun go(to: String?) { vm.clearForm(); page = to }
+    LaunchedEffect(com.stepq.app.ui.components.ProSheets.openHub) {
+        if (com.stepq.app.ui.components.ProSheets.openHub) {
+            com.stepq.app.ui.components.ProSheets.openHub = false
+            page = "pro"
+        }
+    }
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
+        com.stepq.app.data.Pro.refreshAsync()
         onPauseOrDispose { }
     }
     val source by produceState("", page) {
@@ -70,11 +78,26 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     Box(Modifier.fillMaxSize()) {
         com.stepq.app.ui.components.PageHost(
             target = page,
-            depth = { when (it) { null -> 0; "password", "email" -> 2; else -> 1 } },
+            depth = { when (it) { null -> 0; "password", "email", "insights" -> 2; else -> 1 } },
             onBack = { go(if (page == "password" || page == "email") "account" else null) },
         ) { shown ->
         when (shown) {
             "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, pending = state.profile?.nextDailyGoal, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
+            "pro" -> com.stepq.app.ui.pro.ProScreen(
+                plan = plan,
+                profile = state.profile,
+                onWaitlist = state.onWaitlist,
+                onJoinWaitlist = { vm.joinWaitlist { } },
+                onInsights = { page = "insights" },
+                onBack = { page = null },
+                onMessage = { vm.showToast(it) },
+            )
+            "insights" -> com.stepq.app.ui.pro.InsightsScreen(
+                plan,
+                state.profile?.dailyGoal ?: 8000,
+                onBack = { page = null },
+                onLocked = { limitSheet = com.stepq.app.data.MyPlan.F.ANALYSIS_DAYS },
+            )
             "connect" -> ConnectStepsScreen(onBack = { page = null }, fromSettings = true) { page = null }
             "edit" -> state.profile?.let { p ->
                 EditProfileScreen(
@@ -111,7 +134,7 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                 onSave = { e -> auth?.let { vm.changeEmail(it, e) } },
                 onBack = { go("account") },
             )
-            else -> ProfileScreen(state, source) { action ->
+            else -> ProfileScreen(state, source, plan) { action ->
                 when (action) {
                     ProfileAction.EditProfile -> go("edit")
                     ProfileAction.Account -> go("account")
@@ -125,7 +148,8 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                     ProfileAction.Privacy -> privacy = true
                     ProfileAction.Help -> open("mailto:$SUPPORT_EMAIL?subject=" + Uri.encode("StepQ app feedback"))
                     ProfileAction.LogOut -> confirmLogOut = true
-                    ProfileAction.Pro -> pro = true
+                    ProfileAction.Pro -> page = "pro"
+                    ProfileAction.Insights -> page = "insights"
                 }
             }
         }
@@ -139,9 +163,9 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
         }
     }
 
-    if (pro) {
-        ModalBottomSheet(onDismissRequest = { pro = false }, containerColor = StepqColors.White) {
-            ProSheet(state.onWaitlist, onNotify = { vm.joinWaitlist { pro = false } }, onDismiss = { pro = false })
+    limitSheet?.let { key ->
+        ModalBottomSheet(onDismissRequest = { limitSheet = null }, containerColor = StepqColors.White) {
+            com.stepq.app.ui.components.PlanLimitSheet(key, plan, onSeePro = { limitSheet = null; page = "pro" }, onDismiss = { limitSheet = null })
         }
     }
     if (confirmLogOut) {

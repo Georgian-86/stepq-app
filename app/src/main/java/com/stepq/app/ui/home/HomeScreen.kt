@@ -322,7 +322,7 @@ internal fun ShareSheet(state: HomeUiState, preselected: Set<String>? = null, on
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    StepqAvatar(p.avatar, 40.dp)
+                    com.stepq.app.ui.components.PersonAvatar(p.avatar, 40.dp, p.id)
                     Text(p.displayName, style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.padding(start = 12.dp).weight(1f))
                     state.streaks[p.id]?.let { StreakChip(it, Modifier.padding(end = 10.dp)) }
                     Box(

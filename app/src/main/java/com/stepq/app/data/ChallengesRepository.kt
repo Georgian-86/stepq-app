@@ -19,6 +19,8 @@ data class Challenge(
     @SerialName("target_steps") val targetSteps: Int? = null,
     @SerialName("starts_at") val startsAt: String,
     @SerialName("ends_at") val endsAt: String,
+    /** Only StepQ Pro members can join (feature all_challenges). */
+    @SerialName("pro_only") val proOnly: Boolean = false,
 )
 
 @Serializable
