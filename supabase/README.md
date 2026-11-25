@@ -44,6 +44,6 @@ There are no payments: members become Pro when an admin sets them.
 ### Round 2 (`20261127100000_pro_tier_round2.sql`)
 
 Free members can't start Community posts (they like and reply), and new posts from anyone whose
-plan has `post_approval` (Free and Pro by default) wait for an admin: only the author sees them
+plan has `post_approval` (off for Pro by default; Free can't start posts anyway) wait for an admin: only the author sees them
 until an admin approves them in the admin panel (`app.admin_review_post`). Replies are never held.
 Free members' Insights history is one year.

@@ -113,7 +113,7 @@ data class MyPlan(
                 PlanFeature(F.CHANGE_THEME, "Change the app theme", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.PLAN_QRUN, "Plan a QRun (once an admin approves)", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.STREAK_RESTORES, "Streak restores", "limit", "a month", 2, 8, 2),
-                PlanFeature(F.REWARD_WEEKLY, "Weekly reward eligible", "switch", free = 1, pro = 1, mine = 1),
+                PlanFeature(F.REWARD_WEEKLY, "Weekly reward eligible", "switch", free = 1, pro = 0, mine = 1),
                 PlanFeature(F.REWARD_MONTHLY, "Monthly reward eligible", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.REWARD_YEARLY, "Yearly reward eligible", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.ALL_CHALLENGES, "Join every challenge (incl. Pro-only)", "switch", free = 0, pro = 1, mine = 0),
@@ -122,7 +122,7 @@ data class MyPlan(
                 PlanFeature(F.PROFILE_BADGE, "Pro badge on profile", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.PIN_BFF, "Pin one BFF", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.COMMUNITY_POSTS, "Community posts", "limit", "a month", 0, null, 0),
-                PlanFeature(F.POST_APPROVAL, "New Community posts wait for admin approval", "switch", free = 1, pro = 1, mine = 1),
+                PlanFeature(F.POST_APPROVAL, "New Community posts wait for admin approval", "switch", free = 1, pro = 0, mine = 1),
             ),
         )
     }

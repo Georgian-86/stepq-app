@@ -196,7 +196,7 @@ private fun FreeMember(plan: MyPlan, onWaitlist: Boolean, onJoinWaitlist: () -> 
     Section("Free vs Pro")
     PlanTable(plan.features)
     Text(
-        "QRuns are hosted by StepQ and by Pro members StepQ approves. New Community posts go live once StepQ has checked them.",
+        "QRuns are hosted by StepQ and by Pro members StepQ approves.",
         style = StepqType.Small,
         color = StepqColors.Muted,
         modifier = Modifier.padding(top = 8.dp),

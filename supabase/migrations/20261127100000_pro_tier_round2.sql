@@ -1,7 +1,8 @@
 -- StepQ Pro, round 2 (requested 25 Nov):
 --   * Free members can't start Community posts (they can still like and reply).
---   * New posts from anyone whose plan has `post_approval` (Free and Pro by default) wait for an
---     admin. Until approved, only the author sees them. Replies are never held.
+--   * New posts from anyone whose plan has `post_approval` wait for an admin. Until approved,
+--     only the author sees them. Replies are never held. Off for Pro by default (Pro posts go
+--     live straight away); an admin can switch it on per plan from the admin panel.
 --   * Insights history for Free: 1 year.
 -- Additive and safe to re-run. Apply after 20261126000000_pro_tier.sql.
 
@@ -11,8 +12,11 @@
 update app.plan_features set free_value = 0, updated_at = now() where key = 'community_posts' and free_value is distinct from 0;
 update app.plan_features set free_value = 365, updated_at = now() where key = 'analysis_days' and free_value is distinct from 365;
 insert into app.plan_features (key, label, kind, free_value, pro_value, unit, sort) values
-  ('post_approval', 'New Community posts wait for admin approval', 'switch', 1, 1, null, 135)
+  ('post_approval', 'New Community posts wait for admin approval', 'switch', 1, 0, null, 135)
 on conflict (key) do nothing;
+-- Pro posts go live without approval (requested 25 Nov, after the first draft of this file).
+update app.plan_features set pro_value = 0, updated_at = now() where key = 'post_approval' and pro_value = 1
+  and updated_at < '2026-11-26';
 
 -- ---------------------------------------------------------------------------------------
 -- Post approval.
