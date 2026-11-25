@@ -126,7 +126,7 @@ private fun ProMember(plan: MyPlan, profile: Profile?, onInsights: () -> Unit, o
     NightCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("STEPQ PRO MEMBER", style = StepqType.Label, color = ProColors.GoldOnNight, modifier = Modifier.weight(1f))
+                Text("MEMBERSHIP", style = StepqType.Label, color = ProColors.GoldOnNight, modifier = Modifier.weight(1f))
                 ProBadge()
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -196,7 +196,7 @@ private fun FreeMember(plan: MyPlan, onWaitlist: Boolean, onJoinWaitlist: () -> 
     Section("Free vs Pro")
     PlanTable(plan.features)
     Text(
-        "QRuns are hosted by StepQ and by Pro members StepQ approves.",
+        "QRuns are hosted by StepQ and by Pro members StepQ approves. New Community posts go live once StepQ has checked them.",
         style = StepqType.Small,
         color = StepqColors.Muted,
         modifier = Modifier.padding(top = 8.dp),
@@ -229,7 +229,8 @@ fun PlanTable(features: List<PlanFeature>) {
             .border(1.dp, StepqColors.Line, RoundedCornerShape(16.dp)),
     ) {
         TableRow("", "Free", "Pro", header = true)
-        features.forEach { f ->
+        // Post approval is how moderation works, not a perk: it's explained under the table.
+        features.filter { it.key != MyPlan.F.POST_APPROVAL }.forEach { f ->
             TableRow(f.label, planValue(f.kind, f.free, f.unit), planValue(f.kind, f.pro, f.unit))
         }
     }

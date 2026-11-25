@@ -145,10 +145,11 @@ fun MainShell(
             }
         }
     }
-    com.stepq.app.ui.components.ProSheetHost(onSeePro = {
-        com.stepq.app.ui.components.ProSheets.openHub = true
-        tab = Tab.Profile
-    })
+    com.stepq.app.ui.components.ProSheetHost(onSeePro = { com.stepq.app.ui.components.ProSheets.openHub = true })
+    // Any "See StepQ Pro" button sets openHub; the Profile tab opens its Pro page and clears it.
+    androidx.compose.runtime.LaunchedEffect(com.stepq.app.ui.components.ProSheets.openHub) {
+        if (com.stepq.app.ui.components.ProSheets.openHub) tab = Tab.Profile
+    }
 }
 
 private fun mutableTabState() = androidx.compose.runtime.mutableStateOf(Tab.Home)

@@ -120,11 +120,21 @@ fun StreaksScreen(
                     when {
                         plan.feature(com.stepq.app.data.MyPlan.F.STREAK_RESTORES) == null -> "Restore one to bring it back."
                         limit == null -> "Restore any of them. Unlimited restores with StepQ Pro."
+                        used >= limit -> "You've used all $limit restores this month. They come back on the 1st."
                         else -> "$used of $limit restores used this month. Restore one to bring it back."
                     },
                 )
                 lostRows.forEach { (person, streak) ->
                     LostLine(person, streak, busy = restoring == person.id) { onRestore(person.id, person.displayName) }
+                }
+                // Out of restores: Free members can upgrade for more.
+                if (plan.restoresLeft == 0 && !plan.isPro) {
+                    val proRestores = plan.feature(com.stepq.app.data.MyPlan.F.STREAK_RESTORES)?.pro
+                    Spacer(Modifier.height(10.dp))
+                    com.stepq.app.ui.components.GoldButton(
+                        if (proRestores == null) "Upgrade to Pro for unlimited restores" else "Upgrade to Pro for $proRestores restores a month",
+                        onClick = { com.stepq.app.ui.components.ProSheets.openHub = true },
+                    )
                 }
             }
             if (groups.endingTonight.isNotEmpty()) {

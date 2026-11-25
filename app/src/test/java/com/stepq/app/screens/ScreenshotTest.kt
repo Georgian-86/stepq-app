@@ -631,6 +631,39 @@ class ScreenshotTest {
     })
     @Test fun q13StreaksGoldTheme() = themed("gold", "Q13-streaks-gold-theme", withPlan(proPlan.copy(theme = "gold"), "z", "a", content = streaksWith(proPlan)))
 
+    // ------------------------------------------------------------------ Pro round 2
+    @Test fun r01PendingPost() = snap("R01-pro-post-waiting-for-approval", withPlan(proPlan, "me", "b") {
+        val mine = posts[2].copy(id = "p0", kind = "thought", body = "Who's in for a sunrise walk at Marine Drive this Sunday? 🌅", createdAt = ago(2), likeCount = 0, repostCount = 0, reposted = false, pending = true)
+        androidx.compose.foundation.layout.Column(Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Community, {}, {})
+            com.stepq.app.ui.community.CommunityFeed(
+                communityState.copy(feeds = mapOf(com.stepq.app.data.FeedScope.Everyone to com.stepq.app.ui.community.FeedState(posts = listOf(mine) + posts.take(2), loading = false, loaded = true))),
+                noActions, {}, {}, {}, {},
+            )
+        }
+    })
+    @Test fun r02FreeCommunity() = snap("R02-free-community-like-and-reply-only", withPlan(freePlan, "b") {
+        androidx.compose.foundation.layout.Column(Modifier.background(com.stepq.app.ui.theme.StepqColors.White)) {
+            com.stepq.app.ui.friends.FriendsHeader(com.stepq.app.ui.friends.FriendsSection.Community, {}, {})
+            com.stepq.app.ui.community.CommunityFeed(communityState, noActions, {}, {}, {}, {})
+        }
+    })
+    @Test fun r03FreePostSheet() = snap("R03-free-tries-to-post", withPlan(freePlan) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.components.PlanLimitSheet(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS, freePlan, onSeePro = {}, onDismiss = {})
+        }
+    })
+    private val freeOutOfRestores = com.stepq.app.data.MyPlan.FREE_DEFAULTS.copy(usage = com.stepq.app.data.PlanUsage(streakRestores = 2))
+    @Test fun r04RestoresUpgrade() = snap("R04-free-out-of-restores-upgrade", withPlan(freeOutOfRestores, "a", content = streaksWith(freeOutOfRestores)))
+    @Test fun r05RestoreSheet() = snap("R05-free-restore-limit-sheet", withPlan(freeOutOfRestores) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            com.stepq.app.ui.components.PlanLimitSheet(com.stepq.app.data.MyPlan.F.STREAK_RESTORES, freeOutOfRestores, onSeePro = {}, onDismiss = {})
+        }
+    })
+    @Test fun r06BadgeCloseUp() = snap("R06-crown-badge", withPlan(proPlan, "me", "a", "c") {
+        friends(com.stepq.app.ui.friends.FriendsUiState(loading = false, data = friendsData.copy(me = friendsData.me.copy(plan = "pro"), remindersLeft = null, reminderLimit = null)))
+    })
+
     @Test fun a26Goal() = snap("A26-daily-goal") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
     }

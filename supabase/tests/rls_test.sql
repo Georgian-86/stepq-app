@@ -335,6 +335,11 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select pg_temp.expect((select score from app.stepq_scores(array['00000000-0000-0000-0000-00000000000a']::uuid[])) = 2, 'score: friends see it');
 reset role;
 
+-- These community checks are about the feed itself, so plan limits are lifted here; the
+-- Pro section below puts the defaults back (Free can't post, new posts need approval).
+update app.plan_features set free_value = null where key = 'community_posts';
+update app.plan_features set free_value = 0 where key = 'post_approval';
+
 -- Community: everyone signed in sees posts with the author's public fields; you can only
 -- post, like and repost as yourself; achievements take steps from your own daily_steps row.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
@@ -400,6 +405,8 @@ reset role;
 insert into auth.users values
   ('00000000-0000-0000-0000-0000000000f1', 'free@test'),
   ('00000000-0000-0000-0000-0000000000f2', 'pal@test');
+update app.plan_features set free_value = 0 where key = 'community_posts';
+update app.plan_features set free_value = 1 where key = 'post_approval';
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
 insert into app.profiles (id, display_name, username) values (auth.uid(), 'Pal', 'pal');
 reset role;
@@ -407,7 +414,7 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
 insert into app.profiles (id, display_name, username) values (auth.uid(), 'Freya', 'freya');
 insert into app.friendships (requester, addressee) values (auth.uid(), '00000000-0000-0000-0000-0000000000f2');
 select pg_temp.expect((app.my_plan() ->> 'plan') = 'free', 'pro: new members are free');
-select pg_temp.expect((select (f ->> 'mine')::int from jsonb_array_elements(app.my_plan() -> 'features') f where f ->> 'key' = 'community_posts') = 3, 'pro: my plan lists my limits');
+select pg_temp.expect((select (f ->> 'mine')::int from jsonb_array_elements(app.my_plan() -> 'features') f where f ->> 'key' = 'community_posts') = 0, 'pro: my plan lists my limits');
 select pg_temp.expect((select count(*) from app.plan_features) >= 13, 'pro: members read the feature list');
 select pg_temp.expect_error($$update app.plan_features set free_value = 99 where key = 'community_posts'$$, 'pro: member editing a limit');
 select pg_temp.expect_error($$select app.admin_set_feature('community_posts', 99, null)$$, 'pro: member calling the admin limit editor');
@@ -416,12 +423,11 @@ select pg_temp.expect_error($$update app.profiles set qrun_host = true where id 
 select pg_temp.expect_error($$update app.profiles set theme = 'gold' where id = auth.uid()$$, 'pro: free member changing theme');
 select pg_temp.expect_error($$update app.profiles set photo_path = auth.uid()::text || '/me.jpg' where id = auth.uid()$$, 'pro: free member setting a photo');
 select pg_temp.expect_error($$select app.request_qrun_host()$$, 'pro: free member asking to host');
-select app.create_post('one'); select app.create_post('two'); select app.create_post('three');
-select pg_temp.expect_error($$select app.create_post('four')$$, 'pro: 4th community post this month on free');
-select app.create_post('a reply is fine', (select id from app.posts where body = 'one'));
-delete from app.posts where author = auth.uid() and body = 'three';
-select pg_temp.expect_error($$select app.create_post('four')$$, 'pro: deleting a post doesn''t give it back');
-select pg_temp.expect(((app.my_plan() -> 'usage') ->> 'community_posts')::int = 3, 'pro: usage shows posts used');
+select pg_temp.expect_error($$select app.create_post('one')$$, 'pro: free member starting a post');
+select pg_temp.expect_error($$select app.create_post('', null, current_date)$$, 'pro: free member sharing steps as a post');
+select pg_temp.expect(app.create_post('a reply is fine', current_setting('test.post')::uuid) is not null, 'pro: free member replies');
+select pg_temp.expect((select status from app.posts where body = 'a reply is fine') = 'approved', 'pro: replies don''t wait for approval');
+select pg_temp.expect(((app.my_plan() -> 'usage') ->> 'community_posts')::int = 0, 'pro: replies don''t count as posts');
 reset role;
 update app.friendships set status = 'accepted' where requester = '00000000-0000-0000-0000-0000000000f1';
 -- Freya shared with Pal on each of the 3 days before yesterday, then missed yesterday.
@@ -437,7 +443,7 @@ select pg_temp.expect_error($$select app.restore_streak('00000000-0000-0000-0000
 select pg_temp.expect_error($$insert into app.streak_restores (user_id, friend_id, day) values (auth.uid(), '00000000-0000-0000-0000-0000000000f2', current_date - 5)$$, 'restore: writing the table directly');
 update app.profiles set bff_id = null where id = auth.uid();
 select pg_temp.expect_error($$update app.profiles set bff_id = '00000000-0000-0000-0000-0000000000f2' where id = auth.uid()$$, 'bff: free member pinning');
-select pg_temp.expect((select count(*) from app.step_history(365)) <= 7, 'insights: free history is capped');
+select pg_temp.expect((select count(*) from app.step_history(5000)) <= 365, 'insights: free history is capped at a year');
 reset role;
 -- Free gets 2 restores a month: with 2 used, the next one is refused.
 delete from app.streak_restores where user_id = '00000000-0000-0000-0000-0000000000f1';
@@ -462,8 +468,13 @@ select pg_temp.expect_error($$select app.admin_post_qrun('Old', 'X', now() - int
 reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
 select pg_temp.expect((app.my_plan() ->> 'is_pro')::boolean, 'pro: Freya is pro');
-select app.create_post('four');
+select set_config('test.pending', app.create_post('four')::text, false);
 select app.create_post('five, unlimited on pro');
+select pg_temp.expect((select status from app.posts where id = current_setting('test.pending')::uuid) = 'pending', 'approval: a Pro post waits for an admin');
+select pg_temp.expect((select count(*) from app.my_pending_posts()) = 2, 'approval: I see my waiting posts');
+select pg_temp.expect((select count(*) from app.community_feed('mine') where body = 'four') = 1, 'approval: my waiting post shows in my feed');
+select pg_temp.expect_error($$update app.posts set status = 'approved' where author = auth.uid()$$, 'approval: approving my own post');
+select pg_temp.expect_error($$select app.admin_review_post(current_setting('test.pending')::uuid, true)$$, 'approval: member calling the admin review');
 update app.profiles set theme = 'gold', photo_path = auth.uid()::text || '/me.jpg', bff_id = '00000000-0000-0000-0000-0000000000f2' where id = auth.uid();
 select pg_temp.expect((select theme from app.profiles where id = auth.uid()) = 'gold', 'pro: changes theme');
 select pg_temp.expect_error($$update app.profiles set photo_path = '00000000-0000-0000-0000-0000000000f2/x.jpg' where id = auth.uid()$$, 'pro: photo path in someone else''s folder');
@@ -473,6 +484,20 @@ select app.request_qrun_host();
 select pg_temp.expect((select qrun_host_requested_at is not null from app.profiles where id = auth.uid()), 'pro: asks to host QRuns');
 reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select count(*) from app.community_feed() where body = 'four') = 0, 'approval: others don''t see a waiting post');
+select pg_temp.expect((select count(*) from app.posts where body = 'four') = 0, 'approval: nor read it directly');
+select pg_temp.expect_error($$insert into app.post_likes (post_id, user_id) values (current_setting('test.pending')::uuid, auth.uid())$$, 'approval: liking a waiting post');
+select pg_temp.expect_error($$select app.create_post('reply', current_setting('test.pending')::uuid)$$, 'approval: replying to a waiting post');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select pg_temp.expect((select count(*) from app.posts where status = 'pending') = 2, 'approval: admins see the queue');
+select app.admin_review_post(current_setting('test.pending')::uuid, true);
+select app.admin_review_post((select id from app.posts where body = 'five, unlimited on pro'), false);
+select pg_temp.expect_error($$select app.admin_review_post(current_setting('test.pending')::uuid, true)$$, 'approval: reviewing twice');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select count(*) from app.community_feed() where body = 'four') = 1, 'approval: approved post is in the feed');
+select pg_temp.expect((select count(*) from app.community_feed() where body like 'five%') = 0, 'approval: rejected post stays hidden');
 select pg_temp.expect((select pro from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])), 'badge: friends see the Pro badge');
 select pg_temp.expect((select photo_path from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])) is not null, 'badge: friends see the photo');
 reset role;

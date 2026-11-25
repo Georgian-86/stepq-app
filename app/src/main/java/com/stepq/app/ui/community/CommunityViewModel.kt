@@ -148,7 +148,7 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
         viewModelScope.launch {
             repo.create(body, parentId, if (shareSteps) LocalDate.now() else null)
                 .onSuccess {
-                    _state.update { s -> s.copy(posting = false, toast = if (parentId == null) "Posted" else "Reply posted") }
+                    _state.update { s -> s.copy(posting = false, toast = if (parentId != null) "Reply posted" else if (needsApproval()) "Sent for approval. It goes live once StepQ checks it." else "Posted") }
                     if (parentId == null) com.stepq.app.data.Pro.refreshAsync()
                     onDone()
                     if (parentId == null) {
@@ -167,6 +167,8 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
                 }
         }
     }
+
+    private fun needsApproval() = com.stepq.app.data.Pro.plan.value?.has(com.stepq.app.data.MyPlan.F.POST_APPROVAL) == true
 
     fun toggleLike(post: Post) {
         val next = !post.liked

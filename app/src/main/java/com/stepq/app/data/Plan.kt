@@ -102,6 +102,7 @@ data class MyPlan(
         const val PROFILE_BADGE = "profile_badge"
         const val PIN_BFF = "pin_bff"
         const val COMMUNITY_POSTS = "community_posts"
+        const val POST_APPROVAL = "post_approval"
     }
 
     companion object {
@@ -116,11 +117,12 @@ data class MyPlan(
                 PlanFeature(F.REWARD_MONTHLY, "Monthly reward eligible", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.REWARD_YEARLY, "Yearly reward eligible", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.ALL_CHALLENGES, "Join every challenge (incl. Pro-only)", "switch", free = 0, pro = 1, mine = 0),
-                PlanFeature(F.ANALYSIS_DAYS, "Step history in Insights", "limit", "days", 7, null, 7),
+                PlanFeature(F.ANALYSIS_DAYS, "Step history in Insights", "limit", "days", 365, null, 365),
                 PlanFeature(F.WATER_REMINDERS, "Water reminders", "limit", "a day", 3, null, 3),
                 PlanFeature(F.PROFILE_BADGE, "Pro badge on profile", "switch", free = 0, pro = 1, mine = 0),
                 PlanFeature(F.PIN_BFF, "Pin one BFF", "switch", free = 0, pro = 1, mine = 0),
-                PlanFeature(F.COMMUNITY_POSTS, "Community posts", "limit", "a month", 3, null, 3),
+                PlanFeature(F.COMMUNITY_POSTS, "Community posts", "limit", "a month", 0, null, 0),
+                PlanFeature(F.POST_APPROVAL, "New Community posts wait for admin approval", "switch", free = 1, pro = 1, mine = 1),
             ),
         )
     }
