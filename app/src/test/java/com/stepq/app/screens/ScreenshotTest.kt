@@ -685,6 +685,13 @@ class ScreenshotTest {
         friends(com.stepq.app.ui.friends.FriendsUiState(loading = false, data = friendsData.copy(me = friendsData.me.copy(plan = "pro"), remindersLeft = null, reminderLimit = null)))
     })
 
+    @Test fun u01Upgrade() = snap("U01-upgrade-to-pro") {
+        com.stepq.app.ui.pro.UpgradeScreen(freePlan, asked = false, onAsk = {}, onCompare = {}, onClose = {})
+    }
+    @Test fun u02UpgradeAsked() = snap("U02-upgrade-asked") {
+        com.stepq.app.ui.pro.UpgradeScreen(freePlan, asked = true, onAsk = {}, onCompare = {}, onClose = {})
+    }
+
     @Test fun a26Goal() = snap("A26-daily-goal") {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {})
     }

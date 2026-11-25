@@ -133,7 +133,7 @@ fun StreaksScreen(
                     Spacer(Modifier.height(10.dp))
                     com.stepq.app.ui.components.GoldButton(
                         if (proRestores == null) "Upgrade to Pro for unlimited restores" else "Upgrade to Pro for $proRestores restores a month",
-                        onClick = { com.stepq.app.ui.components.ProSheets.openHub = true },
+                        onClick = { com.stepq.app.ui.pro.UpgradePrompt.show() },
                     )
                 }
             }

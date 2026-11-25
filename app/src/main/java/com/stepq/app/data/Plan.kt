@@ -103,6 +103,7 @@ data class MyPlan(
         const val PIN_BFF = "pin_bff"
         const val COMMUNITY_POSTS = "community_posts"
         const val POST_APPROVAL = "post_approval"
+        const val UPGRADE_POPUP_DAYS = "upgrade_popup_days"
     }
 
     companion object {

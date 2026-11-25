@@ -229,8 +229,8 @@ fun PlanTable(features: List<PlanFeature>) {
             .border(1.dp, StepqColors.Line, RoundedCornerShape(16.dp)),
     ) {
         TableRow("", "Free", "Pro", header = true)
-        // Post approval is how moderation works, not a perk: it's explained under the table.
-        features.filter { it.key != MyPlan.F.POST_APPROVAL }.forEach { f ->
+        // Post approval and the upgrade pop-up are settings, not perks.
+        features.filter { it.key != MyPlan.F.POST_APPROVAL && it.key != MyPlan.F.UPGRADE_POPUP_DAYS }.forEach { f ->
             TableRow(f.label, planValue(f.kind, f.free, f.unit), planValue(f.kind, f.pro, f.unit))
         }
     }
