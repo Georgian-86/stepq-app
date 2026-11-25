@@ -185,8 +185,6 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
     fun clearForm() = _state.update { it.copy(formError = null, emailSentTo = null) }
 
     fun toastShown() = _state.update { it.copy(toast = null) }
-
-    fun showToast(message: String) = _state.update { it.copy(toast = message) }
 }
 
 /** A friendly message for a Supabase Auth error. */
