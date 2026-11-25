@@ -16,21 +16,6 @@ fun greeting(now: LocalTime): String = when (now.hour) {
 }
 
 /**
- * Days in a row the goal was met, counting back from today if today is already met, or from
- * yesterday otherwise (so the streak doesn't drop to 0 every morning).
- */
-fun streak(days: List<DailySteps>, goal: Int, today: LocalDate): Int {
-    val met = days.filter { it.steps >= goal }.map { LocalDate.parse(it.day) }.toSet()
-    var day = if (today in met) today else today.minusDays(1)
-    var count = 0
-    while (day in met) {
-        count++
-        day = day.minusDays(1)
-    }
-    return count
-}
-
-/**
  * Provisional StepQ score: percent of today's goal, capped at 100. The Figma shows other
  * numbers once the goal is passed (81, 84), so the real formula is still to be decided.
  */
@@ -53,18 +38,31 @@ fun weekAverage(bars: List<Int?>): Int {
     return if (known.isEmpty()) 0 else known.average().roundToInt()
 }
 
-data class FriendRow(val rank: Int, val name: String, val avatar: com.stepq.app.data.AvatarConfig, val steps: Int, val isMe: Boolean)
+/** [streak]: days in a row I've shared my steps with this friend (0 for me, or no streak). */
+data class FriendRow(
+    val rank: Int,
+    val name: String,
+    val avatar: com.stepq.app.data.AvatarConfig,
+    val steps: Int,
+    val isMe: Boolean,
+    val streak: Int = 0,
+)
 
-/** A12 "Friends today": the top three by steps, always including the user at their real rank. */
+/**
+ * A12 "Friends today": the top three by steps, always including the user at their real rank.
+ * [streaks] lines up with [friends]: my streak with each of them.
+ */
 fun friendsToday(
     me: Pair<String, com.stepq.app.data.AvatarConfig>,
     mySteps: Int,
     friends: List<Triple<String, com.stepq.app.data.AvatarConfig, Int>>,
     size: Int = 3,
+    streaks: List<Int> = emptyList(),
 ): List<FriendRow> {
-    val all = (friends.map { Triple(it.first, it.second, it.third) to false } + (Triple(me.first, me.second, mySteps) to true))
-        .sortedWith(compareByDescending<Pair<Triple<String, com.stepq.app.data.AvatarConfig, Int>, Boolean>> { it.first.third }.thenBy { !it.second })
-        .mapIndexed { i, (p, isMe) -> FriendRow(i + 1, if (isMe) "You" else p.first, p.second, p.third, isMe) }
+    val all = (friends.mapIndexed { i, f -> FriendRow(0, f.first, f.second, f.third, false, streaks.getOrElse(i) { 0 }) } +
+        FriendRow(0, "You", me.second, mySteps, true))
+        .sortedWith(compareByDescending<FriendRow> { it.steps }.thenBy { !it.isMe })
+        .mapIndexed { i, r -> r.copy(rank = i + 1) }
     val top = all.take(size)
     if (top.any { it.isMe }) return top
     return all.take(size - 1) + all.first { it.isMe }
@@ -88,7 +86,10 @@ fun estimatedActiveMinutes(steps: Int): Int =
 
 private const val STEPS_PER_ACTIVE_MINUTE = 100
 
-/** "Shared 6,240 steps with Arjun. 4-day streak!" */
+/**
+ * "Shared 6,240 steps with Arjun. 4-day streak!" Streaks are per friend, so the streak is only
+ * named when sharing with one friend, and only on the first share to them that day.
+ */
 fun shareToast(names: List<String>, steps: Int, streak: Int, firstToday: Boolean): String {
     val who = when (names.size) {
         0 -> "your friends"
@@ -97,9 +98,49 @@ fun shareToast(names: List<String>, steps: Int, streak: Int, firstToday: Boolean
         else -> "${names[0]} and ${names.size - 1} friends"
     }
     val tail = when {
-        !firstToday -> ""
+        !firstToday || names.size != 1 -> ""
         streak <= 1 -> " Streak started!"
         else -> " $streak-day streak!"
     }
     return "Shared ${com.stepq.app.ui.onboarding.formatSteps(steps)} steps with $who.$tail"
+}
+
+/** One friend on the Streaks page. [streak] is my streak with them; [sharedToday] means today already counts. */
+data class StreakRow(val person: com.stepq.app.data.PersonSummary, val streak: Int, val sharedToday: Boolean) {
+    /** Snapchat's hourglass: the streak ends tonight unless I share with them. */
+    val endsTonight: Boolean get() = streak > 0 && !sharedToday
+}
+
+/** The Streaks page, in three groups: ending tonight first, then going (longest first), then none yet. */
+data class StreakGroups(val endingTonight: List<StreakRow>, val going: List<StreakRow>, val notStarted: List<StreakRow>)
+
+fun streakGroups(
+    friends: List<com.stepq.app.data.PersonSummary>,
+    streaks: Map<String, Int>,
+    sharedToday: Set<String>,
+): StreakGroups {
+    val rows = friends.map { StreakRow(it, streaks[it.id] ?: 0, it.id in sharedToday) }
+    val byStreak = compareByDescending<StreakRow> { it.streak }.thenBy { it.person.displayName }
+    return StreakGroups(
+        endingTonight = rows.filter { it.endsTonight }.sortedWith(byStreak),
+        going = rows.filter { it.sharedToday }.sortedWith(byStreak),
+        notStarted = rows.filter { it.streak == 0 && !it.sharedToday }.sortedBy { it.person.displayName },
+    )
+}
+
+/** Snapchat-style marks next to a streak: 💯 at 100 days, ⏳ when it ends tonight. */
+fun streakBadge(row: StreakRow): String = buildString {
+    append("🔥 ").append(row.streak)
+    if (row.streak >= 100) append(" 💯")
+    if (row.endsTonight) append(" ⏳")
+}
+
+/**
+ * The friend at the top of Streaks: my pinned BFF when my plan allows pinning and they're still a
+ * friend, otherwise the friend I have the longest streak with. Null when no streak is going.
+ */
+fun topStreakFriend(groups: StreakGroups, bffId: String?, canPin: Boolean): Pair<StreakRow, Boolean>? {
+    val all = groups.endingTonight + groups.going + groups.notStarted
+    if (canPin && bffId != null) all.firstOrNull { it.person.id == bffId }?.let { return it to true }
+    return (groups.endingTonight + groups.going).maxByOrNull { it.streak }?.let { it to false }
 }

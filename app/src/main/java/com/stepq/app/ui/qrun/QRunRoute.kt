@@ -65,8 +65,14 @@ class QRunSection internal constructor(
             onJoin = { joining.value = it.id },
             onOpenPlanner = { pageState.value = PLANNER },
             onPost = {
-                vm.clearFormError()
-                pageState.value = POST
+                // Only StepQ (admins) and Pro members StepQ approved can host; the server checks too.
+                val plan = com.stepq.app.data.Pro.plan.value
+                if (state.value.data?.isAdmin == true || plan?.canPostQRun == true || plan == null) {
+                    vm.clearFormError()
+                    pageState.value = POST
+                } else {
+                    com.stepq.app.ui.components.ProSheets.show(com.stepq.app.data.MyPlan.F.PLAN_QRUN)
+                }
             },
             onSort = vm::setSort,
             onPrice = vm::setPrice,

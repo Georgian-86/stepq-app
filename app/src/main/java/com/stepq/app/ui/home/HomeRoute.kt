@@ -15,7 +15,7 @@ import com.stepq.app.ui.onboarding.ConnectStepsScreen
 
 /** Wires Home to its data: syncs Health Connect and reloads every time the app comes back. */
 @Composable
-fun HomeRoute(repo: HomeRepository, onSeeAllFriends: () -> Unit) {
+fun HomeRoute(repo: HomeRepository, onSeeAllFriends: () -> Unit, onOpenStreaks: () -> Unit = {}) {
     val context = LocalContext.current.applicationContext
     val vm: HomeViewModel = viewModel { HomeViewModel(repo, StepsReader(context), context) }
     val state by vm.state.collectAsState()
@@ -39,6 +39,7 @@ fun HomeRoute(repo: HomeRepository, onSeeAllFriends: () -> Unit) {
             onSeeAllFriends = onSeeAllFriends,
             onShare = vm::share,
             onToastShown = vm::toastShown,
+            onOpenStreaks = onOpenStreaks,
         )
     }
 }

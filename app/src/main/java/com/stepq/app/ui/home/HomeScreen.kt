@@ -81,6 +81,7 @@ fun HomeScreen(
     onSeeAllFriends: () -> Unit,
     onShare: (Set<String>) -> Unit = {},
     onToastShown: () -> Unit = {},
+    onOpenStreaks: () -> Unit = {},
 ) {
     var sharing by remember { mutableStateOf(false) }
     val goalReached = !state.loading && state.goal > 0 && state.steps >= state.goal
@@ -113,7 +114,7 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
             Ring(state)
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.appear(1)) { ShareCard(state, onOpen = { sharing = true }, onAddFriends = onSeeAllFriends) }
+            Box(Modifier.appear(1)) { ShareCard(state, onOpen = { sharing = true }, onAddFriends = onSeeAllFriends, onOpenStreaks = onOpenStreaks) }
             if (!state.healthConnected) {
                 Spacer(Modifier.height(16.dp))
                 ConnectCard(onConnectSteps)
@@ -196,25 +197,8 @@ private fun Header(state: HomeUiState) {
                 style = StepqType.Heading, color = StepqColors.Ink,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (state.streak > 0) {
-                Row(
-                    Modifier
-                        .clip(CircleShape)
-                        .background(if (state.sharedToday) StepqColors.Mango else StepqColors.MangoSoft)
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = "${state.streak}-day streak" + if (state.sharedToday) "" else ", share today to keep it"
-                        }
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.Whatshot, contentDescription = null, tint = StepqColors.Ink, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(state.streak.toString(), style = StepqType.SmallStrong, color = StepqColors.Ink)
-                }
-            }
-            ScoreBadge(state.score)
-        }
+        // No overall streak here: streaks are per friend, shown next to each friend below.
+        ScoreBadge(state.score)
     }
 }
 
@@ -262,17 +246,19 @@ private fun Ring(state: HomeUiState) {
 }
 
 /**
- * The streak card under the ring: share today's steps with a friend to keep the streak going
- * (Snapchat style). Once shared, it says so and offers to share again.
+ * The share card under the ring: share today's steps with friends to keep your streak with
+ * each of them going (Snapchat style). There's no overall streak, so no number here; each
+ * friend's streak shows next to them. Once shared, it says so and offers to share again.
  */
 @Composable
-private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -> Unit) {
+private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -> Unit, onOpenStreaks: () -> Unit = {}) {
     val noFriends = state.shareTo.isEmpty()
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(StepqDimens.RadiusM))
             .background(if (state.sharedToday) StepqColors.LeafSoft else StepqColors.MangoSoft)
+            .clickable(enabled = !noFriends, onClickLabel = "See your streaks", onClick = onOpenStreaks)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -280,9 +266,9 @@ private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -
         Column(Modifier.padding(horizontal = 12.dp).weight(1f)) {
             Text(
                 when {
-                    state.sharedToday -> "${state.streak}-day streak · shared today"
-                    state.streak > 0 -> "Share today to keep your ${state.streak}-day streak"
-                    else -> "Start a streak"
+                    state.sharedToday -> "Shared your steps today"
+                    state.streaks.isNotEmpty() -> "Share today to keep your streaks going"
+                    else -> "Start a streak with a friend"
                 },
                 style = StepqType.BodyStrong,
                 color = StepqColors.Ink,
@@ -290,12 +276,15 @@ private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -
             Text(
                 when {
                     noFriends -> "Add a friend, then share your steps with them every day."
-                    state.sharedToday -> "Come back tomorrow and share again."
-                    else -> "Share your steps with a friend every day."
+                    state.sharedToday -> "Each friend you share with keeps your streak with them going."
+                    else -> "Every friend you share with daily has their own streak."
                 },
                 style = StepqType.Small,
                 color = StepqColors.Muted,
             )
+            if (!noFriends) {
+                Text("See your streaks ›", style = StepqType.SmallStrong, color = StepqColors.Deep, modifier = Modifier.padding(top = 4.dp))
+            }
         }
         com.stepq.app.ui.friends.SmallPill(
             when {
@@ -310,14 +299,14 @@ private fun ShareCard(state: HomeUiState, onOpen: () -> Unit, onAddFriends: () -
     }
 }
 
-/** Pick friends to share today's steps with. Everyone is picked to start with. */
+/** Pick friends to share today's steps with. Everyone in [preselected] (default: all) is picked to start with. */
 @Composable
-private fun ShareSheet(state: HomeUiState, onSend: (Set<String>) -> Unit) {
-    var picked by remember(state.shareTo) { mutableStateOf(state.shareTo.map { it.id }.toSet()) }
+internal fun ShareSheet(state: HomeUiState, preselected: Set<String>? = null, onSend: (Set<String>) -> Unit) {
+    var picked by remember(state.shareTo, preselected) { mutableStateOf(preselected ?: state.shareTo.map { it.id }.toSet()) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp)) {
         Text("Share today's steps", style = StepqType.Heading, color = StepqColors.Ink)
         Text(
-            "${formatSteps(state.steps)} steps so far. Sharing with at least one friend each day keeps your streak going.",
+            "${formatSteps(state.steps)} steps so far. Share with a friend each day to keep your streak with them going.",
             style = StepqType.Small,
             color = StepqColors.Muted,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -333,8 +322,9 @@ private fun ShareSheet(state: HomeUiState, onSend: (Set<String>) -> Unit) {
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    StepqAvatar(p.avatar, 40.dp)
+                    com.stepq.app.ui.components.PersonAvatar(p.avatar, 40.dp, p.id)
                     Text(p.displayName, style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.padding(start = 12.dp).weight(1f))
+                    state.streaks[p.id]?.let { StreakChip(it, Modifier.padding(end = 10.dp)) }
                     Box(
                         Modifier
                             .size(24.dp)
@@ -498,6 +488,24 @@ private fun FriendLine(row: FriendRow) {
         Text(row.rank.toString(), style = StepqType.BodyStrong, color = StepqColors.Muted, modifier = Modifier.width(24.dp))
         StepqAvatar(row.avatar, 34.dp)
         Text(row.name, style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.padding(start = 12.dp).weight(1f))
+        if (row.streak > 0) StreakChip(row.streak, Modifier.padding(end = 10.dp))
         Text(formatSteps(row.steps), style = StepqType.NumberM, color = StepqColors.Ink)
+    }
+}
+
+/** My streak with one friend: a flame and the days in a row. */
+@Composable
+private fun StreakChip(days: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(CircleShape)
+            .background(StepqColors.MangoSoft)
+            .semantics(mergeDescendants = true) { contentDescription = "$days-day streak" }
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Whatshot, contentDescription = null, tint = StepqColors.Ink, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(2.dp))
+        Text(days.toString(), style = StepqType.SmallStrong, color = StepqColors.Ink)
     }
 }

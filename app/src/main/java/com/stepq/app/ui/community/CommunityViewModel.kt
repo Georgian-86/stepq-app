@@ -149,6 +149,7 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
             repo.create(body, parentId, if (shareSteps) LocalDate.now() else null)
                 .onSuccess {
                     _state.update { s -> s.copy(posting = false, toast = if (parentId == null) "Posted" else "Reply posted") }
+                    if (parentId == null) com.stepq.app.data.Pro.refreshAsync()
                     onDone()
                     if (parentId == null) {
                         // Show it at the top of every feed it belongs to.
@@ -161,7 +162,8 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
                 }
                 .onFailure { e ->
                     android.util.Log.w("StepqCommunity", "Couldn't post", e)
-                    _state.update { s -> s.copy(posting = false, composeError = postErrorMessage(e)) }
+                    val limited = com.stepq.app.ui.components.ProSheets.showFor(e)
+                    _state.update { s -> s.copy(posting = false, composeError = if (limited) null else postErrorMessage(e)) }
                 }
         }
     }

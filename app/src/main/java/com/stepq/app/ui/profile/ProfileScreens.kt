@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -64,11 +65,11 @@ import com.stepq.app.ui.theme.StepqDimens
 import com.stepq.app.ui.theme.StepqType
 
 /** What a Profile row opens. */
-enum class ProfileAction { EditProfile, Account, Goal, ConnectedApps, Notifications, Privacy, Help, LogOut, Pro }
+enum class ProfileAction { EditProfile, Account, Goal, ConnectedApps, Notifications, Privacy, Help, LogOut, Pro, Insights }
 
 /** A26 Profile. */
 @Composable
-fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileAction) -> Unit) {
+fun ProfileScreen(state: ProfileUiState, stepSource: String, plan: com.stepq.app.data.MyPlan? = null, onAction: (ProfileAction) -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
@@ -88,55 +89,38 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
             }
         } else {
             Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StepqAvatar(p.avatar, 84.dp)
-                Column(Modifier.padding(start = 16.dp)) {
-                    Text(p.displayName, style = StepqType.Heading, color = StepqColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("@${p.username}", style = StepqType.Body, color = StepqColors.Muted)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        if (p.plan == "pro") "Pro plan" else "Free plan",
-                        style = StepqType.SmallStrong,
-                        color = StepqColors.Deep,
-                        modifier = Modifier.clip(CircleShape).background(StepqColors.LeafSoft).padding(horizontal = 10.dp, vertical = 3.dp),
-                    )
+            if (plan?.isPro == true) {
+                ProHero(p, state.stats)
+                Spacer(Modifier.height(12.dp))
+                com.stepq.app.ui.components.ProRow("Your Pro membership", "Themes, photo, BFF, restores and more", { onAction(ProfileAction.Pro) })
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    com.stepq.app.ui.components.PersonAvatar(p.avatar, 84.dp, p.id)
+                    Column(Modifier.padding(start = 16.dp)) {
+                        Text(p.displayName, style = StepqType.Heading, color = StepqColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("@${p.username}", style = StepqType.Body, color = StepqColors.Muted)
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Free plan",
+                            style = StepqType.SmallStrong,
+                            color = StepqColors.Deep,
+                            modifier = Modifier.clip(CircleShape).background(StepqColors.LeafSoft).padding(horizontal = 10.dp, vertical = 3.dp),
+                        )
+                    }
                 }
-            }
-            if (p.plan != "pro") {
                 Spacer(Modifier.height(16.dp))
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(StepqDimens.RadiusS))
-                        .background(StepqColors.MangoSoft)
-                        .clickable(role = Role.Button) { onAction(ProfileAction.Pro) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = StepqColors.Ink, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text("Add your own profile photo", style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.weight(1f))
-                    Text(
-                        "Pro",
-                        style = StepqType.SmallStrong,
-                        color = StepqColors.Ink,
-                        modifier = Modifier.clip(CircleShape).background(StepqColors.Mango).padding(horizontal = 10.dp, vertical = 3.dp),
-                    )
+                com.stepq.app.ui.components.ProRow("StepQ Pro", "Your photo, themes, a BFF and unlimited posts", { onAction(ProfileAction.Pro) })
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Stat(formatSteps(state.stats.score), "StepQ score", Modifier.weight(1f))
+                    Stat(formatSteps(state.stats.bestDay), "best day", Modifier.weight(1f))
+                    Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat(state.stats.streak.toString(), "day streak", Modifier.weight(1f))
-                Stat(formatSteps(state.stats.score), "StepQ score", Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat(formatSteps(state.stats.bestDay), "best day", Modifier.weight(1f))
-                Stat(formatSteps(state.stats.kmSoFar), "km so far", Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
             Item(Icons.Outlined.Edit, "Edit profile", "Name, username, avatar") { onAction(ProfileAction.EditProfile) }
             Item(Icons.Outlined.ManageAccounts, "Account", "Email, password, delete account") { onAction(ProfileAction.Account) }
+            Item(Icons.Outlined.Insights, "Insights", "Your steps over time") { onAction(ProfileAction.Insights) }
             Item(Icons.Outlined.TrackChanges, "Daily goal", "${formatSteps(p.dailyGoal)} steps" + (p.nextDailyGoal?.let { " · ${formatSteps(it)} from tomorrow" } ?: "")) { onAction(ProfileAction.Goal) }
             Item(Icons.Outlined.Link, "Connected apps", stepSource) { onAction(ProfileAction.ConnectedApps) }
             Item(Icons.Outlined.NotificationsNone, "Notifications") { onAction(ProfileAction.Notifications) }
@@ -145,6 +129,35 @@ fun ProfileScreen(state: ProfileUiState, stepSource: String, onAction: (ProfileA
             Item(Icons.AutoMirrored.Outlined.Logout, "Log out", color = StepqColors.TomatoText, chevron = false) { onAction(ProfileAction.LogOut) }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** Pro members' profile header: night-green card, gold ring, Pro badge and stats inside. */
+@Composable
+private fun ProHero(p: com.stepq.app.data.Profile, stats: ProfileStats) {
+    com.stepq.app.ui.components.NightCard {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                com.stepq.app.ui.components.PersonAvatar(p.avatar, 88.dp, p.id)
+                Column(Modifier.padding(start = 14.dp)) {
+                    Text(p.displayName, style = StepqType.Heading, color = StepqColors.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("@${p.username}", style = StepqType.Small, color = com.stepq.app.ui.theme.ProColors.OnNightMuted)
+                    Spacer(Modifier.height(6.dp))
+                    com.stepq.app.ui.components.ProBadge()
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(formatSteps(stats.score) to "StepQ score", formatSteps(stats.bestDay) to "best day", formatSteps(stats.kmSoFar) to "km so far").forEach { (v, l) ->
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(StepqColors.White.copy(alpha = 0.08f)).padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(v, style = StepqType.NumberM, color = StepqColors.White)
+                        Text(l, style = StepqType.Small, color = com.stepq.app.ui.theme.ProColors.OnNightMuted)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -240,42 +253,6 @@ private fun RoundButton(icon: ImageVector, label: String, enabled: Boolean, onCl
             .clickable(enabled = enabled, onClickLabel = label, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = label, tint = if (enabled) StepqColors.Ink else StepqColors.Line) }
-}
-
-/** A27 StepQ Pro waitlist sheet content. */
-@Composable
-fun ProSheet(onWaitlist: Boolean, onNotify: () -> Unit, onDismiss: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(56.dp).clip(CircleShape).background(StepqColors.Mango), contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.StarOutline, contentDescription = null, tint = StepqColors.Ink)
-        }
-        Spacer(Modifier.height(14.dp))
-        Text("StepQ Pro", style = StepqType.Title, color = StepqColors.Ink)
-        Spacer(Modifier.height(8.dp))
-        Text("Put your own photo on your profile, leaderboards and streak cards.", style = StepqType.Body, color = StepqColors.Muted, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(StepqDimens.RadiusM)).background(StepqColors.Mint).padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Check, contentDescription = null, tint = StepqColors.Deep, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Profile photo instead of an avatar", style = StepqType.BodyStrong, color = StepqColors.Ink)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.StarOutline, contentDescription = null, tint = StepqColors.Muted, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("More Pro features are on the way", style = StepqType.Body, color = StepqColors.Muted)
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        if (onWaitlist) {
-            Text("You're on the list. We'll tell you when Pro launches.", style = StepqType.BodyStrong, color = StepqColors.Deep, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(8.dp))
-        } else {
-            StepqButton("Notify me when Pro launches", onNotify)
-        }
-        TextButton(onClick = onDismiss) { Text(if (onWaitlist) "Close" else "Not now", style = StepqType.SmallStrong, color = StepqColors.Deep) }
-    }
 }
 
 const val GOAL_MIN = 1000

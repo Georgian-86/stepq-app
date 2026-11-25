@@ -8,12 +8,12 @@ import java.time.LocalDate
 /** Everything A12 Home shows, read with the signed-in user's token (RLS applies). */
 data class HomeData(
     val me: Profile,
-    /** The user's own days, newest first, enough to count a streak and fill this week. */
+    /** The user's own days, newest first, enough for the score and this week. */
     val myDays: List<DailySteps>,
     /** Friends with their steps today (0 when they have no row yet). */
     val friendsToday: List<Pair<PersonSummary, Int>>,
-    /** Null until the Nov 20 migration is applied. */
-    val streak: ShareStreak? = null,
+    /** My streak with each friend, by friend id. Null until the Nov 24 migration is applied. */
+    val streaks: Map<String, FriendStreak>? = null,
     val score: Int? = null,
 )
 
@@ -49,16 +49,16 @@ class HomeRepository(private val client: SupabaseClient?, private val profiles: 
         }
         HomeData(
             me, myDays, friendsToday,
-            streak = StreakScore.streak(db, today),
+            streaks = StreakScore.friendStreaks(db, today),
             score = StreakScore.scores(db, listOf(me.id))?.let { it[me.id] ?: 0 },
         )
     }
 
-    /** Shares today's step count with friends; this is what keeps the streak going. */
-    suspend fun shareSteps(friendIds: Collection<String>, steps: Int, day: LocalDate): Result<Pair<Int, ShareStreak?>> = runCatching {
+    /** Shares today's step count with friends; this keeps my streak with each of them going. */
+    suspend fun shareSteps(friendIds: Collection<String>, steps: Int, day: LocalDate): Result<Pair<Int, Map<String, FriendStreak>?>> = runCatching {
         val db = (client ?: throw NotConfiguredException()).postgrest
         val sent = StreakScore.share(db, friendIds, steps, day)
-        sent to StreakScore.streak(db, day)
+        sent to StreakScore.friendStreaks(db, day)
     }
 
     /** Saves days read from Health Connect. One upsert; RLS only lets the user write their own. */

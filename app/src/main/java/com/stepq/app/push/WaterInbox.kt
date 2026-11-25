@@ -59,7 +59,7 @@ fun shareMessage(shares: List<InboxShare>): Pair<String, String>? {
     val others = shares.map { it.fromName }.distinct().size - 1
     val title = if (others == 0) "$first shared ${com.stepq.app.ui.onboarding.formatSteps(latest.steps)} steps with you"
     else "$first and ${if (others == 1) "1 friend" else "$others friends"} shared their steps with you"
-    return title to "Share yours back to keep your streak going."
+    return title to "Share yours back to keep your streak with them going."
 }
 
 /** The notification text for reminders that arrived since the last check, or null for none. */

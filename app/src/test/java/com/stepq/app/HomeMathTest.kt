@@ -5,7 +5,6 @@ import com.stepq.app.data.DailySteps
 import com.stepq.app.ui.home.friendsToday
 import com.stepq.app.ui.home.greeting
 import com.stepq.app.ui.home.stepqScore
-import com.stepq.app.ui.home.streak
 import com.stepq.app.ui.home.weekAverage
 import com.stepq.app.ui.home.weekBars
 import org.junit.Assert.assertEquals
@@ -16,13 +15,6 @@ import java.time.LocalTime
 class HomeMathTest {
     private val today = LocalDate.of(2026, 10, 17) // a Saturday
     private fun day(daysAgo: Long, steps: Int) = DailySteps("me", today.minusDays(daysAgo).toString(), steps)
-
-    @Test fun streakCountsFromYesterdayUntilTodayIsMet() {
-        val days = listOf(day(0, 3000), day(1, 9000), day(2, 8000), day(3, 7000))
-        assertEquals(2, streak(days, 8000, today))
-        assertEquals(3, streak(days.map { if (it.day == today.toString()) it.copy(steps = 8000) else it }, 8000, today))
-        assertEquals(0, streak(emptyList(), 8000, today))
-    }
 
     @Test fun scoreIsPercentOfGoalCapped() {
         assertEquals(78, stepqScore(6240, 8000))
@@ -43,6 +35,20 @@ class HomeMathTest {
         assertEquals(listOf("Arjun", "Meera", "You"), rows.map { it.name })
         assertEquals(4, rows.last().rank)
         assertEquals(listOf("You"), friendsToday("You" to a, 10, emptyList()).map { it.name })
+        // Each friend keeps their own streak with me; I have none of my own.
+        val withStreaks = friendsToday("You" to a, 6240, friends, size = 4, streaks = listOf(4, 0, 12))
+        assertEquals(listOf(4, 0, 12, 0), withStreaks.map { it.streak })
+    }
+
+    @Test fun streaksPageGroupsEachFriendOnTheirOwn() {
+        val a = AvatarConfig()
+        val people = listOf("Arjun", "Meera", "Kabir", "Zoya").map { com.stepq.app.data.PersonSummary(it.lowercase(), it, it.lowercase(), a) }
+        val g = com.stepq.app.ui.home.streakGroups(people, mapOf("arjun" to 12, "meera" to 4, "zoya" to 104), setOf("arjun"))
+        assertEquals(listOf("Zoya", "Meera"), g.endingTonight.map { it.person.displayName })
+        assertEquals(listOf("Arjun"), g.going.map { it.person.displayName })
+        assertEquals(listOf("Kabir"), g.notStarted.map { it.person.displayName })
+        assertEquals("🔥 104 💯 ⏳", com.stepq.app.ui.home.streakBadge(g.endingTonight[0]))
+        assertEquals("🔥 12", com.stepq.app.ui.home.streakBadge(g.going[0]))
     }
 
     @Test fun greetings() {
