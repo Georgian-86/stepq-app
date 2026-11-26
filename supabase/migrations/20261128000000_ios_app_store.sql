@@ -2,7 +2,7 @@
 --
 -- 1. A word filter for community posts (App Review Guideline 1.2: "a method for filtering
 --    objectionable material from being posted"). Terms live in app.blocked_terms, which only
---    admins can change. A post or reply containing one is refused with hint 'content_filter'.
+--    admins can read or change. A post or reply containing one is refused with hint 'content_filter'.
 -- 2. StepQ Pro bought in the App Store (Guideline 3.1.1). The appstore-verify Edge Function
 --    checks Apple's signed transaction and calls app.apply_store_subscription() with the
 --    service role. Members can read their own rows; nobody can write them from the app.
@@ -21,9 +21,9 @@ create table if not exists app.blocked_terms (
 alter table app.blocked_terms enable row level security;
 revoke all on app.blocked_terms from public, anon, authenticated;
 
--- A starting list: slurs, sexual terms and common abuse in English and Hinglish. Admins add or
--- remove terms in the dashboard (stepq.is_admin()). Whole words only, so "class" never matches
--- "ass". Seeded once; existing rows are kept.
+-- A starting list: slurs, sexual terms and common abuse in English and Hinglish. The admin
+-- dashboard lists them; admins (stepq.is_admin()) add or remove terms in Supabase's SQL editor.
+-- Whole words only, so "class" never matches "ass". Seeded once; existing rows are kept.
 insert into app.blocked_terms (term) values
   ('fuck'), ('fucking'), ('fucker'), ('motherfucker'), ('shit'), ('bullshit'), ('bitch'), ('bastard'),
   ('cunt'), ('dick'), ('pussy'), ('asshole'), ('slut'), ('whore'), ('porn'), ('nude'), ('nudes'),
