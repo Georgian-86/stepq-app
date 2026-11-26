@@ -46,10 +46,16 @@ class StepqApplication : Application() {
             com.russhwolf.settings.SharedPreferencesSettings(getSharedPreferences("stepq_auth_flags", MODE_PRIVATE)),
         )
         com.stepq.app.data.Telemetry.watch(appScope)
-        auth = AuthRepository(Supabase.client)
+        auth = AuthRepository(
+            Supabase.client,
+            beforeLogOut = { PushTokens.unregister() },
+            beforeDelete = { com.stepq.app.data.Pro.deleteAllMyPhotos() },
+        )
         profiles = ProfileRepository(Supabase.client)
         home = HomeRepository(Supabase.client, profiles)
-        friends = com.stepq.app.data.FriendsRepository(Supabase.client, profiles)
+        friends = com.stepq.app.data.FriendsRepository(Supabase.client, profiles) {
+            com.stepq.app.data.Pro.plan.value ?: com.stepq.app.data.Pro.refresh()
+        }
         groups = com.stepq.app.data.GroupsRepository(Supabase.client, profiles)
         qruns = com.stepq.app.data.QRunsRepository(Supabase.client)
         challenges = com.stepq.app.data.ChallengesRepository(Supabase.client, profiles)
