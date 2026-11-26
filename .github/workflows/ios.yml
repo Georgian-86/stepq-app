@@ -57,7 +57,7 @@ jobs:
           set -o pipefail
           xcodebuild -project iosApp/StepQ.xcodeproj -scheme StepQ -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath iosApp/build CODE_SIGNING_ALLOWED=NO build | tee iosApp/build.log | grep -E "error:|warning: .*StepQ/|BUILD (SUCCEEDED|FAILED)" || true
+            -derivedDataPath iosApp/build CODE_SIGNING_ALLOWED=NO SWIFT_COMPILATION_MODE=wholemodule build | tee iosApp/build.log | grep -E "error:|warning: .*StepQ/|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" iosApp/build.log
       - name: Screenshots on a simulator
         run: ./iosApp/scripts/screenshots.sh

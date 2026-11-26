@@ -110,7 +110,7 @@ struct GoalSheet: View {
                     }
                 }
             }
-            .onAppear { goal = Int(model.profile?.nextDailyGoal?.intValue ?? model.profile?.dailyGoal ?? 8000) }
+            .onAppear { goal = Int(model.profile?.nextDailyGoal?.int32Value ?? model.profile?.dailyGoal ?? 8000) }
         }
     }
 }
