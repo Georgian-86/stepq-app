@@ -12,7 +12,11 @@ final class OnboardingDraft {
     var birthDigits = ""
     var birthdate: String?
     var gender: String?
-    var skin = 2, hair = 0, outfit = 0, headband = 0, style = 0
+    var skin = 2
+    var hair = 0
+    var outfit = 0
+    var headband = 0
+    var style = 0
     var goal = 8000
     var agreed = false
 
