@@ -69,3 +69,11 @@ jobs:
             iosApp/build.log
             iosApp/screenshots/
           retention-days: 14
+      # The simulator build as a zip, for trying the app in a browser (e.g. appetize.io) without a Mac.
+      - name: Zip the simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent iosApp/build/Build/Products/Debug-iphonesimulator/StepQ.app iosApp/StepQ-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StepQ-simulator-app
+          path: iosApp/StepQ-simulator.zip
+          retention-days: 14
