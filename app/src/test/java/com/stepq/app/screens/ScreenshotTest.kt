@@ -665,10 +665,13 @@ class ScreenshotTest {
     })
 
     @Test fun u01Upgrade() = snap("U01-upgrade-to-pro") {
-        com.stepq.app.ui.pro.UpgradeScreen(freePlan, asked = false, onAsk = {}, onCompare = {}, onClose = {})
+        com.stepq.app.ui.pro.UpgradeScreen(freePlan, asked = false, onAsk = {}, onExplore = {}, onClose = {})
     }
-    @Test fun u02UpgradeAsked() = snap("U02-upgrade-asked") {
-        com.stepq.app.ui.pro.UpgradeScreen(freePlan, asked = true, onAsk = {}, onCompare = {}, onClose = {})
+    @Test fun u02ProBenefits() = snap("U02-explore-pro-benefits") {
+        com.stepq.app.ui.pro.ProBenefitsScreen(freePlan, asked = false, onAsk = {}, onCompare = {}, onBack = {})
+    }
+    @Test fun u03UpgradeAsked() = snap("U03-upgrade-asked") {
+        com.stepq.app.ui.pro.UpgradeScreen(freePlan, asked = true, onAsk = {}, onExplore = {}, onClose = {})
     }
 
     @Test fun a26Goal() = snap("A26-daily-goal") {
