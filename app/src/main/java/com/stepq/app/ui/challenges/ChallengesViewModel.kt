@@ -1,5 +1,7 @@
 package com.stepq.app.ui.challenges
 
+import com.stepq.app.data.java
+import com.stepq.app.data.kx
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.stepq.app.data.ChallengesData
@@ -48,7 +50,7 @@ class ChallengesViewModel(private val repo: ChallengesRepository, private val co
                             joining = false,
                             data = d?.copy(
                                 challenges = d.challenges.map {
-                                    if (it.challenge.id == challengeId) it.copy(myJoinedAt = Instant.now(), joined = it.joined + 1) else it
+                                    if (it.challenge.id == challengeId) it.copy(myJoinedAt = kotlin.time.Clock.System.now(), joined = it.joined + 1) else it
                                 },
                             ),
                         )
@@ -78,7 +80,7 @@ class ChallengesViewModel(private val repo: ChallengesRepository, private val co
     fun toastShown() = _state.update { it.copy(toast = null) }
 }
 
-private val IST = com.stepq.app.data.FriendsRepository.IST
+private val IST = com.stepq.app.data.ANDROID_IST
 
 /** "Ends in 1d 14h", "Ends in 3h", "Ends in 12m". */
 fun endsIn(end: Instant, now: Instant = Instant.now()): String {
@@ -96,13 +98,13 @@ fun endsIn(end: Instant, now: Instant = Instant.now()): String {
 
 /** End of the current week (Sunday 23:59:59) or month, India time. */
 fun periodEnd(today: LocalDate, monthly: Boolean): Instant {
-    val lastDay = if (monthly) today.withDayOfMonth(today.lengthOfMonth()) else ChallengesRepository.weekStart(today).plusDays(6)
+    val lastDay = if (monthly) today.withDayOfMonth(today.lengthOfMonth()) else ChallengesRepository.weekStart(today.kx).java.plusDays(6)
     return lastDay.plusDays(1).atStartOfDay(IST).toInstant()
 }
 
 /** "Mon 10 Nov – Sun 16 Nov" or "1 Nov – 30 Nov". */
 fun periodLabel(today: LocalDate, monthly: Boolean): String {
-    val start = if (monthly) today.withDayOfMonth(1) else ChallengesRepository.weekStart(today)
+    val start = if (monthly) today.withDayOfMonth(1) else ChallengesRepository.weekStart(today.kx).java
     val end = if (monthly) today.withDayOfMonth(today.lengthOfMonth()) else start.plusDays(6)
     val f = DateTimeFormatter.ofPattern(if (monthly) "d MMM" else "EEE d MMM", Locale.ENGLISH)
     return "${start.format(f)} – ${end.format(f)} · ranked by total steps"

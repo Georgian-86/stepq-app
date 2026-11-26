@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 
 /** A row of app.friend_streaks(): days in a row I shared my steps with one friend. */
 @Serializable

@@ -381,7 +381,7 @@ class ScreenshotTest {
     }
 
     @Test fun a25Joined() = snap("A25-challenge-joined") {
-        com.stepq.app.ui.challenges.ChallengeJoinedScreen(shoes.copy(myJoinedAt = java.time.Instant.now()), onDone = {}, onShare = {})
+        com.stepq.app.ui.challenges.ChallengeJoinedScreen(shoes.copy(myJoinedAt = kotlin.time.Clock.System.now()), onDone = {}, onShare = {})
     }
 
     private val qrunNow = java.time.Instant.parse("2026-10-17T04:00:00Z")

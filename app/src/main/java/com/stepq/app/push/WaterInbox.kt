@@ -140,9 +140,9 @@ object WaterInbox {
             return
         }
         val since = runCatching { Instant.parse(seen) }.getOrDefault(Instant.EPOCH)
-        val fresh = requests.filter { com.stepq.app.data.ChallengesRepository.parseInstant(it.createdAt).isAfter(since) }
+        val fresh = requests.filter { com.stepq.app.data.parseJavaInstant(it.createdAt).isAfter(since) }
         val (title, body) = requestMessage(fresh) ?: return
-        prefs.edit().putString(REQUESTS_SEEN, fresh.maxOf { com.stepq.app.data.ChallengesRepository.parseInstant(it.createdAt) }.toString()).apply()
+        prefs.edit().putString(REQUESTS_SEEN, fresh.maxOf { com.stepq.app.data.parseJavaInstant(it.createdAt) }.toString()).apply()
         notify(context, title, body, id = REQUESTS_SEEN.hashCode())
     }
 

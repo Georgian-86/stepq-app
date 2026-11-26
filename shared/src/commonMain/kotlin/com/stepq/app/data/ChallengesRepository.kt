@@ -4,10 +4,10 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
+import com.stepq.app.data.Dates.firstOfMonth
+import kotlinx.datetime.LocalDate
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Serializable
 data class Challenge(
@@ -79,14 +79,14 @@ class ChallengesRepository(private val client: SupabaseClient?, private val prof
      * [country] is where the phone is from (SIM, then network, then region setting); it's saved
      * on my profile when it changes, and the rankings cover everyone with the same country.
      */
-    suspend fun load(country: String?, today: LocalDate = LocalDate.now(FriendsRepository.IST)): Result<ChallengesData?> = runCatching {
+    suspend fun load(country: String?, today: LocalDate = Dates.todayIst()): Result<ChallengesData?> = runCatching {
         val db = db()
         var me = profiles.mine().getOrThrow() ?: return@runCatching null
         if (country != null && country != me.country) {
             runCatching { db["profiles"].update({ set("country", country) }) { filter { eq("id", me.id) } } }
                 .onSuccess { me = me.copy(country = country) }
         }
-        val monthStart = today.withDayOfMonth(1)
+        val monthStart = today.firstOfMonth()
         val weekStart = weekStart(today)
 
         suspend fun countryRank(start: LocalDate): Pair<List<Ranked>, Int> {
@@ -121,7 +121,7 @@ class ChallengesRepository(private val client: SupabaseClient?, private val prof
         val (weekly, weeklyCount) = rank(weekStart)
         val (monthly, monthlyCount) = rank(monthStart)
 
-        val now = Instant.now()
+        val now = Clock.System.now()
         val challenges = db["challenges"].select { filter { gt("ends_at", now.toString()) } }.decodeList<Challenge>()
             .sortedBy { it.endsAt }
         val entries = db["challenge_entries"].select().decodeList<Entry>().associateBy { it.challengeId }
@@ -168,16 +168,15 @@ class ChallengesRepository(private val client: SupabaseClient?, private val prof
             return sorted.mapIndexed { i, r -> r.copy(rank = sorted.indexOfFirst { it.steps == r.steps } + 1) }
         }
 
-        fun weekStart(day: LocalDate): LocalDate = day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        fun weekStart(day: LocalDate): LocalDate = Dates.weekStart(day)
 
         /** Steps from the day of joining (India time) through the last day of the challenge. */
         fun progress(days: List<DailySteps>, joinedAt: Instant, endsAt: Instant): Int {
-            val first = joinedAt.atZone(FriendsRepository.IST).toLocalDate().toString()
-            val last = endsAt.atZone(FriendsRepository.IST).toLocalDate().toString()
+            val first = Dates.localDate(joinedAt).toString()
+            val last = Dates.localDate(endsAt).toString()
             return days.filter { it.day in first..last }.sumOf { it.steps }
         }
 
-        fun parseInstant(s: String): Instant =
-            runCatching { Instant.parse(s) }.getOrElse { java.time.OffsetDateTime.parse(s).toInstant() }
+        fun parseInstant(s: String): Instant = Dates.parseInstant(s)
     }
 }

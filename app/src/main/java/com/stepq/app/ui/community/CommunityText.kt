@@ -43,7 +43,7 @@ fun postShareText(post: Post): String {
     val who = "${post.authorName} (@${post.authorUsername})"
     val text = when {
         post.isAchievement && post.steps != null -> {
-            val walked = "$who walked ${formatSteps(post.steps)} steps" +
+            val walked = "$who walked ${formatSteps(post.steps ?: 0)} steps" +
                 (if (post.goalReached) " and hit their goal" else "") + " on StepQ"
             if (post.body.isBlank()) "$walked 🎉" else "$walked: “${post.body.trim()}”"
         }

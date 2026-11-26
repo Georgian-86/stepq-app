@@ -42,7 +42,9 @@ class StepqApplication : Application() {
         super.onCreate()
         com.stepq.app.debug.CrashLog.install(this)
         Supabase.init(this)
-        com.stepq.app.data.PasswordRecovery.init(this)
+        com.stepq.app.data.PasswordRecovery.init(
+            com.russhwolf.settings.SharedPreferencesSettings(getSharedPreferences("stepq_auth_flags", MODE_PRIVATE)),
+        )
         com.stepq.app.data.Telemetry.watch(appScope)
         auth = AuthRepository(Supabase.client)
         profiles = ProfileRepository(Supabase.client)

@@ -75,7 +75,7 @@ fun ChallengesScreen(
     onPeriod: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onOpen: (String) -> Unit,
-    today: LocalDate = LocalDate.now(com.stepq.app.data.FriendsRepository.IST),
+    today: LocalDate = LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")),
 ) {
     PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize().background(StepqColors.White)) {
         Column(
@@ -362,8 +362,8 @@ private fun ChallengeRow(c: ChallengeCard, onOpen: () -> Unit) {
 }
 
 fun challengeSubtitle(c: ChallengeCard): String {
-    val goal = c.challenge.targetSteps?.let { "Walk ${formatSteps(it)} steps by ${shortDate(ChallengesRepository.parseInstant(c.challenge.endsAt))}" }
-        ?: "Ends ${shortDate(ChallengesRepository.parseInstant(c.challenge.endsAt))}"
+    val goal = c.challenge.targetSteps?.let { "Walk ${formatSteps(it)} steps by ${shortDate(com.stepq.app.data.parseJavaInstant(c.challenge.endsAt))}" }
+        ?: "Ends ${shortDate(com.stepq.app.data.parseJavaInstant(c.challenge.endsAt))}"
     val who = if (c.joined > 0) " · ${formatSteps(c.joined.toInt())} joined" else ""
     return goal + who
 }
@@ -373,7 +373,7 @@ fun challengeSubtitle(c: ChallengeCard): String {
 fun ChallengeDetailScreen(card: ChallengeCard, joining: Boolean, onJoin: () -> Unit, onLeave: () -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val c = card.challenge
-    val end = ChallengesRepository.parseInstant(c.endsAt)
+    val end = com.stepq.app.data.parseJavaInstant(c.endsAt)
     Column(Modifier.fillMaxSize().background(StepqColors.White).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(4.dp))
@@ -451,7 +451,7 @@ private fun Progress(card: ChallengeCard) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(StepqDimens.RadiusM)).background(StepqColors.White).border(BorderStroke(1.dp, StepqColors.Line), RoundedCornerShape(StepqDimens.RadiusM)).padding(16.dp)) {
         Row {
             Text("${formatSteps(card.myProgress.coerceAtMost(target))} of ${formatSteps(target)} steps", style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.weight(1f))
-            Text(daysLeft(ChallengesRepository.parseInstant(card.challenge.endsAt)), style = StepqType.Small, color = StepqColors.Muted)
+            Text(daysLeft(com.stepq.app.data.parseJavaInstant(card.challenge.endsAt)), style = StepqType.Small, color = StepqColors.Muted)
         }
         Spacer(Modifier.height(10.dp))
         LinearProgressIndicator(
@@ -478,7 +478,7 @@ fun ChallengeJoinedScreen(card: ChallengeCard, onDone: () -> Unit, onShare: () -
         Spacer(Modifier.height(20.dp))
         Text("You're in!", style = StepqType.Title, color = StepqColors.Ink)
         Spacer(Modifier.height(10.dp))
-        val end = shortDate(ChallengesRepository.parseInstant(c.endsAt))
+        val end = shortDate(com.stepq.app.data.parseJavaInstant(c.endsAt))
         Text(
             listOfNotNull(
                 c.targetSteps?.let { "Walk ${formatSteps(it)} steps by $end. Steps from today count." }

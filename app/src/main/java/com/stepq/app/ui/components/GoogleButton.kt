@@ -31,7 +31,7 @@ fun GoogleSignInButton(auth: AuthRepository?, onError: (String?) -> Unit, modifi
         scope.launch {
             val result = runCatching {
                 val token = GoogleSignIn.getIdToken(context)
-                (auth ?: throw NotConfiguredException()).logInWithGoogle(token).getOrThrow()
+                (auth ?: throw NotConfiguredException()).logInWithGoogle(token.idToken, token.rawNonce).getOrThrow()
             }
             busy = false
             result.onFailure {

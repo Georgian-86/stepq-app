@@ -1,5 +1,6 @@
 package com.stepq.app.ui.home
 
+import com.stepq.app.data.kx
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -72,7 +73,7 @@ class HomeViewModel(
             val today = LocalDate.now()
             val source = reader.source()
             connected = source != StepsReader.Source.None
-            val first = repo.load(today)
+            val first = repo.load(today.kx)
             val me = first.getOrNull()?.me
             var local: List<DailySteps> = emptyList()
             if (connected && me != null) {
@@ -81,7 +82,7 @@ class HomeViewModel(
                     .getOrDefault(emptyList())
                 repo.saveDays(local).onFailure { android.util.Log.w("StepqHealth", "Couldn't save steps", it) }
             }
-            val result = if (connected && me != null) repo.load(today) else first
+            val result = if (connected && me != null) repo.load(today.kx) else first
             result
                 .onSuccess { fetched ->
                     // Show what the phone counted even if the server copy is behind.
@@ -194,7 +195,7 @@ class HomeViewModel(
         _state.value = s.copy(sharing = true)
         viewModelScope.launch {
             val today = LocalDate.now()
-            repo.shareSteps(friendIds, s.steps, today)
+            repo.shareSteps(friendIds, s.steps, today.kx)
                 .onSuccess { (sent, streaks) ->
                     val names = s.shareTo.filter { it.id in friendIds }.map { it.displayName.substringBefore(' ') }
                     val before = data?.streaks

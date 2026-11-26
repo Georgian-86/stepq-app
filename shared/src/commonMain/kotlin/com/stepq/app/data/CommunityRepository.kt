@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 
 /**
  * One post as the community shows it: from app.community_feed() or app.post_thread().
@@ -73,7 +73,7 @@ class CommunityRepository(private val client: SupabaseClient?, private val profi
     suspend fun me(): Result<Profile?> = profiles.mine()
 
     /** My steps today, to preview an achievement before posting it. Null without a row yet. */
-    suspend fun myStepsToday(today: LocalDate = LocalDate.now()): Int? = runCatching {
+    suspend fun myStepsToday(today: LocalDate = Dates.today()): Int? = runCatching {
         c().postgrest["daily_steps"].select {
             filter {
                 eq("user_id", myId())

@@ -1,5 +1,6 @@
 package com.stepq.app.ui.community
 
+import com.stepq.app.data.kx
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.stepq.app.data.CommunityRepository
@@ -146,7 +147,7 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
         if (_state.value.posting) return
         _state.update { it.copy(posting = true, composeError = null) }
         viewModelScope.launch {
-            repo.create(body, parentId, if (shareSteps) LocalDate.now() else null)
+            repo.create(body, parentId, if (shareSteps) LocalDate.now().kx else null)
                 .onSuccess {
                     _state.update { s -> s.copy(posting = false, toast = if (parentId != null) "Reply posted" else if (needsApproval()) "Sent for approval. It goes live once StepQ checks it." else "Posted") }
                     if (parentId == null) com.stepq.app.data.Pro.refreshAsync()

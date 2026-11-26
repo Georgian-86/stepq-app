@@ -3,7 +3,8 @@ package com.stepq.app.data
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
-import java.time.LocalDate
+import com.stepq.app.data.Dates.minusDays
+import kotlinx.datetime.LocalDate
 
 /** Everything A12 Home shows, read with the signed-in user's token (RLS applies). */
 data class HomeData(
@@ -70,7 +71,7 @@ class HomeRepository(private val client: SupabaseClient?, private val profiles: 
         if (upserted.isSuccess) return@runCatching
         // The upsert needs UPDATE on the key columns (migration 20261102010000). Until that is
         // applied, update each existing day and insert the new ones, which the base grants allow.
-        android.util.Log.w("StepqHealth", "Upsert failed, saving day by day", upserted.exceptionOrNull())
+        logWarn("StepqHealth", "Upsert failed, saving day by day", upserted.exceptionOrNull())
         for (d in days) {
             val updated = table.update({
                 set("steps", d.steps)

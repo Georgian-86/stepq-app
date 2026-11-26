@@ -93,6 +93,8 @@ kotlin {
 }
 
 dependencies {
+    // Data layer, models and the Free/Pro and streak rules, shared with the iOS app.
+    implementation(project(":shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)

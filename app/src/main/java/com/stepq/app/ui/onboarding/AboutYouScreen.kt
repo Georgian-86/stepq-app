@@ -31,7 +31,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.stepq.app.data.Gender
 import com.stepq.app.data.MIN_AGE
-import com.stepq.app.data.parseBirthdate
+import com.stepq.app.data.parseBirthdateJava
 import com.stepq.app.ui.components.ConsentCheckbox
 import com.stepq.app.ui.components.legalText
 import com.stepq.app.ui.components.FieldHint
@@ -52,7 +52,7 @@ fun AboutYouScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: (
     var digits by rememberSaveable {
         mutableStateOf(state.birthdate?.format(DateTimeFormatter.ofPattern("ddMMyyyy")).orEmpty())
     }
-    val parsed = parseBirthdate(digits)
+    val parsed = parseBirthdateJava(digits)
 
     OnboardingFrame(
         step = 3,

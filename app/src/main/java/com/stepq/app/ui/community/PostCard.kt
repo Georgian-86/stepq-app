@@ -186,7 +186,7 @@ fun PostRow(
                         }
                         if (post.isAchievement && post.steps != null) {
                             Spacer(Modifier.height(10.dp))
-                            AchievementCard(post.steps, post.goal, Modifier.padding(end = 8.dp))
+                            AchievementCard(post.steps ?: 0, post.goal, Modifier.padding(end = 8.dp))
                         }
                     }
                     HeartBurst(burst, Modifier.align(Alignment.Center))

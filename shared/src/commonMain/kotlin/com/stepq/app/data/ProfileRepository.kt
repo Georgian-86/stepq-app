@@ -3,18 +3,30 @@ package com.stepq.app.data
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
+import com.stepq.app.data.Dates.plusDays
+import io.ktor.client.HttpClient
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** The pending goal to switch to on [today], if one is due. */
-fun pendingGoalDue(p: Profile, today: java.time.LocalDate): Int? {
+fun pendingGoalDue(p: Profile, today: LocalDate): Int? {
     val next = p.nextDailyGoal ?: return null
-    val from = p.nextGoalFrom?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() } ?: return null
-    return next.takeIf { !from.isAfter(today) }
+    val from = Dates.parseDateOrNull(p.nextGoalFrom) ?: return null
+    return next.takeIf { from <= today }
 }
 
 /** The signed-in user's row in app.profiles. RLS limits writes to their own row. */
 class ProfileRepository(private val client: SupabaseClient?) {
+
+    /** For the few calls that go to stepq.in rather than Supabase. */
+    private val siteHttp by lazy { HttpClient { expectSuccess = false } }
 
     private fun requireClient() = client ?: throw NotConfiguredException()
 
@@ -32,7 +44,7 @@ class ProfileRepository(private val client: SupabaseClient?) {
         val p = c.postgrest["profiles"].select { filter { eq("id", id) } }.decodeSingleOrNull<Profile>()
             ?: return@runCatching null
         // A goal set yesterday (or earlier) takes over from today.
-        val due = pendingGoalDue(p, java.time.LocalDate.now())
+        val due = pendingGoalDue(p, Dates.today())
         if (due != null) {
             runCatching {
                 c.postgrest["profiles"].update({
@@ -109,22 +121,11 @@ class ProfileRepository(private val client: SupabaseClient?) {
             put("parentName", parentName.trim())
             put("parentEmail", parentEmail.trim())
         }.toString()
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val conn = java.net.URL("${com.stepq.app.ui.components.Legal.SITE_URL}/api/requestParentConsent").openConnection() as java.net.HttpURLConnection
-            try {
-                conn.requestMethod = "POST"
-                conn.doOutput = true
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 20_000
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.outputStream.use { it.write(body.toByteArray()) }
-                val ok = conn.responseCode in 200..299
-                val text = (if (ok) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
-                if (!ok) throw IllegalStateException(siteErrorMessage(text))
-            } finally {
-                conn.disconnect()
-            }
+        val response = siteHttp.post("${StepqClient.SITE_URL}/api/requestParentConsent") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
         }
+        if (!response.status.isSuccess()) throw IllegalStateException(siteErrorMessage(response.bodyAsText()))
     }
 
     /** People I've blocked, newest first. */
@@ -155,7 +156,7 @@ class ProfileRepository(private val client: SupabaseClient?) {
      */
     suspend fun updateGoal(goal: Int, current: Int): Result<Unit> = runCatching {
         val id = currentUserId() ?: throw NotConfiguredException()
-        val tomorrow = java.time.LocalDate.now().plusDays(1).toString()
+        val tomorrow = Dates.today().plusDays(1).toString()
         requireClient().postgrest["profiles"].update({
             if (goal == current) {
                 set("next_daily_goal", null as Int?)

@@ -6,8 +6,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 
 /** Someone to add: from search, contacts, or friends of friends. Public fields only. */
 @Serializable
@@ -59,11 +59,16 @@ private data class NewReminder(@SerialName("from_user") val fromUser: String, @S
 private data class NewFriendship(val requester: String, val addressee: String)
 
 /** Friends, friend requests and water reminders (A13, A14). Every query runs under RLS. */
-class FriendsRepository(private val client: SupabaseClient?, private val profiles: ProfileRepository) {
+class FriendsRepository(
+    private val client: SupabaseClient?,
+    private val profiles: ProfileRepository,
+    /** My plan, for the water reminder limit (Android caches it in `Pro`). */
+    private val myPlan: suspend () -> MyPlan? = { PlanRepository(client).myPlan() },
+) {
 
     private fun db() = (client ?: throw NotConfiguredException()).postgrest
 
-    suspend fun load(today: LocalDate = LocalDate.now(IST)): Result<FriendsData?> = runCatching {
+    suspend fun load(today: LocalDate = Dates.todayIst()): Result<FriendsData?> = runCatching {
         val db = db()
         val me = profiles.mine().getOrThrow() ?: return@runCatching null
         val links = db["friendships"].select().decodeList<Friendship>()
@@ -93,11 +98,11 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
         // name stays hidden by RLS until then.
         val incoming = links.filter { it.status == "pending" && it.addressee == me.id }.map { it.requester }
         val requests = runCatching { db.rpc("friend_requests").decodeList<PersonSummary>() }
-            .onFailure { android.util.Log.w("StepqFriends", "friend_requests unavailable", it) }
+            .onFailure { logWarn("StepqFriends", "friend_requests unavailable", it) }
             .getOrNull()
             .let { named -> requestsWithFallback(named, incoming) }
 
-        val startOfDay = today.atStartOfDay(IST).toInstant().toString()
+        val startOfDay = Dates.startOfDay(today, IST).toString()
         val reminded = db["water_reminders"].select(io.github.jan.supabase.postgrest.query.Columns.list("to_user")) {
             filter {
                 eq("from_user", me.id)
@@ -119,7 +124,7 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
 
     /** My plan's daily limit from app.plan_features; the seeded default if it can't be read. */
     private suspend fun reminderLimit(plan: String?): Int? {
-        val p = Pro.plan.value ?: Pro.refresh()
+        val p = myPlan()
         val f = p?.feature(MyPlan.F.WATER_REMINDERS) ?: return if (plan == "pro") null else FREE_REMINDERS_PER_DAY
         return f.mine
     }
@@ -213,7 +218,7 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
         const val UNKNOWN_SENDER = "Someone on StepQ"
 
         /** Matches app.check_water_reminder(): the free plan's day is India time. */
-        val IST: ZoneId = ZoneId.of("Asia/Kolkata")
+        val IST: TimeZone = Dates.IST
         const val FREE_REMINDERS_PER_DAY = 3
     }
 }

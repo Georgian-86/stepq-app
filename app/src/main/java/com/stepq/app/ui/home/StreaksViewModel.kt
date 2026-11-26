@@ -1,5 +1,6 @@
 package com.stepq.app.ui.home
 
+import com.stepq.app.data.kx
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.stepq.app.data.HomeData
@@ -28,7 +29,7 @@ class StreaksViewModel(private val repo: HomeRepository) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             val today = LocalDate.now()
-            repo.load(today)
+            repo.load(today.kx)
                 .onSuccess { loaded -> loaded?.let { data = it; _state.value = build(it, today, _state.value) } }
                 .onFailure { _state.value = _state.value.copy(loading = false, error = "Couldn't load your streaks. Try again.") }
             _lost.value = com.stepq.app.data.Pro.lostStreaks(today)
@@ -79,7 +80,7 @@ class StreaksViewModel(private val repo: HomeRepository) : ViewModel() {
         _state.value = s.copy(sharing = true)
         viewModelScope.launch {
             val today = LocalDate.now()
-            repo.shareSteps(friendIds, s.steps, today)
+            repo.shareSteps(friendIds, s.steps, today.kx)
                 .onSuccess { (sent, streaks) ->
                     val names = s.shareTo.filter { it.id in friendIds }.map { it.displayName.substringBefore(' ') }
                     val before = data?.streaks

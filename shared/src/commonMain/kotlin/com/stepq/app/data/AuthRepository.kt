@@ -3,6 +3,7 @@ package com.stepq.app.data
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.auth.providers.Apple
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
@@ -15,12 +16,17 @@ import kotlinx.coroutines.flow.runningFold
 
 enum class AuthState { Loading, SignedOut, SignedIn }
 
-class NotConfiguredException : IllegalStateException(
-    "This build has no Supabase key. Add SUPABASE_ANON_KEY to local.properties.",
-)
 
-/** Accounts through Supabase Auth: email + password, and Google. Apple needs OAuth set up first. */
-class AuthRepository(private val client: SupabaseClient?) {
+/**
+ * Accounts through Supabase Auth: email + password, Google and Apple.
+ * [beforeLogOut] lets a platform drop its push token first; [beforeDelete] removes files the
+ * database can't reach (profile photos) before the account goes.
+ */
+class AuthRepository(
+    private val client: SupabaseClient?,
+    private val beforeLogOut: suspend () -> Unit = {},
+    private val beforeDelete: suspend () -> Unit = { PlanRepository(client).deleteAllMyPhotos() },
+) {
 
     val state: Flow<AuthState> = client?.auth?.sessionStatus?.let(::authStates) ?: flowOf(AuthState.SignedOut)
 
@@ -39,7 +45,7 @@ class AuthRepository(private val client: SupabaseClient?) {
      */
     suspend fun signUp(email: String, password: String): Result<Boolean> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.signUpWith(Email, redirectUrl = Supabase.AUTH_REDIRECT_URL) {
+        c.auth.signUpWith(Email, redirectUrl = StepqClient.AUTH_REDIRECT_URL) {
             this.email = email.trim()
             this.password = password
         }
@@ -47,12 +53,12 @@ class AuthRepository(private val client: SupabaseClient?) {
     }
 
     /** Signs in (or up) with a Google ID token. New users then go through onboarding. */
-    suspend fun logInWithGoogle(token: GoogleIdToken): Result<Unit> = runCatching {
+    suspend fun logInWithGoogle(idToken: String, rawNonce: String?): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
         c.auth.signInWith(IDToken) {
-            idToken = token.idToken
+            this.idToken = idToken
             provider = Google
-            nonce = token.rawNonce
+            nonce = rawNonce
         }
     }
 
@@ -62,13 +68,51 @@ class AuthRepository(private val client: SupabaseClient?) {
      */
     suspend fun logInWithApple(): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.signInWith(io.github.jan.supabase.auth.providers.Apple, redirectUrl = Supabase.AUTH_REDIRECT_URL)
+        c.auth.signInWith(Apple, redirectUrl = StepqClient.AUTH_REDIRECT_URL)
     }
+
+    /**
+     * iOS: native Sign in with Apple. [idToken] is the identity token from
+     * ASAuthorizationAppleIDCredential and [rawNonce] the nonce whose SHA-256 went into the request.
+     */
+    suspend fun logInWithAppleIdToken(idToken: String, rawNonce: String): Result<Unit> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        c.auth.signInWith(IDToken) {
+            this.idToken = idToken
+            provider = Apple
+            nonce = rawNonce
+        }
+    }
+
+    /**
+     * iOS: the Google sign-in page to open in an ASWebAuthenticationSession. It comes back to
+     * stepq://auth-callback?code=…, which [handleAuthLink] turns into a session (PKCE).
+     */
+    suspend fun googleOAuthUrl(): String {
+        val c = client ?: throw NotConfiguredException()
+        return c.auth.getOAuthUrl(Google, redirectUrl = StepqClient.AUTH_REDIRECT_URL)
+    }
+
+    /**
+     * A stepq://auth-callback link (email confirmation, password reset, change of email, or the
+     * end of a web sign-in). Exchanges its one-time code for a session. Returns false when the
+     * link carries no code (then there's nothing to do).
+     */
+    suspend fun handleAuthLink(url: String): Result<Boolean> = runCatching {
+        val c = client ?: throw NotConfiguredException()
+        PasswordRecovery.linkOpened(url, null)
+        val code = Regex("[?&#]code=([^&#]+)").find(url)?.groupValues?.get(1) ?: return@runCatching false
+        c.auth.exchangeCodeForSession(code)
+        true
+    }
+
+    /** True when the signed-in account was made with Sign in with Apple. */
+    fun usesApple(): Boolean = client?.auth?.currentUserOrNull()?.identities?.any { it.provider == "apple" } == true
 
     /** A03: the reset link opens the app, which then asks for a new password (see [PasswordRecovery]). */
     suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.resetPasswordForEmail(email.trim(), redirectUrl = Supabase.AUTH_REDIRECT_URL)
+        c.auth.resetPasswordForEmail(email.trim(), redirectUrl = StepqClient.AUTH_REDIRECT_URL)
         PasswordRecovery.requested()
     }
 
@@ -95,7 +139,7 @@ class AuthRepository(private val client: SupabaseClient?) {
     /** Supabase emails a confirmation link to the new address; the change applies once it's opened. */
     suspend fun updateEmail(newEmail: String): Result<Unit> = runCatching {
         val c = client ?: throw NotConfiguredException()
-        c.auth.updateUser(redirectUrl = Supabase.AUTH_REDIRECT_URL) { email = newEmail.trim() }
+        c.auth.updateUser(redirectUrl = StepqClient.AUTH_REDIRECT_URL) { email = newEmail.trim() }
     }
 
     /** Deletes the account and everything in it (app.delete_my_account), then signs out. */
@@ -103,15 +147,14 @@ class AuthRepository(private val client: SupabaseClient?) {
         val c = client ?: throw NotConfiguredException()
         // Profile photos live in Storage, which the database function can't reach: remove
         // them first so nothing of the account is left behind (DPDP s.8(7), s.12).
-        Pro.deleteAllMyPhotos()
+        beforeDelete()
         c.postgrest.rpc("delete_my_account")
         runCatching { c.auth.signOut() }
         runCatching { c.auth.clearSession() }
-        Unit
     }
 
     suspend fun logOut() {
-        com.stepq.app.push.PushTokens.unregister()
+        runCatching { beforeLogOut() }
         client?.auth?.signOut()
     }
 }
@@ -149,34 +192,34 @@ object PasswordRecovery {
 
     /**
      * When a reset was last requested on this phone, to recognise the link: with PKCE the link
-     * carries only `?code=`, no type. Kept on disk, because Android often stops the app while
+     * carries only `?code=`, no type. Kept on disk, because the phone often stops the app while
      * the person is in their email app.
      */
-    @Volatile private var requestedAt: Long = 0
-    private var prefs: android.content.SharedPreferences? = null
+    private var requestedAt: Long = 0
+    private var settings: com.russhwolf.settings.Settings? = null
     private const val KEY = "reset_requested_at"
 
-    /** Called once at start-up. */
-    fun init(context: android.content.Context) {
-        prefs = context.applicationContext.getSharedPreferences("stepq_auth_flags", android.content.Context.MODE_PRIVATE)
-        requestedAt = prefs?.getLong(KEY, 0L) ?: 0L
+    /** Called once at start-up with a small on-device store (not the session store). */
+    fun init(settings: com.russhwolf.settings.Settings) {
+        this.settings = settings
+        requestedAt = settings.getLong(KEY, 0L)
     }
 
     fun requested() {
-        requestedAt = System.currentTimeMillis()
-        prefs?.edit()?.putLong(KEY, requestedAt)?.apply()
+        requestedAt = nowMillis()
+        settings?.putLong(KEY, requestedAt)
     }
 
     /** Called with what the opened link said about itself. */
     fun linkOpened(url: String?, sessionType: String?) {
-        val recent = System.currentTimeMillis() - requestedAt < 2 * 60 * 60 * 1000
+        val recent = nowMillis() - requestedAt < 2 * 60 * 60 * 1000
         if (isRecovery(url, sessionType) || (recent && url?.contains("code=") == true)) _active.value = true
     }
 
     fun done() {
         _active.value = false
         requestedAt = 0
-        prefs?.edit()?.remove(KEY)?.apply()
+        settings?.remove(KEY)
     }
 
     fun isRecovery(url: String?, sessionType: String?): Boolean =

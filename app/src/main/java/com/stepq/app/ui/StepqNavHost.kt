@@ -237,7 +237,7 @@ fun StepqNavHost(
             GoalScreen(onboarding, profiles, onBack = { nav.popBackStack() }) {
                 // The profile exists now, so there's no going back into A06–A09. Under-18s
                 // first need a parent's consent.
-                val next = if (com.stepq.app.data.isMinor(onboarding.birthdate)) Routes.PARENT else Routes.CONNECT
+                val next = if (com.stepq.app.data.isMinor(onboarding.birthdate?.let { kotlinx.datetime.LocalDate(it.year, it.monthValue, it.dayOfMonth) })) Routes.PARENT else Routes.CONNECT
                 nav.navigate(next) { popUpTo(0) { inclusive = true } }
             }
         }

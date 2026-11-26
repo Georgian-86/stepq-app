@@ -25,8 +25,8 @@ data class QRun(
     /** Rupees; 0 is free. Paid QRuns can only be posted by StepQ. Read from app.qruns. */
     @SerialName("price_inr") val priceInr: Int = 0,
 ) {
-    val startsAt: Instant get() = ChallengesRepository.parseInstant(startsAtRaw)
-    val createdAt: Instant get() = ChallengesRepository.parseInstant(createdAtRaw)
+    val startsAt: Instant get() = parseJavaInstant(startsAtRaw)
+    val createdAt: Instant get() = parseJavaInstant(createdAtRaw)
 }
 
 /** A place picked on A19: its name and, when the phone could find it, where it is. */
