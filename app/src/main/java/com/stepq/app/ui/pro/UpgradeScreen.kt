@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.EmojiEvents
@@ -56,7 +57,6 @@ import com.stepq.app.data.MyPlan
 import com.stepq.app.data.PlanFeature
 import com.stepq.app.ui.components.Crown
 import com.stepq.app.ui.components.GoldButton
-import com.stepq.app.ui.components.Sparkle
 import com.stepq.app.ui.theme.ProColors
 import com.stepq.app.ui.theme.StepqColors
 import com.stepq.app.ui.theme.StepqType
@@ -105,23 +105,98 @@ fun upgradePerks(plan: MyPlan): List<Perk> {
         out += Perk(Icons.Outlined.WaterDrop, "Water reminders", freeCount(MyPlan.F.WATER_REMINDERS, "a day"), count(MyPlan.F.WATER_REMINDERS, "a day"))
     }
     if (differs(MyPlan.F.PLAN_QRUN) && on(MyPlan.F.PLAN_QRUN)) {
-        out += Perk(Icons.Outlined.DirectionsRun, "Host QRuns", "Join only", "Once approved")
+        out += Perk(Icons.Outlined.DirectionsRun, "Host QRuns", "Join only", "Yes")
     }
     return out
 }
 
 /**
- * The full-screen "Upgrade to StepQ Pro" page. It pops up for Free members (see [UpgradeHost])
- * and opens from every limit sheet. There are no payments yet, so the button asks StepQ for Pro.
+ * The full-screen "Upgrade to StepQ Pro" page: a crown, one line and the button, nothing else.
+ * The perks live on [ProBenefitsScreen] ("Explore Pro benefits"). It pops up for Free members
+ * (see [UpgradeHost]) and opens from every limit sheet. There are no payments yet, so the
+ * button asks StepQ for Pro.
  */
 @Composable
 fun UpgradeScreen(
     plan: MyPlan,
     asked: Boolean,
     onAsk: () -> Unit,
-    onCompare: () -> Unit,
+    onExplore: () -> Unit,
     onClose: () -> Unit,
 ) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(ProColors.night),
+    ) {
+        Glow(Modifier.fillMaxSize())
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Close", tint = ProColors.OnNightMuted)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier
+                    .size(104.dp)
+                    .clip(CircleShape)
+                    .background(ProColors.gold)
+                    .border(3.dp, ProColors.Gold1.copy(alpha = 0.6f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Crown(52.dp, StepqColors.Ink) }
+            Spacer(Modifier.height(28.dp))
+            Text(
+                "STEPQ PRO",
+                style = StepqType.Label,
+                color = ProColors.GoldOnNight,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Walk further,\nevery day",
+                style = StepqType.Display,
+                color = StepqColors.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading() },
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "More streak saves, your own posts and a crown by your name.",
+                style = StepqType.Body,
+                color = ProColors.OnNightMuted,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.weight(1.2f))
+            AskBlock(asked, onAsk)
+            Spacer(Modifier.height(6.dp))
+            TextButton(onClick = onExplore) {
+                Text("Explore Pro benefits  ›", style = StepqType.BodyStrong, color = ProColors.GoldOnNight)
+            }
+            TextButton(onClick = onClose) {
+                Text("Maybe later", style = StepqType.SmallStrong, color = ProColors.OnNightMuted)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+/** "Explore Pro benefits": every perk where Pro differs from Free, Free next to Pro. */
+@Composable
+fun ProBenefitsScreen(
+    plan: MyPlan,
+    asked: Boolean,
+    onAsk: () -> Unit,
+    onCompare: () -> Unit,
+    onBack: () -> Unit,
+) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
     Column(
         Modifier
             .fillMaxSize()
@@ -129,52 +204,21 @@ fun UpgradeScreen(
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-      Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-        Box(Modifier.fillMaxWidth()) {
-            Glow()
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = ProColors.OnNightMuted)
-                    }
-                }
-                Box(contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier
-                            .size(92.dp)
-                            .clip(CircleShape)
-                            .background(ProColors.gold)
-                            .border(3.dp, ProColors.Gold1.copy(alpha = 0.6f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) { Crown(46.dp, StepqColors.Ink) }
-                    Box(Modifier.align(Alignment.TopEnd).padding(start = 80.dp)) { Sparkle(26.dp) }
-                }
-                Spacer(Modifier.height(18.dp))
-                Text(
-                    "Walk further with Pro",
-                    style = StepqType.Title,
-                    color = StepqColors.White,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "More streak saves, your own posts, every challenge, and a crown next to your name.",
-                    style = StepqType.Body,
-                    color = ProColors.OnNightMuted,
-                    textAlign = TextAlign.Center,
-                )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = StepqColors.White)
             }
+            Text("Pro benefits", style = StepqType.Heading, color = StepqColors.White, modifier = Modifier.semantics { heading() })
         }
-        Spacer(Modifier.height(22.dp))
         Column(
-            Modifier.padding(horizontal = 20.dp),
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+            Spacer(Modifier.height(4.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 Spacer(Modifier.weight(1f))
                 Text("FREE", style = StepqType.Label, color = ProColors.OnNightMuted, textAlign = TextAlign.Center, modifier = Modifier.width(72.dp))
                 Row(Modifier.width(92.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -184,51 +228,35 @@ fun UpgradeScreen(
                 }
             }
             upgradePerks(plan).forEach { PerkRow(it) }
+            TextButton(onClick = onCompare, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text("See the full Free vs Pro table", style = StepqType.SmallStrong, color = ProColors.GoldOnNight)
+            }
+            Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(4.dp))
-        TextButton(onClick = onCompare, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("See everything in Free vs Pro", style = StepqType.SmallStrong, color = ProColors.GoldOnNight)
-        }
-        Spacer(Modifier.height(8.dp))
-      }
-        // The button stays in view while the perks scroll.
+        // Below the list, not over it.
         Column(
-            Modifier
-                .fillMaxWidth()
-                .background(ProColors.Night3)
-                .border(width = 0.5.dp, color = ProColors.Gold2.copy(alpha = 0.25f), shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                .padding(horizontal = 24.dp)
-                .padding(top = 18.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (asked) {
-                Box(
-                    Modifier.fillMaxWidth().clip(CircleShape).border(1.dp, ProColors.Gold2, CircleShape).padding(vertical = 15.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("You're on the list for Pro", style = StepqType.Button, color = ProColors.GoldOnNight)
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "We'll let you know as soon as Pro is yours.",
-                    style = StepqType.Small,
-                    color = ProColors.OnNightMuted,
-                    textAlign = TextAlign.Center,
-                )
-            } else {
-                GoldButton("Get StepQ Pro", onAsk)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Payments aren't open yet. Tap to ask, and StepQ will turn Pro on for you.",
-                    style = StepqType.Small,
-                    color = ProColors.OnNightMuted,
-                    textAlign = TextAlign.Center,
-                )
+        ) { AskBlock(asked, onAsk) }
+    }
+}
+
+@Composable
+private fun AskBlock(asked: Boolean, onAsk: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (asked) {
+            Box(
+                Modifier.fillMaxWidth().clip(CircleShape).border(1.dp, ProColors.Gold2, CircleShape).padding(vertical = 15.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("You're on the list for Pro", style = StepqType.Button, color = ProColors.GoldOnNight)
             }
-            TextButton(onClick = onClose) {
-                Text("Maybe later", style = StepqType.SmallStrong, color = ProColors.OnNightMuted)
-            }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("We'll let you know as soon as Pro is yours.", style = StepqType.Small, color = ProColors.OnNightMuted, textAlign = TextAlign.Center)
+        } else {
+            GoldButton("Get StepQ Pro", onAsk)
+            Spacer(Modifier.height(8.dp))
+            Text("Payments open soon. Tap to ask and we'll turn Pro on for you.", style = StepqType.Small, color = ProColors.OnNightMuted, textAlign = TextAlign.Center)
         }
     }
 }
@@ -260,9 +288,9 @@ private fun PerkRow(p: Perk) {
 }
 
 @Composable
-private fun Glow() {
-    Canvas(Modifier.fillMaxWidth().height(260.dp)) {
-        val c = Offset(size.width / 2f, size.height * 0.42f)
+private fun Glow(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val c = Offset(size.width / 2f, size.height * 0.36f)
         drawCircle(
             Brush.radialGradient(listOf(ProColors.Gold2.copy(alpha = 0.28f), Color.Transparent), center = c, radius = size.width * 0.6f),
             radius = size.width * 0.6f,
@@ -317,24 +345,32 @@ fun UpgradeHost(profiles: com.stepq.app.data.ProfileRepository?) {
         if (UpgradePrompt.dueNow(context, p, asked)) UpgradePrompt.show()
     }
     if (!UpgradePrompt.showing) return
-    val close = { UpgradePrompt.showing = false }
+    var benefits by androidx.compose.runtime.remember { mutableStateOf(false) }
+    val close = {
+        UpgradePrompt.showing = false
+        benefits = false
+    }
     androidx.compose.ui.window.Dialog(
         onDismissRequest = close,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        UpgradeScreen(
-            plan = plan ?: MyPlan.FREE_DEFAULTS,
-            asked = asked,
-            onAsk = {
-                scope.launch {
-                    profiles?.joinProWaitlist()?.onSuccess { asked = true }
-                }
-            },
-            onCompare = {
-                close()
-                com.stepq.app.ui.components.ProSheets.openHub = true
-            },
-            onClose = close,
-        )
+        val p = plan ?: MyPlan.FREE_DEFAULTS
+        val ask: () -> Unit = {
+            scope.launch { profiles?.joinProWaitlist()?.onSuccess { asked = true } }
+        }
+        if (benefits) {
+            ProBenefitsScreen(
+                plan = p,
+                asked = asked,
+                onAsk = ask,
+                onCompare = {
+                    close()
+                    com.stepq.app.ui.components.ProSheets.openHub = true
+                },
+                onBack = { benefits = false },
+            )
+        } else {
+            UpgradeScreen(p, asked, onAsk = ask, onExplore = { benefits = true }, onClose = close)
+        }
     }
 }
