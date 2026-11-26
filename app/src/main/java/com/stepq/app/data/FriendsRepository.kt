@@ -45,6 +45,8 @@ data class FriendsData(
     val remindedToday: Set<String>,
     /** Reminders I can still send today, or null when unlimited (Pro). */
     val remindersLeft: Int?,
+    /** Reminders a day on my plan (admins can change it); null for unlimited. */
+    val reminderLimit: Int? = FriendsRepository.FREE_REMINDERS_PER_DAY,
 )
 
 @Serializable
@@ -103,17 +105,26 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
             }
         }.decodeList<Reminder>().map { it.toUser }
 
+        val limit = reminderLimit(me.plan)
         FriendsData(
             me = me,
             board = board,
             requests = requests,
             sentRequestIds = sent,
             remindedToday = reminded.toSet(),
-            remindersLeft = if (me.plan == "pro") null else (FREE_REMINDERS_PER_DAY - reminded.size).coerceAtLeast(0),
+            remindersLeft = limit?.let { (it - reminded.size).coerceAtLeast(0) },
+            reminderLimit = limit,
         )
     }
 
-    /** One water reminder to a friend. Postgres refuses non-friends and the 6th on the free plan. */
+    /** My plan's daily limit from app.plan_features; the seeded default if it can't be read. */
+    private suspend fun reminderLimit(plan: String?): Int? {
+        val p = Pro.plan.value ?: Pro.refresh()
+        val f = p?.feature(MyPlan.F.WATER_REMINDERS) ?: return if (plan == "pro") null else FREE_REMINDERS_PER_DAY
+        return f.mine
+    }
+
+    /** One water reminder to a friend. Postgres refuses non-friends and any past my plan's daily limit. */
     suspend fun sendWaterReminder(fromId: String, toId: String): Result<Unit> = runCatching {
         db()["water_reminders"].insert(NewReminder(fromId, toId))
     }
@@ -203,6 +214,6 @@ class FriendsRepository(private val client: SupabaseClient?, private val profile
 
         /** Matches app.check_water_reminder(): the free plan's day is India time. */
         val IST: ZoneId = ZoneId.of("Asia/Kolkata")
-        const val FREE_REMINDERS_PER_DAY = 5
+        const val FREE_REMINDERS_PER_DAY = 3
     }
 }

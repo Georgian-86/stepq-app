@@ -1,5 +1,7 @@
 package com.stepq.app.ui.community
 
+import androidx.compose.runtime.collectAsState
+import com.stepq.app.ui.theme.ProColors
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -158,11 +160,12 @@ private fun ComposePrompt(me: Profile?, onCompose: (Boolean) -> Unit) {
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepqAvatar(me?.avatar ?: com.stepq.app.data.AvatarConfig(), 40.dp)
+            com.stepq.app.ui.components.PersonAvatar(me?.avatar ?: com.stepq.app.data.AvatarConfig(), 40.dp, me?.id)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(me?.displayName ?: "You", style = StepqType.BodyStrong, color = StepqColors.Ink)
                 Text("Start a thread…", style = StepqType.Body, color = StepqColors.Muted)
+                postsLeftLine()?.let { Text(it, style = StepqType.Small, color = ProColors.GoldText) }
             }
             Text(
                 "Post",
@@ -344,7 +347,7 @@ fun ThreadScreen(
                 Text(error.orEmpty(), style = StepqType.Small, color = StepqColors.TomatoText, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                StepqAvatar(me?.avatar ?: com.stepq.app.data.AvatarConfig(), 32.dp)
+                com.stepq.app.ui.components.PersonAvatar(me?.avatar ?: com.stepq.app.data.AvatarConfig(), 32.dp, me?.id)
                 Spacer(Modifier.width(10.dp))
                 Box(
                     Modifier
@@ -427,7 +430,7 @@ fun ComposeScreen(
         PostDivider()
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
             Row {
-                StepqAvatar(me?.avatar ?: com.stepq.app.data.AvatarConfig(), 40.dp)
+                com.stepq.app.ui.components.PersonAvatar(me?.avatar ?: com.stepq.app.data.AvatarConfig(), 40.dp, me?.id)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(me?.displayName ?: "You", style = StepqType.BodyStrong, color = StepqColors.Ink)
@@ -459,6 +462,10 @@ fun ComposeScreen(
             error?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, style = StepqType.Small, color = StepqColors.TomatoText)
+            }
+            postsLeftLine()?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = StepqType.Small, color = ProColors.GoldText)
             }
             Spacer(Modifier.height(16.dp))
             Row(
@@ -609,5 +616,22 @@ private fun SheetRow(icon: ImageVector, label: String, danger: Boolean = false, 
     ) {
         Text(label, style = StepqType.BodyStrong, color = if (danger) StepqColors.TomatoText else StepqColors.Ink, modifier = Modifier.weight(1f))
         Icon(icon, contentDescription = null, tint = if (danger) StepqColors.TomatoText else StepqColors.Ink, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** "2 of 3 posts left this month" on a limited plan; null when posting is unlimited. */
+@Composable
+private fun postsLeftLine(): String? {
+    val plan by com.stepq.app.data.Pro.plan.collectAsState()
+    val p = plan ?: return null
+    if (p.feature(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS) == null) return null
+    val limit = p.limit(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS)
+    val left = p.postsLeft
+    val review = if (p.has(com.stepq.app.data.MyPlan.F.POST_APPROVAL)) "StepQ checks new posts before they go live." else null
+    return when {
+        limit == 0 -> "Starting posts is for StepQ Pro members. You can still like and reply."
+        limit == null -> review
+        left == 0 -> "No new threads left this month. You can still like and reply."
+        else -> listOfNotNull("$left of $limit new threads left this month.", review).joinToString(" ")
     }
 }

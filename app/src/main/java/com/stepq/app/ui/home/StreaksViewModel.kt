@@ -19,12 +19,57 @@ class StreaksViewModel(private val repo: HomeRepository) : ViewModel() {
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
     private var data: HomeData? = null
 
+    /** Streaks that ended last night and can still be restored (StepQ Pro restores). */
+    private val _lost = MutableStateFlow<List<com.stepq.app.data.LostStreak>>(emptyList())
+    val lost: StateFlow<List<com.stepq.app.data.LostStreak>> = _lost.asStateFlow()
+    private val _restoring = MutableStateFlow<String?>(null)
+    val restoring: StateFlow<String?> = _restoring.asStateFlow()
+
     fun refresh() {
         viewModelScope.launch {
             val today = LocalDate.now()
             repo.load(today)
                 .onSuccess { loaded -> loaded?.let { data = it; _state.value = build(it, today, _state.value) } }
                 .onFailure { _state.value = _state.value.copy(loading = false, error = "Couldn't load your streaks. Try again.") }
+            _lost.value = com.stepq.app.data.Pro.lostStreaks(today)
+        }
+    }
+
+    /** Brings back yesterday's streak with a friend, using one of this month's restores. */
+    fun restore(friendId: String, name: String) {
+        if (_restoring.value != null) return
+        val plan = com.stepq.app.data.Pro.plan.value
+        if (plan?.restoresLeft == 0) {
+            com.stepq.app.ui.components.ProSheets.show(com.stepq.app.data.MyPlan.F.STREAK_RESTORES)
+            return
+        }
+        _restoring.value = friendId
+        viewModelScope.launch {
+            com.stepq.app.data.Pro.restoreStreak(friendId, LocalDate.now())
+                .onSuccess { left ->
+                    _lost.value = _lost.value.filterNot { it.friendId == friendId }
+                    _state.value = _state.value.copy(toast = restoreToast(name.substringBefore(' '), left))
+                    refresh()
+                }
+                .onFailure { e ->
+                    if (!com.stepq.app.ui.components.ProSheets.showFor(e)) {
+                        _state.value = _state.value.copy(toast = "Couldn't restore that streak. Try again.")
+                    }
+                }
+            _restoring.value = null
+        }
+    }
+
+    /** Pins a friend to the top of Streaks (Pro), or unpins with null. */
+    fun pinBff(friendId: String?) {
+        viewModelScope.launch {
+            com.stepq.app.data.Pro.setBff(friendId)
+                .onSuccess { _state.value = _state.value.copy(toast = if (friendId == null) "BFF unpinned" else "Pinned as your BFF") }
+                .onFailure { e ->
+                    if (!com.stepq.app.ui.components.ProSheets.showFor(e)) {
+                        _state.value = _state.value.copy(toast = "Couldn't pin your BFF. Try again.")
+                    }
+                }
         }
     }
 
@@ -72,3 +117,11 @@ class StreaksViewModel(private val repo: HomeRepository) : ViewModel() {
         )
     }
 }
+
+fun restoreToast(first: String, left: Int?): String =
+    "Your streak with $first is back. " + when (left) {
+        null -> "Keep it going today."
+        0 -> "That was your last restore this month."
+        1 -> "1 restore left this month."
+        else -> "$left restores left this month."
+    }

@@ -78,10 +78,11 @@ class QRunViewModel(private val repo: QRunsRepository) : ViewModel() {
                     onPosted(id)
                 }
                 .onFailure { e ->
+                    val limited = com.stepq.app.ui.components.ProSheets.showFor(e)
                     _state.update {
                         it.copy(
                             busy = false,
-                            formError = postErrorMessage(e.message),
+                            formError = if (limited) null else postErrorMessage(e.message),
                         )
                     }
                 }

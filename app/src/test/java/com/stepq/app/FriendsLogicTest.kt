@@ -33,9 +33,9 @@ class FriendsLogicTest {
 
     @Test fun reminderMessages() {
         assertEquals("Water reminder sent to Meera. 4 left today.", reminderSentMessage("Meera Rao", 4))
-        assertEquals("Water reminder sent to Meera. That's all 5 for today.", reminderSentMessage("Meera", 0))
+        assertEquals("Water reminder sent to Meera. That's all 3 for today.", reminderSentMessage("Meera", 0))
         assertEquals("Water reminder sent to Meera.", reminderSentMessage("Meera", null))
-        assertEquals("Water reminders left today: 5 of 5 · Free plan", remindersBanner(5))
+        assertEquals("Water reminders left today: 3 of 3 · Free plan", remindersBanner(3))
     }
 
     @Test fun groupCopy() {

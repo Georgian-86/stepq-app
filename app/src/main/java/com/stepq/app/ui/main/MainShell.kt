@@ -145,6 +145,13 @@ fun MainShell(
             }
         }
     }
+    // "Upgrade to StepQ Pro" on a limit sheet opens the upgrade page.
+    com.stepq.app.ui.components.ProSheetHost(onSeePro = { com.stepq.app.ui.pro.UpgradePrompt.show() })
+    com.stepq.app.ui.pro.UpgradeHost(profiles)
+    // "See everything in Free vs Pro" sets openHub; the Profile tab opens its Pro page and clears it.
+    androidx.compose.runtime.LaunchedEffect(com.stepq.app.ui.components.ProSheets.openHub) {
+        if (com.stepq.app.ui.components.ProSheets.openHub) tab = Tab.Profile
+    }
 }
 
 private fun mutableTabState() = androidx.compose.runtime.mutableStateOf(Tab.Home)

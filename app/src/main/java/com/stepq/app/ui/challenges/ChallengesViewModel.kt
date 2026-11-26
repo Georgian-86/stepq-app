@@ -56,7 +56,10 @@ class ChallengesViewModel(private val repo: ChallengesRepository, private val co
                     onJoined()
                     refresh()
                 }
-                .onFailure { _state.update { it.copy(joining = false, toast = "Couldn't join. The challenge may have ended.") } }
+                .onFailure { e ->
+                    val limited = com.stepq.app.ui.components.ProSheets.showFor(e)
+                    _state.update { it.copy(joining = false, toast = if (limited) null else "Couldn't join. The challenge may have ended.") }
+                }
         }
     }
 

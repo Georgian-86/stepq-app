@@ -50,6 +50,8 @@ object Supabase {
                 // `stepq` schema. See docs/PLAN.md.
                 defaultSchema = APP_SCHEMA
             }
+            // Profile photos (StepQ Pro), in the private `avatars` bucket.
+            install(io.github.jan.supabase.storage.Storage)
         }
     }
 
