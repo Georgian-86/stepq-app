@@ -617,6 +617,55 @@ select pg_temp.expect((select app.export_my_data() ? 'plan' and app.export_my_da
                          and (app.export_my_data() ->> 'contact_lookups')::int = 10), 'export: includes Pro data and lookups');
 reset role;
 
+-- iOS: the community word filter and App Store subscriptions.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect_error($$select app.create_post('you are a CHUTIYA')$$, 'filter: blocked word in a post');
+select pg_temp.expect_error($$select app.create_post('what the fuck, 10k steps')$$, 'filter: blocked word in English');
+select pg_temp.expect(app.text_is_allowed('Classic walk past the abc mall, basic class, Scunthorpe'), 'filter: matches whole words only');
+select pg_temp.expect(app.text_is_allowed('Morning walk in the park, 8k steps'), 'filter: normal text passes');
+select pg_temp.expect((select count(*) from app.blocked_terms) = 0, 'filter: members cannot read the word list');
+select pg_temp.expect_error($$insert into app.blocked_terms (term) values ('walk')$$, 'filter: members cannot add words');
+select pg_temp.expect_error($$insert into app.store_subscriptions (original_transaction_id, user_id, product_id, environment, expires_at)
+  values ('t1', auth.uid(), 'in.stepq.app.pro.monthly', 'Sandbox', now() + interval '30 days')$$, 'store: members cannot write subscriptions');
+select pg_temp.expect_error($$select app.apply_store_subscription(auth.uid(), 't1', 'in.stepq.app.pro.monthly', 'Sandbox', now() + interval '30 days')$$,
+  'store: members cannot grant themselves Pro');
+select pg_temp.expect_error($$update app.profiles set pro_source = 'app_store' where id = auth.uid()$$, 'store: members cannot set pro_source');
+reset role;
+
+set role service_role;
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() + interval '30 days') = 'pro', 'store: verified purchase makes the member Pro');
+select pg_temp.expect_error($$select app.apply_store_subscription('00000000-0000-0000-0000-0000000000f1', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() + interval '30 days')$$, 'store: one subscription cannot serve two accounts');
+-- An older notification arriving late does not shorten the subscription.
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() - interval '1 day') = 'pro', 'store: late notification keeps Pro');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select count(*) from app.store_subscriptions) = 1, 'store: member reads their own subscription');
+select pg_temp.expect((select pro_source from app.profiles where id = auth.uid()) = 'app_store', 'store: Pro marked as from the App Store');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect((select count(*) from app.store_subscriptions) = 0, 'store: others cannot read it');
+reset role;
+
+set role service_role;
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() + interval '30 days', now()) = 'free', 'store: refund or revoke ends Pro');
+reset role;
+-- Pro an admin gave stays when an App Store subscription lapses.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f2', 'pro');
+select pg_temp.expect((select count(*) from app.blocked_terms) > 10, 'filter: admins read the word list');
+insert into app.blocked_terms (term) values ('testbadword');
+delete from app.blocked_terms where term = 'testbadword';
+reset role;
+select pg_temp.expect((select pro_source from app.profiles where id = '00000000-0000-0000-0000-0000000000f2') = 'admin', 'store: admin Pro marked as admin');
+set role service_role;
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() - interval '1 day', now()) = 'pro', 'store: lapsed App Store subscription keeps admin Pro');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
@@ -633,6 +682,8 @@ select pg_temp.expect_error($$select app.export_my_data()$$, 'anon exporting dat
 select pg_temp.expect_error($$select app.record_consent('terms_privacy', 'x')$$, 'anon recording consent');
 select pg_temp.expect_error($$select * from app.user_blocks$$, 'anon reading blocks');
 select pg_temp.expect_error($$select * from app.match_contacts(array['00'])$$, 'anon matching contacts after audit');
+select pg_temp.expect_error($$select * from app.store_subscriptions$$, 'anon reading subscriptions');
+select pg_temp.expect_error($$select app.text_is_allowed('x')$$, 'anon using the word filter');
 reset role;
 
 \echo 'All RLS checks passed.'
