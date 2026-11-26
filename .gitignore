@@ -11,3 +11,10 @@ app/google-services.json
 *.jks
 *.keystore
 !app/keystore/debug.keystore
+
+# iOS: generated project, local secrets and build output
+iosApp/StepQ.xcodeproj/
+iosApp/Config/Secrets.xcconfig
+iosApp/build/
+*.xcuserstate
+xcuserdata/

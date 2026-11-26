@@ -1,0 +1,94 @@
+{
+  "identifier" : "5C1E3A9B",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_IN",
+    "_storefront" : "IND",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "StepQPro",
+      "localizations" : [
+        {
+          "description" : "StepQ Pro",
+          "displayName" : "StepQ Pro",
+          "locale" : "en_IN"
+        }
+      ],
+      "name" : "StepQ Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "99.0",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6C2B1F01",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "All StepQ Pro features, billed monthly",
+              "displayName" : "StepQ Pro Monthly",
+              "locale" : "en_IN"
+            }
+          ],
+          "productID" : "in.stepq.app.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "StepQ Pro Monthly",
+          "subscriptionGroupID" : "StepQPro",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "799.0",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6C2B1F02",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "All StepQ Pro features, billed yearly",
+              "displayName" : "StepQ Pro Yearly",
+              "locale" : "en_IN"
+            }
+          ],
+          "productID" : "in.stepq.app.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "StepQ Pro Yearly",
+          "subscriptionGroupID" : "StepQPro",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -145,7 +145,9 @@ class StepqApi(private val supabaseUrl: String, anonKey: String) {
     @Throws(Throwable::class)
     suspend fun deleteAccount(appleAuthorizationCode: String?) {
         if (appleAuthorizationCode != null) {
-            callFunction("apple-revoke", buildJsonObject { put("authorizationCode", appleAuthorizationCode) })
+            // Best effort: deleting the account must never fail because of Apple.
+            runCatching { callFunction("apple-revoke", buildJsonObject { put("authorizationCode", appleAuthorizationCode) }) }
+                .onFailure { logWarn("StepqAuth", "Couldn't revoke the Apple token", it) }
         }
         call("Couldn't delete your account. Check your connection and try again.") { auth.deleteAccount() }
     }
@@ -385,15 +387,16 @@ class StepqApi(private val supabaseUrl: String, anonKey: String) {
     }
 }
 
-/** A message for the person, from a Postgres or network error. */
+/**
+ * A message for the person, from a Postgres or network error. StepQ's database functions raise
+ * messages written for people (e.g. "Keep it under 500 characters."), so those are shown as is.
+ */
 internal fun userMessage(e: Throwable, fallback: String): String {
     if (e is StepqError) return e.message ?: fallback
     friendlyAuthError(e)?.let { return it }
-    val text = listOfNotNull((e as? io.github.jan.supabase.postgrest.exception.PostgrestRestException)?.hint, e.message).joinToString("\n")
-    return when {
-        "content_filter" in text -> "That post has words StepQ doesn't allow. Please edit it and try again."
-        "plan_limit:" in text -> "You've reached your plan's limit for this."
-        "Only StepQ Pro" in text || "pro_only" in text -> "That's for StepQ Pro members."
-        else -> (e as? io.github.jan.supabase.postgrest.exception.PostgrestRestException)?.error?.takeIf { it.isNotBlank() && it.length < 160 } ?: fallback
+    val pg = e as? io.github.jan.supabase.postgrest.exception.PostgrestRestException ?: return fallback
+    if (pg.hint?.contains("content_filter") == true) {
+        return "That has words StepQ doesn't allow in the community. Please change it and try again."
     }
+    return pg.error.takeIf { it.isNotBlank() && it.length < 200 && !it.contains("violates") && !it.contains("relation") } ?: fallback
 }
