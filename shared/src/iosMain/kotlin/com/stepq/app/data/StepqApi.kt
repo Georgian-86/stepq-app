@@ -344,7 +344,8 @@ class StepqApi(private val supabaseUrl: String, anonKey: String) {
 
     fun defaultHairStyle(gender: String?): Int = com.stepq.app.data.defaultHairStyle(gender)
 
-    fun newDay(userId: String, day: String, steps: Int, distanceM: Int, activeMinutes: Int, calories: Int) =
+    // Not "newDay": Objective-C treats new… names specially, so Swift would see doNewDay.
+    fun stepsDay(userId: String, day: String, steps: Int, distanceM: Int, activeMinutes: Int, calories: Int) =
         DailySteps(userId, day, steps, distanceM, activeMinutes, calories)
 
     fun avatar(skin: Int, hair: Int, outfit: Int, headband: Int, style: Int) = AvatarConfig(skin, hair, outfit, headband, style)

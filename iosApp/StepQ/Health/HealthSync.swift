@@ -58,7 +58,7 @@ final class HealthSync {
         let read = await readDays(days)
         if let t = read.last, t.day == isoDay(Date()) { today = t }
         let rows = read.filter { $0.steps > 0 || $0.day == isoDay(Date()) }.map {
-            api.newDay(userId: me, day: $0.day, steps: Int32($0.steps), distanceM: Int32($0.distanceM),
+            api.stepsDay(userId: me, day: $0.day, steps: Int32($0.steps), distanceM: Int32($0.distanceM),
                        activeMinutes: Int32($0.activeMinutes), calories: Int32($0.calories))
         }
         do {
