@@ -1,0 +1,8 @@
+// Build settings for the StepQ iOS app. Secrets and your Apple team go in Secrets.xcconfig
+// (git-ignored, copy Secrets.example.xcconfig). Note: "//" starts a comment in xcconfig files,
+// so the Supabase URL is given as a host name; the app adds https://.
+SUPABASE_HOST = koagkmedvsplbgmltehk.supabase.co
+SUPABASE_ANON_KEY =
+DEVELOPMENT_TEAM =
+
+#include? "Secrets.xcconfig"

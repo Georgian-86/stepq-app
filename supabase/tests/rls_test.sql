@@ -67,8 +67,8 @@ select pg_temp.expect((select count(*) from app.daily_steps) = 2, 'friends: sees
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date - 1, 99999)$$, 'writing a friend''s steps');
 select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values ('00000000-0000-0000-0000-00000000000b', current_date, 99999) on conflict (user_id, day) do update set steps = excluded.steps$$, 'upserting over a friend''s steps');
 insert into app.water_reminders (from_user, to_user)
-  select auth.uid(), '00000000-0000-0000-0000-00000000000b' from generate_series(1, 5);
-select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_user) values (auth.uid(), '00000000-0000-0000-0000-00000000000b')$$, '6th water reminder on free plan');
+  select auth.uid(), '00000000-0000-0000-0000-00000000000b' from generate_series(1, 3);
+select pg_temp.expect_error($$insert into app.water_reminders (from_user, to_user) values (auth.uid(), '00000000-0000-0000-0000-00000000000b')$$, '4th water reminder on free plan');
 insert into app.groups (name, created_by) values ('Morning walkers', auth.uid());
 insert into app.group_members (group_id, user_id) select id, auth.uid() from app.groups;
 insert into app.group_members (group_id, user_id) select id, '00000000-0000-0000-0000-00000000000b' from app.groups;
@@ -105,6 +105,11 @@ select pg_temp.expect_error($$insert into app.challenges (title, starts_at, ends
 reset role;
 
 -- QRuns: anyone signed in sees the feed with the host's name, but can only post and join as themselves.
+-- Posting needs Pro and an admin's OK (see the Pro checks below); the stranger has both here.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Free run', 'X', now() + interval '1 day')$$, 'free member posting a QRun');
+reset role;
+update app.profiles set plan = 'pro', qrun_host = true where id = '00000000-0000-0000-0000-00000000000c';
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Morning run', 'Carter Road', now() + interval '1 day');
 insert into app.qrun_participants (qrun_id, user_id) select id, auth.uid() from app.qruns;
@@ -155,7 +160,7 @@ reset role;
 
 -- Water reminders reach the friend they were sent to, with the sender's name.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
-select pg_temp.expect((select count(*) from app.water_inbox(now() - interval '1 hour')) = 5, 'inbox: reminders sent to me');
+select pg_temp.expect((select count(*) from app.water_inbox(now() - interval '1 hour')) = 3, 'inbox: reminders sent to me');
 select pg_temp.expect((select bool_and(from_name = 'Riya') from app.water_inbox(now() - interval '1 hour')), 'inbox: sender name');
 select pg_temp.expect((select count(*) from app.water_inbox(now() + interval '1 minute')) = 0, 'inbox: nothing newer than since');
 reset role;
@@ -179,6 +184,10 @@ select pg_temp.expect(not exists (select 1 from app.profiles where id = '0000000
 select pg_temp.expect((select created_by from app.groups where name = 'Shared walk') = '00000000-0000-0000-0000-00000000000b', 'delete: shared group handed to a member');
 select pg_temp.expect(not exists (select 1 from app.groups where name = 'Solo walk'), 'delete: solo group removed');
 select pg_temp.expect((select count(*) from app.profiles) = 3, 'delete: other accounts untouched');
+select pg_temp.expect((select email from app.deleted_accounts where user_id = '00000000-0000-0000-0000-00000000000d') = 'leaver@test', 'delete: registration details kept for the IT Rules 180 days');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.deleted_accounts) = 0, 'delete: archived details hidden from users');
+reset role;
 select set_config('request.jwt.claims', '', false);
 set role anon;
 select pg_temp.expect_error($$select app.delete_my_account()$$, 'anon deleting an account');
@@ -189,7 +198,7 @@ insert into auth.users values ('00000000-0000-0000-0000-0000000000ad', 'admin@te
 insert into stepq.admins values ('00000000-0000-0000-0000-0000000000ad', 'admin@test');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
 select pg_temp.expect((select count(*) from app.profiles) = 3, 'admin: reads all profiles');
-select pg_temp.expect((select count(*) from app.water_reminders) = 5, 'admin: reads all reminders');
+select pg_temp.expect((select count(*) from app.water_reminders) = 3, 'admin: reads all reminders');
 with u as (update app.profiles set display_name = 'x' returning 1)
 select pg_temp.expect((select count(*) from u) = 0, 'admin: cannot edit profiles');
 reset role;
@@ -294,11 +303,17 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 select pg_temp.expect((select streak from app.share_streak(current_date)) = 3, 'streak: counts days in a row, stops at a gap');
 select pg_temp.expect((select streak from app.share_streak(current_date + 1)) = 3 and not (select shared_today from app.share_streak(current_date + 1)), 'streak: kept until the day ends');
 select pg_temp.expect((select streak from app.share_streak(current_date + 2)) = 0, 'streak: a missed day resets it');
+select pg_temp.expect((select streak from app.friend_streaks(current_date) where friend_id = '00000000-0000-0000-0000-00000000000b') = 3, 'friend streak: counts days in a row with that friend');
+select pg_temp.expect((select shared_today from app.friend_streaks(current_date) where friend_id = '00000000-0000-0000-0000-00000000000b'), 'friend streak: shared with them today');
+select pg_temp.expect((select streak from app.friend_streaks(current_date + 1)) = 3 and not (select shared_today from app.friend_streaks(current_date + 1)), 'friend streak: kept until the day ends');
+select pg_temp.expect((select streak from app.friend_streaks(current_date + 2)) = 0, 'friend streak: a missed day resets it');
+select pg_temp.expect((select count(*) from app.friend_streaks(current_date) where friend_id = '00000000-0000-0000-0000-00000000000c') = 0, 'friend streak: none with a non-friend');
 reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select pg_temp.expect((select from_name from app.step_share_inbox(now() - interval '1 hour')) = 'Riya' and (select steps from app.step_share_inbox(now() - interval '1 hour')) = 7000, 'share: friend gets it in the inbox');
 select pg_temp.expect((select count(*) from app.step_share_inbox(now() - interval '1 hour')) = 1, 'share: inbox only has new ones');
 select pg_temp.expect((select streak from app.share_streak(current_date)) = 0, 'streak: receiving doesn''t count');
+select pg_temp.expect((select count(*) from app.friend_streaks(current_date)) = 0, 'friend streak: receiving doesn''t count');
 reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 select pg_temp.expect((select count(*) from app.step_shares) = 0, 'share: others can''t read it');
@@ -323,6 +338,11 @@ reset role;
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select pg_temp.expect((select score from app.stepq_scores(array['00000000-0000-0000-0000-00000000000a']::uuid[])) = 2, 'score: friends see it');
 reset role;
+
+-- These community checks are about the feed itself, so plan limits are lifted here; the
+-- Pro section below puts the defaults back (Free can't post, new posts need approval).
+update app.plan_features set free_value = null where key = 'community_posts';
+update app.plan_features set free_value = 0 where key = 'post_approval';
 
 -- Community: everyone signed in sees posts with the author's public fields; you can only
 -- post, like and repost as yourself; achievements take steps from your own daily_steps row.
@@ -385,6 +405,267 @@ select pg_temp.expect((select count(*) from app.post_likes) = 1, 'admin: reads a
 select pg_temp.expect((select count(*) from app.post_reports) = 0, 'admin: reports went with the deleted post');
 reset role;
 
+-- Compliance: 13+ for new accounts; 13 to 17 need a parent's consent before doing anything.
+insert into auth.users values ('00000000-0000-0000-0000-00000000000f', 'teen@test') on conflict do nothing;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000f');
+select pg_temp.expect_error($$insert into app.profiles (id, display_name, username, birthdate) values (auth.uid(), 'Kid', 'kid', current_date - interval '12 years')$$, 'compliance: under-13 sign-up');
+insert into app.profiles (id, display_name, username, birthdate) values (auth.uid(), 'Teen', 'teen', current_date - interval '15 years');
+select pg_temp.expect(app.my_parental_consent() = 'none', 'parental: teen needs a parent');
+select pg_temp.expect_error($$insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date, 100)$$, 'parental: teen saving steps before consent');
+select pg_temp.expect_error($$select app.create_post('hi')$$, 'parental: teen posting before consent');
+select pg_temp.expect_error($$select app.record_consent('parental', 'x')$$, 'parental: teen consenting for their parent');
+select pg_temp.expect_error($$insert into app.parental_consents (child_id, parent_name, parent_email, token_hash, status) values (auth.uid(), 'Me', 'me@test', 'x', 'granted')$$, 'parental: teen writing their own consent');
+reset role;
+-- What the stepq.in server does when the parent says yes.
+insert into app.parental_consents (child_id, parent_name, parent_email, token_hash, status) values ('00000000-0000-0000-0000-00000000000f', 'Parent', 'parent@test', 'hash', 'granted');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000f');
+select pg_temp.expect(app.my_parental_consent() = 'granted', 'parental: status visible to the teen');
+insert into app.daily_steps (user_id, day, steps) values (auth.uid(), current_date, 100);
+select pg_temp.expect((select count(*) from app.daily_steps where user_id = auth.uid()) = 1, 'parental: teen can walk once a parent agrees');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.parental_consents) = 0, 'parental: others cannot read it');
+select pg_temp.expect(app.my_parental_consent() = 'not_needed', 'parental: adults need nothing');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select app.record_consent('terms_privacy', '2026-11-24');
+select pg_temp.expect((select count(*) from app.consents where withdrawn_at is null) = 1, 'consent: recorded and readable by me');
+select pg_temp.expect_error($$insert into app.consents (user_id, purpose, version) values (auth.uid(), 'health', 'x')$$, 'consent: writing the log directly');
+select pg_temp.expect_error($$select app.record_consent('ads', 'x')$$, 'consent: unknown purpose');
+select app.record_consent('community', 'v1');
+select app.record_consent('community', 'v1', false);
+select pg_temp.expect((select withdrawn_at is not null from app.consents where purpose = 'community'), 'consent: withdrawn');
+select pg_temp.expect((app.export_my_data() -> 'profile' ->> 'username') = 'riya.walks', 'export: my profile');
+select pg_temp.expect(jsonb_array_length(app.export_my_data() -> 'posts') >= 1, 'export: my posts');
+select pg_temp.expect(jsonb_array_length(app.export_my_data() -> 'consents') = 2, 'export: my consents');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect((select count(*) from app.consents) = 0, 'consent: others cannot read mine');
+select pg_temp.expect(jsonb_array_length(app.export_my_data() -> 'posts') = 0, 'export: only my own rows');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect(exists (select 1 from app.community_feed() where id = current_setting('test.post')::uuid), 'block: post visible before blocking');
+insert into app.user_blocks (blocker, blocked) values (auth.uid(), '00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect(not exists (select 1 from app.community_feed() where id = current_setting('test.post')::uuid), 'block: blocked author hidden from me');
+select pg_temp.expect((select count(*) from app.my_blocks()) = 1, 'block: listed in my blocks');
+select pg_temp.expect_error($$insert into app.user_blocks (blocker, blocked) values ('00000000-0000-0000-0000-00000000000b', auth.uid())$$, 'block: blocking on someone else''s behalf');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select count(*) from app.user_blocks) = 0, 'block: the blocked person cannot see the block');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+delete from app.user_blocks where blocked = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect(exists (select 1 from app.community_feed() where id = current_setting('test.post')::uuid), 'block: unblocking shows posts again');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+delete from app.posts where id = current_setting('test.post')::uuid;
+select pg_temp.expect(exists (select 1 from app.posts where id = current_setting('test.post')::uuid), 'moderation: others cannot delete my post');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+-- Removes Riya's achievement post; test.post stays for the Pro checks further down.
+delete from app.posts where id = current_setting('test.win')::uuid;
+select pg_temp.expect(not exists (select 1 from app.posts where id = current_setting('test.win')::uuid), 'moderation: admin removes a post');
+reset role;
+
+-- StepQ Pro: plans, limits from app.plan_features, admin-only changes.
+insert into auth.users values
+  ('00000000-0000-0000-0000-0000000000f1', 'free@test'),
+  ('00000000-0000-0000-0000-0000000000f2', 'pal@test');
+update app.plan_features set free_value = 0 where key = 'community_posts';
+update app.plan_features set free_value = 1 where key = 'post_approval';
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'Pal', 'pal');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+insert into app.profiles (id, display_name, username) values (auth.uid(), 'Freya', 'freya');
+insert into app.friendships (requester, addressee) values (auth.uid(), '00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((app.my_plan() ->> 'plan') = 'free', 'pro: new members are free');
+select pg_temp.expect((select (f ->> 'mine')::int from jsonb_array_elements(app.my_plan() -> 'features') f where f ->> 'key' = 'community_posts') = 0, 'pro: my plan lists my limits');
+select pg_temp.expect((select count(*) from app.plan_features) >= 13, 'pro: members read the feature list');
+select pg_temp.expect_error($$update app.plan_features set free_value = 99 where key = 'community_posts'$$, 'pro: member editing a limit');
+select pg_temp.expect_error($$select app.admin_set_feature('community_posts', 99, null)$$, 'pro: member calling the admin limit editor');
+select pg_temp.expect_error($$select app.admin_set_member(auth.uid(), 'pro')$$, 'pro: member making themselves pro');
+select pg_temp.expect_error($$update app.profiles set qrun_host = true where id = auth.uid()$$, 'pro: member making themselves a QRun host');
+select pg_temp.expect_error($$update app.profiles set theme = 'gold' where id = auth.uid()$$, 'pro: free member changing theme');
+select pg_temp.expect_error($$update app.profiles set photo_path = auth.uid()::text || '/me.jpg' where id = auth.uid()$$, 'pro: free member setting a photo');
+select pg_temp.expect_error($$select app.request_qrun_host()$$, 'pro: free member asking to host');
+select pg_temp.expect_error($$select app.create_post('one')$$, 'pro: free member starting a post');
+select pg_temp.expect_error($$select app.create_post('', null, current_date)$$, 'pro: free member sharing steps as a post');
+select pg_temp.expect(app.create_post('a reply is fine', current_setting('test.post')::uuid) is not null, 'pro: free member replies');
+select pg_temp.expect((select status from app.posts where body = 'a reply is fine') = 'approved', 'pro: replies don''t wait for approval');
+select pg_temp.expect(((app.my_plan() -> 'usage') ->> 'community_posts')::int = 0, 'pro: replies don''t count as posts');
+reset role;
+update app.friendships set status = 'accepted' where requester = '00000000-0000-0000-0000-0000000000f1';
+-- Freya shared with Pal on each of the 3 days before yesterday, then missed yesterday.
+insert into app.step_shares (from_user, to_user, day, steps)
+  select '00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', current_date - d, 5000 from generate_series(2, 4) d;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect((select streak from app.lost_streaks(current_date)) = 3, 'restore: lost streak listed with its length');
+select pg_temp.expect(coalesce((select streak from app.friend_streaks(current_date)), 0) = 0, 'restore: streak is broken before restoring');
+select pg_temp.expect(app.restore_streak('00000000-0000-0000-0000-0000000000f2', current_date) = 1, 'restore: one of two left');
+select pg_temp.expect((select streak from app.friend_streaks(current_date)) = 4, 'restore: streak is back, with the restored day');
+select pg_temp.expect((select count(*) from app.lost_streaks(current_date)) = 0, 'restore: nothing left to restore');
+select pg_temp.expect_error($$select app.restore_streak('00000000-0000-0000-0000-0000000000f2', current_date)$$, 'restore: same streak twice');
+select pg_temp.expect_error($$insert into app.streak_restores (user_id, friend_id, day) values (auth.uid(), '00000000-0000-0000-0000-0000000000f2', current_date - 5)$$, 'restore: writing the table directly');
+update app.profiles set bff_id = null where id = auth.uid();
+select pg_temp.expect_error($$update app.profiles set bff_id = '00000000-0000-0000-0000-0000000000f2' where id = auth.uid()$$, 'bff: free member pinning');
+select pg_temp.expect((select count(*) from app.step_history(5000)) <= 365, 'insights: free history is capped at a year');
+reset role;
+-- Free gets 2 restores a month: with 2 used, the next one is refused.
+delete from app.streak_restores where user_id = '00000000-0000-0000-0000-0000000000f1';
+insert into app.streak_restores (user_id, friend_id, day) values
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', current_date - 30),
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', current_date - 31);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select app.restore_streak('00000000-0000-0000-0000-0000000000f2', current_date)$$, 'restore: over the monthly limit');
+reset role;
+
+-- The admin edits limits and makes Freya Pro; everything is logged.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_feature('community_posts', 5, null);
+select pg_temp.expect((select free_value from app.plan_features where key = 'community_posts') = 5, 'admin: changes a limit');
+select pg_temp.expect_error($$select app.admin_set_feature('change_theme', 2, 1)$$, 'admin: a switch is 0 or 1');
+select pg_temp.expect_error($$select app.admin_set_feature('community_posts', -1, null)$$, 'admin: no negative limits');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f1', 'pro');
+select pg_temp.expect((select count(*) from app.admin_log) = 2, 'admin: changes are logged');
+select pg_temp.expect(app.admin_post_qrun('StepQ Sunday walk', 'Juhu Beach', now() + interval '3 days') is not null, 'admin: posts a QRun from the dashboard');
+select pg_temp.expect((select official from app.qruns where title = 'StepQ Sunday walk'), 'admin: dashboard QRuns are official');
+select pg_temp.expect_error($$select app.admin_post_qrun('Old', 'X', now() - interval '1 day')$$, 'admin: QRun in the past');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect((app.my_plan() ->> 'is_pro')::boolean, 'pro: Freya is pro');
+select set_config('test.live', app.create_post('pro posts go live')::text, false);
+select pg_temp.expect((select status from app.posts where id = current_setting('test.live')::uuid) = 'approved', 'approval: off for Pro by default');
+reset role;
+-- An admin can still switch approval on for Pro; the rest checks that path.
+update app.plan_features set pro_value = 1 where key = 'post_approval';
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select set_config('test.pending', app.create_post('four')::text, false);
+select app.create_post('five, unlimited on pro');
+select pg_temp.expect((select status from app.posts where id = current_setting('test.pending')::uuid) = 'pending', 'approval: a Pro post waits for an admin');
+select pg_temp.expect((select count(*) from app.my_pending_posts()) = 2, 'approval: I see my waiting posts');
+select pg_temp.expect((select count(*) from app.community_feed('mine') where body = 'four') = 1, 'approval: my waiting post shows in my feed');
+select pg_temp.expect_error($$update app.posts set status = 'approved' where author = auth.uid()$$, 'approval: approving my own post');
+select pg_temp.expect_error($$select app.admin_review_post(current_setting('test.pending')::uuid, true)$$, 'approval: member calling the admin review');
+update app.profiles set theme = 'gold', photo_path = auth.uid()::text || '/me.jpg', bff_id = '00000000-0000-0000-0000-0000000000f2' where id = auth.uid();
+select pg_temp.expect((select theme from app.profiles where id = auth.uid()) = 'gold', 'pro: changes theme');
+select pg_temp.expect_error($$update app.profiles set photo_path = '00000000-0000-0000-0000-0000000000f2/x.jpg' where id = auth.uid()$$, 'pro: photo path in someone else''s folder');
+select pg_temp.expect_error($$update app.profiles set bff_id = '00000000-0000-0000-0000-00000000000c' where id = auth.uid()$$, 'pro: pinning a non-friend');
+select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Mine', 'X', now() + interval '1 day')$$, 'pro: posting a QRun before an admin approves');
+select app.request_qrun_host();
+select pg_temp.expect((select qrun_host_requested_at is not null from app.profiles where id = auth.uid()), 'pro: asks to host QRuns');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select count(*) from app.community_feed() where body = 'four') = 0, 'approval: others don''t see a waiting post');
+select pg_temp.expect((select count(*) from app.posts where body = 'four') = 0, 'approval: nor read it directly');
+select pg_temp.expect_error($$insert into app.post_likes (post_id, user_id) values (current_setting('test.pending')::uuid, auth.uid())$$, 'approval: liking a waiting post');
+select pg_temp.expect_error($$select app.create_post('reply', current_setting('test.pending')::uuid)$$, 'approval: replying to a waiting post');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select pg_temp.expect((select count(*) from app.posts where status = 'pending') = 2, 'approval: admins see the queue');
+select app.admin_review_post(current_setting('test.pending')::uuid, true);
+select app.admin_review_post((select id from app.posts where body = 'five, unlimited on pro'), false);
+select pg_temp.expect_error($$select app.admin_review_post(current_setting('test.pending')::uuid, true)$$, 'approval: reviewing twice');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select count(*) from app.community_feed() where body = 'four') = 1, 'approval: approved post is in the feed');
+select pg_temp.expect((select count(*) from app.community_feed() where body like 'five%') = 0, 'approval: rejected post stays hidden');
+select pg_temp.expect((select pro from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])), 'badge: friends see the Pro badge');
+select pg_temp.expect((select photo_path from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])) is not null, 'badge: friends see the photo');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect((select photo_path from app.people_badges(array['00000000-0000-0000-0000-0000000000f1'::uuid])) is null, 'badge: strangers don''t see the photo');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f1', 'pro', true);
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+insert into app.qruns (created_by, title, place_name, starts_at) values (auth.uid(), 'Freya''s walk', 'Bandra Fort', now() + interval '1 day');
+select pg_temp.expect(not (select official from app.qruns where title = 'Freya''s walk'), 'pro: approved host posts a QRun');
+reset role;
+insert into app.challenges (title, starts_at, ends_at, pro_only) values ('Pro 100K', now() - interval '1 day', now() + interval '20 days', true);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect_error($$insert into app.challenge_entries (challenge_id, user_id) select id, auth.uid() from app.challenges where title = 'Pro 100K'$$, 'challenge: free member joining a Pro-only challenge');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+insert into app.challenge_entries (challenge_id, user_id) select id, auth.uid() from app.challenges where title = 'Pro 100K';
+select pg_temp.expect(app.reward_eligible(auth.uid(), 'monthly'), 'reward: pro is eligible monthly');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect(not app.reward_eligible(auth.uid(), 'monthly') and app.reward_eligible(auth.uid(), 'weekly'), 'reward: free is weekly only');
+reset role;
+-- Back to Free: theme, photo, BFF and hosting go; data stays.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f1', 'free');
+reset role;
+select pg_temp.expect((select theme = 'leaf' and photo_path is null and bff_id is null and not qrun_host and pro_since is null from app.profiles where id = '00000000-0000-0000-0000-0000000000f1'), 'admin: downgrade resets Pro-only settings');
+select set_config('request.jwt.claims', '', false);
+set role anon;
+select pg_temp.expect_error($$select app.my_plan()$$, 'anon reading a plan');
+select pg_temp.expect_error($$select * from app.plan_features$$, 'anon reading the feature list');
+reset role;
+
+-- Launch audit: contact matching is rate limited; the export covers Pro data.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+do $$ begin for i in 1..10 loop perform * from app.match_contacts(array['00']); end loop; end $$;
+select pg_temp.expect_error($$select * from app.match_contacts(array['00'])$$, 'contacts: 11th lookup in a day');
+select pg_temp.expect_error($$select * from app.contact_lookups$$, 'contacts: lookups log is private');
+select pg_temp.expect((select app.export_my_data() ? 'plan' and app.export_my_data() ? 'streak_restores'
+                         and (app.export_my_data() ->> 'contact_lookups')::int = 10), 'export: includes Pro data and lookups');
+reset role;
+
+-- iOS: the community word filter and App Store subscriptions.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect_error($$select app.create_post('you are a CHUTIYA')$$, 'filter: blocked word in a post');
+select pg_temp.expect_error($$select app.create_post('what the fuck, 10k steps')$$, 'filter: blocked word in English');
+select pg_temp.expect(app.text_is_allowed('Classic walk past the abc mall, basic class, Scunthorpe'), 'filter: matches whole words only');
+select pg_temp.expect(app.text_is_allowed('Morning walk in the park, 8k steps'), 'filter: normal text passes');
+select pg_temp.expect((select count(*) from app.blocked_terms) = 0, 'filter: members cannot read the word list');
+select pg_temp.expect_error($$insert into app.blocked_terms (term) values ('walk')$$, 'filter: members cannot add words');
+select pg_temp.expect_error($$insert into app.store_subscriptions (original_transaction_id, user_id, product_id, environment, expires_at)
+  values ('t1', auth.uid(), 'in.stepq.app.pro.monthly', 'Sandbox', now() + interval '30 days')$$, 'store: members cannot write subscriptions');
+select pg_temp.expect_error($$select app.apply_store_subscription(auth.uid(), 't1', 'in.stepq.app.pro.monthly', 'Sandbox', now() + interval '30 days')$$,
+  'store: members cannot grant themselves Pro');
+select pg_temp.expect_error($$update app.profiles set pro_source = 'app_store' where id = auth.uid()$$, 'store: members cannot set pro_source');
+reset role;
+
+set role service_role;
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() + interval '30 days') = 'pro', 'store: verified purchase makes the member Pro');
+select pg_temp.expect_error($$select app.apply_store_subscription('00000000-0000-0000-0000-0000000000f1', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() + interval '30 days')$$, 'store: one subscription cannot serve two accounts');
+-- An older notification arriving late does not shorten the subscription.
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() - interval '1 day') = 'pro', 'store: late notification keeps Pro');
+reset role;
+
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f2');
+select pg_temp.expect((select count(*) from app.store_subscriptions) = 1, 'store: member reads their own subscription');
+select pg_temp.expect((select pro_source from app.profiles where id = auth.uid()) = 'app_store', 'store: Pro marked as from the App Store');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect((select count(*) from app.store_subscriptions) = 0, 'store: others cannot read it');
+reset role;
+
+set role service_role;
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() + interval '30 days', now()) = 'free', 'store: refund or revoke ends Pro');
+reset role;
+-- Pro an admin gave stays when an App Store subscription lapses.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000ad');
+select app.admin_set_member('00000000-0000-0000-0000-0000000000f2', 'pro');
+select pg_temp.expect((select count(*) from app.blocked_terms) > 10, 'filter: admins read the word list');
+insert into app.blocked_terms (term) values ('testbadword');
+delete from app.blocked_terms where term = 'testbadword';
+reset role;
+select pg_temp.expect((select pro_source from app.profiles where id = '00000000-0000-0000-0000-0000000000f2') = 'admin', 'store: admin Pro marked as admin');
+set role service_role;
+select pg_temp.expect(app.apply_store_subscription('00000000-0000-0000-0000-0000000000f2', 'ios-t1', 'in.stepq.app.pro.monthly',
+  'Sandbox', now() - interval '1 day', now()) = 'pro', 'store: lapsed App Store subscription keeps admin Pro');
+reset role;
+
 -- Anonymous (no sign-in) gets nothing at all.
 select set_config('request.jwt.claims', '', false);
 set role anon;
@@ -397,6 +678,12 @@ select pg_temp.expect_error($$select * from app.stepq_scores(array[]::uuid[])$$,
 select pg_temp.expect_error($$select * from app.community_feed()$$, 'anon reading the community');
 select pg_temp.expect_error($$select * from app.posts$$, 'anon reading posts');
 select pg_temp.expect_error($$select app.create_post('hi')$$, 'anon posting');
+select pg_temp.expect_error($$select app.export_my_data()$$, 'anon exporting data');
+select pg_temp.expect_error($$select app.record_consent('terms_privacy', 'x')$$, 'anon recording consent');
+select pg_temp.expect_error($$select * from app.user_blocks$$, 'anon reading blocks');
+select pg_temp.expect_error($$select * from app.match_contacts(array['00'])$$, 'anon matching contacts after audit');
+select pg_temp.expect_error($$select * from app.store_subscriptions$$, 'anon reading subscriptions');
+select pg_temp.expect_error($$select app.text_is_allowed('x')$$, 'anon using the word filter');
 reset role;
 
 \echo 'All RLS checks passed.'

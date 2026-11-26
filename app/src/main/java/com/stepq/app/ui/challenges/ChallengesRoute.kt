@@ -64,7 +64,14 @@ fun ChallengesRoute(repo: ChallengesRepository) {
             card != null -> ChallengeDetailScreen(
                 card,
                 joining = state.joining,
-                onJoin = { vm.join(card.challenge.id) { justJoined = true } },
+                onJoin = {
+                    val plan = com.stepq.app.data.Pro.plan.value
+                    if (card.challenge.proOnly && plan != null && !plan.has(com.stepq.app.data.MyPlan.F.ALL_CHALLENGES)) {
+                        com.stepq.app.ui.components.ProSheets.show(com.stepq.app.data.MyPlan.F.ALL_CHALLENGES)
+                    } else {
+                        vm.join(card.challenge.id) { justJoined = true }
+                    }
+                },
                 onLeave = { vm.leave(card.challenge.id) },
                 onBack = { open = null },
             )

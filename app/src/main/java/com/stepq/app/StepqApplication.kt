@@ -42,10 +42,20 @@ class StepqApplication : Application() {
         super.onCreate()
         com.stepq.app.debug.CrashLog.install(this)
         Supabase.init(this)
-        auth = AuthRepository(Supabase.client)
+        com.stepq.app.data.PasswordRecovery.init(
+            com.russhwolf.settings.SharedPreferencesSettings(getSharedPreferences("stepq_auth_flags", MODE_PRIVATE)),
+        )
+        com.stepq.app.data.Telemetry.watch(appScope)
+        auth = AuthRepository(
+            Supabase.client,
+            beforeLogOut = { PushTokens.unregister() },
+            beforeDelete = { com.stepq.app.data.Pro.deleteAllMyPhotos() },
+        )
         profiles = ProfileRepository(Supabase.client)
         home = HomeRepository(Supabase.client, profiles)
-        friends = com.stepq.app.data.FriendsRepository(Supabase.client, profiles)
+        friends = com.stepq.app.data.FriendsRepository(Supabase.client, profiles) {
+            com.stepq.app.data.Pro.plan.value ?: com.stepq.app.data.Pro.refresh()
+        }
         groups = com.stepq.app.data.GroupsRepository(Supabase.client, profiles)
         qruns = com.stepq.app.data.QRunsRepository(Supabase.client)
         challenges = com.stepq.app.data.ChallengesRepository(Supabase.client, profiles)
@@ -53,6 +63,21 @@ class StepqApplication : Application() {
         createNotificationChannel()
         com.stepq.app.push.WaterInbox.schedule(this)
         registerForPush()
+        trackPlan()
+    }
+
+    /** Loads my StepQ Pro plan (limits, theme, badge) on sign-in and forgets it on sign-out. */
+    private fun trackPlan() {
+        val client = Supabase.client ?: return
+        appScope.launch {
+            client.auth.sessionStatus
+                .map { it is SessionStatus.Authenticated }
+                .distinctUntilChanged()
+                .collect { signedIn ->
+                    if (signedIn) com.stepq.app.data.Pro.refresh()
+                    else kotlinx.coroutines.withContext(Dispatchers.Main) { com.stepq.app.data.Pro.clear() }
+                }
+        }
     }
 
     /**

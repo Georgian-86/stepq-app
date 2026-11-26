@@ -11,12 +11,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,8 +39,7 @@ import com.stepq.app.ui.theme.StepqType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val SUPPORT_EMAIL = "connect@stepq.in"
-private const val PRIVACY_URL = "https://stepq.in/privacy"
+private const val SUPPORT_EMAIL = com.stepq.app.ui.components.Legal.SUPPORT_EMAIL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,14 +49,31 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var page by rememberSaveable { mutableStateOf<String?>(null) }
-    var pro by rememberSaveable { mutableStateOf(false) }
+    val plan by com.stepq.app.data.Pro.plan.collectAsState()
+    var limitSheet by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmLogOut by rememberSaveable { mutableStateOf(false) }
-    var privacy by rememberSaveable { mutableStateOf(false) }
+    // "Download my data": the JSON waits here while the person picks where to save it.
+    var pendingExport by remember { mutableStateOf<String?>(null) }
+    val saveExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val json = pendingExport
+        pendingExport = null
+        if (uri != null && json != null) {
+            val ok = runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) } ?: error("no stream") }.isSuccess
+            vm.showToast(if (ok) "Saved your StepQ data" else "Couldn't save the file. Try another folder.")
+        }
+    }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     fun go(to: String?) { vm.clearForm(); page = to }
+    LaunchedEffect(com.stepq.app.ui.components.ProSheets.openHub) {
+        if (com.stepq.app.ui.components.ProSheets.openHub) {
+            com.stepq.app.ui.components.ProSheets.openHub = false
+            page = "pro"
+        }
+    }
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
+        com.stepq.app.data.Pro.refreshAsync()
         onPauseOrDispose { }
     }
     val source by produceState("", page) {
@@ -70,11 +89,26 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     Box(Modifier.fillMaxSize()) {
         com.stepq.app.ui.components.PageHost(
             target = page,
-            depth = { when (it) { null -> 0; "password", "email" -> 2; else -> 1 } },
+            depth = { when (it) { null -> 0; "password", "email", "insights" -> 2; else -> 1 } },
             onBack = { go(if (page == "password" || page == "email") "account" else null) },
         ) { shown ->
         when (shown) {
             "goal" -> EditGoalScreen(state.profile?.dailyGoal ?: 8000, state.saving, pending = state.profile?.nextDailyGoal, onSave = { vm.saveGoal(it) { page = null } }, onBack = { page = null })
+            "pro" -> com.stepq.app.ui.pro.ProScreen(
+                plan = plan,
+                profile = state.profile,
+                onWaitlist = state.onWaitlist,
+                onJoinWaitlist = { vm.joinWaitlist { } },
+                onInsights = { page = "insights" },
+                onBack = { page = null },
+                onMessage = { vm.showToast(it) },
+            )
+            "insights" -> com.stepq.app.ui.pro.InsightsScreen(
+                plan,
+                state.profile?.dailyGoal ?: 8000,
+                onBack = { page = null },
+                onLocked = { limitSheet = com.stepq.app.data.MyPlan.F.ANALYSIS_DAYS },
+            )
             "connect" -> ConnectStepsScreen(onBack = { page = null }, fromSettings = true) { page = null }
             "edit" -> state.profile?.let { p ->
                 EditProfileScreen(
@@ -103,6 +137,28 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                 onSave = { pw -> auth?.let { vm.changePassword(it, pw) { go("account") } } },
                 onBack = { go("account") },
             )
+            "privacy" -> {
+                LaunchedEffect(Unit) { vm.loadBlocks() }
+                PrivacyScreen(
+                    exporting = state.exporting,
+                    blocks = state.blocks,
+                    onExport = {
+                        vm.exportData { json ->
+                            pendingExport = json
+                            saveExport.launch("stepq-data-${java.time.LocalDate.now()}.json")
+                        }
+                    },
+                    onPermissions = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
+                        }
+                    },
+                    onAccount = { go("account") },
+                    onUnblock = { vm.unblock(it) },
+                    onOpen = { open(it) },
+                    onBack = { go(null) },
+                )
+            }
             "email" -> ChangeEmailScreen(
                 auth?.email(),
                 state.saving,
@@ -111,7 +167,7 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                 onSave = { e -> auth?.let { vm.changeEmail(it, e) } },
                 onBack = { go("account") },
             )
-            else -> ProfileScreen(state, source) { action ->
+            else -> ProfileScreen(state, source, plan) { action ->
                 when (action) {
                     ProfileAction.EditProfile -> go("edit")
                     ProfileAction.Account -> go("account")
@@ -122,10 +178,11 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
                             Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
                         )
                     }
-                    ProfileAction.Privacy -> privacy = true
+                    ProfileAction.Privacy -> go("privacy")
                     ProfileAction.Help -> open("mailto:$SUPPORT_EMAIL?subject=" + Uri.encode("StepQ app feedback"))
                     ProfileAction.LogOut -> confirmLogOut = true
-                    ProfileAction.Pro -> pro = true
+                    ProfileAction.Pro -> page = "pro"
+                    ProfileAction.Insights -> page = "insights"
                 }
             }
         }
@@ -139,9 +196,9 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
         }
     }
 
-    if (pro) {
-        ModalBottomSheet(onDismissRequest = { pro = false }, containerColor = StepqColors.White) {
-            ProSheet(state.onWaitlist, onNotify = { vm.joinWaitlist { pro = false } }, onDismiss = { pro = false })
+    limitSheet?.let { key ->
+        ModalBottomSheet(onDismissRequest = { limitSheet = null }, containerColor = StepqColors.White) {
+            com.stepq.app.ui.components.PlanLimitSheet(key, plan, onSeePro = { limitSheet = null; page = "pro" }, onDismiss = { limitSheet = null })
         }
     }
     if (confirmLogOut) {
@@ -161,30 +218,5 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
     }
     if (confirmDelete && auth != null) {
         DeleteAccountDialog(state.saving, state.formError, onConfirm = { vm.deleteAccount(auth) }, onDismiss = { confirmDelete = false })
-    }
-    if (privacy) {
-        AlertDialog(
-            onDismissRequest = { privacy = false },
-            title = { Text("Privacy and data", style = StepqType.Heading) },
-            text = {
-                Text(
-                    "Your name, avatar and step totals appear in your country's rankings and to your friends and group mates. Read the full policy, or email us for a copy of your data. You can delete your account any time under Account.",
-                    style = StepqType.Body,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    privacy = false
-                    open(PRIVACY_URL)
-                }) { Text("Read the policy", color = StepqColors.Deep) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    privacy = false
-                    open("mailto:$SUPPORT_EMAIL?subject=" + Uri.encode("Delete or export my StepQ data"))
-                }) { Text("Email us", color = StepqColors.Ink) }
-            },
-            containerColor = StepqColors.White,
-        )
     }
 }

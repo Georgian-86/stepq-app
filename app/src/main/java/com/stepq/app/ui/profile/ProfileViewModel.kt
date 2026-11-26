@@ -10,15 +10,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
-data class ProfileStats(val streak: Int, val bestDay: Int, val kmSoFar: Int, val score: Int = 0)
+data class ProfileStats(val bestDay: Int, val kmSoFar: Int, val score: Int = 0)
 
 data class ProfileUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val profile: Profile? = null,
-    val stats: ProfileStats = ProfileStats(0, 0, 0),
+    val stats: ProfileStats = ProfileStats(0, 0),
     val onWaitlist: Boolean = false,
     val saving: Boolean = false,
     val toast: String? = null,
@@ -26,11 +25,14 @@ data class ProfileUiState(
     val formError: String? = null,
     /** Address a change-email link was sent to. */
     val emailSentTo: String? = null,
+    /** Privacy and data: building the "Download my data" file. */
+    val exporting: Boolean = false,
+    /** Privacy and data: people I've blocked; null until loaded. */
+    val blocks: List<com.stepq.app.data.BlockedUser>? = null,
 )
 
-/** [streak] and [score] come from Postgres; before the Nov 20 migration they fall back to goal days. */
-fun profileStats(days: List<DailySteps>, goal: Int, today: LocalDate, streak: Int? = null, score: Int? = null): ProfileStats = ProfileStats(
-    streak = streak ?: 0,
+/** [score] comes from Postgres; before the Nov 20 migration it falls back to goal days. */
+fun profileStats(days: List<DailySteps>, goal: Int, score: Int? = null): ProfileStats = ProfileStats(
     bestDay = days.maxOfOrNull { it.steps } ?: 0,
     kmSoFar = days.sumOf { it.distanceM } / 1000,
     score = score ?: com.stepq.app.data.goalDays(days, goal),
@@ -45,7 +47,7 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
             val profile = repo.mine()
             val days = repo.myDays().getOrDefault(emptyList())
             val waitlist = repo.onProWaitlist().getOrDefault(false)
-            val (streak, score) = repo.streakAndScore(LocalDate.now())
+            val score = repo.score()
             profile
                 .onSuccess { p ->
                     _state.update {
@@ -53,7 +55,7 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
                             loading = false,
                             error = null,
                             profile = p,
-                            stats = profileStats(days, p?.dailyGoal ?: 8000, LocalDate.now(), streak, score),
+                            stats = profileStats(days, p?.dailyGoal ?: 8000, score),
                             onWaitlist = waitlist,
                         )
                     }
@@ -90,7 +92,7 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
         viewModelScope.launch {
             repo.joinProWaitlist()
                 .onSuccess {
-                    _state.update { it.copy(onWaitlist = true, toast = "We'll let you know when Pro launches.") }
+                    _state.update { it.copy(onWaitlist = true, toast = "Asked. We'll let you know when Pro is yours.") }
                     onDone()
                 }
                 .onFailure { _state.update { it.copy(toast = "Couldn't add you to the list. Try again.") } }
@@ -149,6 +151,36 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
                 .onFailure { _state.update { it.copy(saving = false, formError = "Couldn't delete your account. Check your connection and try again.") } }
         }
     }
+
+    /** Fetches everything StepQ holds about me and hands the JSON to [onReady] to save. */
+    fun exportData(onReady: (String) -> Unit) {
+        _state.update { it.copy(exporting = true) }
+        viewModelScope.launch {
+            repo.exportMyData()
+                .onSuccess { json ->
+                    _state.update { it.copy(exporting = false) }
+                    onReady(json)
+                }
+                .onFailure { _state.update { it.copy(exporting = false, toast = "Couldn't get your data. Check your connection and try again.") } }
+        }
+    }
+
+    fun loadBlocks() {
+        viewModelScope.launch {
+            repo.myBlocks().onSuccess { list -> _state.update { it.copy(blocks = list) } }
+                .onFailure { _state.update { it.copy(blocks = emptyList()) } }
+        }
+    }
+
+    fun unblock(user: com.stepq.app.data.BlockedUser) {
+        viewModelScope.launch {
+            repo.unblock(user.userId)
+                .onSuccess { _state.update { s -> s.copy(blocks = s.blocks?.filterNot { it.userId == user.userId }, toast = "Unblocked @${user.username}") } }
+                .onFailure { _state.update { it.copy(toast = "Couldn't unblock. Try again.") } }
+        }
+    }
+
+    fun showToast(message: String) = _state.update { it.copy(toast = message) }
 
     fun clearForm() = _state.update { it.copy(formError = null, emailSentTo = null) }
 

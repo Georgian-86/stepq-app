@@ -48,7 +48,7 @@ class GroupsRepository(private val client: SupabaseClient?, private val profiles
 
     private fun db() = (client ?: throw NotConfiguredException()).postgrest
 
-    suspend fun load(today: LocalDate = LocalDate.now(FriendsRepository.IST)): Result<GroupsData?> = runCatching {
+    suspend fun load(today: LocalDate = LocalDate.now(ANDROID_IST)): Result<GroupsData?> = runCatching {
         val db = db()
         val me = profiles.mine().getOrThrow() ?: return@runCatching null
         val groups = db["groups"].select().decodeList<GroupRow>()

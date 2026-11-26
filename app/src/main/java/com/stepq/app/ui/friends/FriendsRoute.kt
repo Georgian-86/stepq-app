@@ -41,12 +41,23 @@ fun FriendsRoute(
     repo: FriendsRepository,
     communityRepo: com.stepq.app.data.CommunityRepository? = null,
     qrunsRepo: com.stepq.app.data.QRunsRepository? = null,
+    homeRepo: com.stepq.app.data.HomeRepository? = null,
+    /** Open on this section (e.g. Streaks from Home), then [onStartSectionUsed]. */
+    startSection: FriendsSection? = null,
+    onStartSectionUsed: () -> Unit = {},
 ) {
     val vm: FriendsViewModel = viewModel { FriendsViewModel(repo) }
     val state by vm.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
     var section by rememberSaveable { mutableStateOf(FriendsSection.Friends) }
     var adding by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(startSection) {
+        if (startSection != null) {
+            section = startSection
+            adding = false
+            onStartSectionUsed()
+        }
+    }
 
     val qruns = qrunsRepo?.let { QRunSection(it, section == FriendsSection.QRun) }
     val community = communityRepo?.let { CommunitySection(it, section == FriendsSection.Community) }
@@ -128,6 +139,11 @@ fun FriendsRoute(
                         onDecline = vm::decline,
                         onAddFriend = { adding = true },
                     )
+                    FriendsSection.Streaks -> if (homeRepo != null) {
+                        com.stepq.app.ui.home.StreaksSection(homeRepo, onAddFriend = { adding = true })
+                    } else {
+                        SectionComingSoon("Streaks", "Share your steps with a friend every day to keep a streak with them.")
+                    }
                     FriendsSection.Community -> community?.Feed()
                         ?: SectionComingSoon("Community", "Share your walks and wins with everyone on StepQ.")
                     FriendsSection.QRun -> qruns?.List()

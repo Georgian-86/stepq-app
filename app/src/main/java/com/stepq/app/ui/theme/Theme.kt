@@ -20,7 +20,7 @@ object StepqDimens {
     val SpaceXL = 32.dp
 }
 
-private val colors = lightColorScheme(
+private fun colors() = lightColorScheme(
     primary = StepqColors.Deep,
     onPrimary = StepqColors.White,
     secondary = StepqColors.Leaf,
@@ -65,6 +65,6 @@ fun StepqTheme(content: @Composable () -> Unit) {
     androidx.compose.runtime.CompositionLocalProvider(
         com.stepq.app.ui.components.LocalMotionEnabled provides com.stepq.app.ui.components.systemMotionEnabled(),
     ) {
-        MaterialTheme(colorScheme = colors, typography = typography, shapes = shapes, content = content)
+        MaterialTheme(colorScheme = colors(), typography = typography, shapes = shapes, content = content)
     }
 }

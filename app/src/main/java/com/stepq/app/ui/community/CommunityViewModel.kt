@@ -1,5 +1,6 @@
 package com.stepq.app.ui.community
 
+import com.stepq.app.data.kx
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.stepq.app.data.CommunityRepository
@@ -146,9 +147,10 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
         if (_state.value.posting) return
         _state.update { it.copy(posting = true, composeError = null) }
         viewModelScope.launch {
-            repo.create(body, parentId, if (shareSteps) LocalDate.now() else null)
+            repo.create(body, parentId, if (shareSteps) LocalDate.now().kx else null)
                 .onSuccess {
-                    _state.update { s -> s.copy(posting = false, toast = if (parentId == null) "Posted" else "Reply posted") }
+                    _state.update { s -> s.copy(posting = false, toast = if (parentId != null) "Reply posted" else if (needsApproval()) "Sent for approval. It goes live once StepQ checks it." else "Posted") }
+                    if (parentId == null) com.stepq.app.data.Pro.refreshAsync()
                     onDone()
                     if (parentId == null) {
                         // Show it at the top of every feed it belongs to.
@@ -161,10 +163,13 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
                 }
                 .onFailure { e ->
                     android.util.Log.w("StepqCommunity", "Couldn't post", e)
-                    _state.update { s -> s.copy(posting = false, composeError = postErrorMessage(e)) }
+                    val limited = com.stepq.app.ui.components.ProSheets.showFor(e)
+                    _state.update { s -> s.copy(posting = false, composeError = if (limited) null else postErrorMessage(e)) }
                 }
         }
     }
+
+    private fun needsApproval() = com.stepq.app.data.Pro.plan.value?.has(com.stepq.app.data.MyPlan.F.POST_APPROVAL) == true
 
     fun toggleLike(post: Post) {
         val next = !post.liked
@@ -216,6 +221,22 @@ class CommunityViewModel(private val repo: CommunityRepository) : ViewModel() {
             repo.report(post.id, reason)
                 .onSuccess { _state.update { s -> s.copy(toast = "Thanks. We'll take a look.") } }
                 .onFailure { _state.update { s -> s.copy(toast = "Couldn't send the report. Try again.") } }
+        }
+    }
+
+    fun block(post: Post) {
+        viewModelScope.launch {
+            repo.block(post.authorId)
+                .onSuccess {
+                    _state.update { s ->
+                        s.copy(
+                            feeds = s.feeds.mapValues { (_, f) -> f.copy(posts = f.posts.filterNot { it.authorId == post.authorId }) },
+                            thread = s.thread?.copy(posts = s.thread.posts.filterNot { it.authorId == post.authorId }),
+                            toast = "Blocked @${post.authorUsername}. Unblock in Profile → Privacy and data.",
+                        )
+                    }
+                }
+                .onFailure { _state.update { s -> s.copy(toast = "Couldn't block. Try again.") } }
         }
     }
 

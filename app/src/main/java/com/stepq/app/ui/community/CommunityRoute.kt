@@ -67,7 +67,14 @@ class CommunitySection internal constructor(
             state.value,
             actions,
             onScope = vm::setScope,
-            onCompose = { steps -> push(if (steps) "compose-steps" else "compose") },
+            onCompose = { steps ->
+                // Free members get a few new threads a month (replies and likes are unlimited).
+                if (com.stepq.app.data.Pro.plan.value?.postsLeft == 0) {
+                    com.stepq.app.ui.components.ProSheets.show(com.stepq.app.data.MyPlan.F.COMMUNITY_POSTS)
+                } else {
+                    push(if (steps) "compose-steps" else "compose")
+                }
+            },
             onRefresh = vm::refresh,
             onLoadMore = vm::loadMore,
         )
@@ -119,6 +126,10 @@ class CommunitySection internal constructor(
                     if (page?.postId() == post.id) back()
                 },
                 onReport = { vm.report(post, it) },
+                onBlock = {
+                    vm.block(post)
+                    if (page?.postId() == post.id) back()
+                },
                 onDismiss = { options.value = null },
             )
         }

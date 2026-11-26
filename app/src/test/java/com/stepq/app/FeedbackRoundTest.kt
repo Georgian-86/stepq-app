@@ -4,6 +4,7 @@ import com.stepq.app.data.Contacts
 import com.stepq.app.data.Profile
 import com.stepq.app.data.QRun
 import com.stepq.app.data.defaultHairStyle
+import com.stepq.app.data.kx
 import com.stepq.app.data.pendingGoalDue
 import com.stepq.app.ui.qrun.LatLng
 import com.stepq.app.ui.qrun.PriceFilter
@@ -47,10 +48,10 @@ class FeedbackRoundTest {
 
     @Test fun pendingGoalStartsOnItsDay() {
         val p = Profile(id = "me", displayName = "Riya", username = "riya", dailyGoal = 8000, nextDailyGoal = 10000, nextGoalFrom = "2026-11-19")
-        assertNull(pendingGoalDue(p, LocalDate.of(2026, 11, 18)))
-        assertEquals(10000, pendingGoalDue(p, LocalDate.of(2026, 11, 19)))
-        assertEquals(10000, pendingGoalDue(p, LocalDate.of(2026, 11, 25)))
-        assertNull(pendingGoalDue(p.copy(nextDailyGoal = null), LocalDate.of(2026, 11, 25)))
+        assertNull(pendingGoalDue(p, LocalDate.of(2026, 11, 18).kx))
+        assertEquals(10000, pendingGoalDue(p, LocalDate.of(2026, 11, 19).kx))
+        assertEquals(10000, pendingGoalDue(p, LocalDate.of(2026, 11, 25).kx))
+        assertNull(pendingGoalDue(p.copy(nextDailyGoal = null), LocalDate.of(2026, 11, 25).kx))
     }
 
     @Test fun hairStyleFollowsGender() {

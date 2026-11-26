@@ -35,7 +35,7 @@ android {
         minSdk = 28
         targetSdk = 37
         versionCode = config("VERSION_CODE", "1").toInt()
-        versionName = "1.0.0"
+        versionName = config("VERSION_NAME", "1.0.0")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${config("SUPABASE_URL", "https://koagkmedvsplbgmltehk.supabase.co")}\"")
@@ -93,6 +93,8 @@ kotlin {
 }
 
 dependencies {
+    // Data layer, models and the Free/Pro and streak rules, shared with the iOS app.
+    implementation(project(":shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
@@ -111,6 +113,7 @@ dependencies {
 
     implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.storage)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)
 

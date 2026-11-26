@@ -2,6 +2,7 @@ package com.stepq.app
 
 import com.stepq.app.data.ChallengesRepository
 import com.stepq.app.data.DailySteps
+import com.stepq.app.data.java
 import com.stepq.app.ui.challenges.endsIn
 import com.stepq.app.ui.challenges.periodEnd
 import com.stepq.app.ui.challenges.periodLabel
@@ -20,7 +21,7 @@ class ChallengesLogicTest {
 
     @Test fun weekRunsMondayToSundayIndiaTime() {
         val thu = LocalDate.of(2026, 11, 12)
-        assertEquals(LocalDate.of(2026, 11, 9), ChallengesRepository.weekStart(thu))
+        assertEquals(LocalDate.of(2026, 11, 9), ChallengesRepository.weekStart(kotlinx.datetime.LocalDate(2026, 11, 12)).java)
         assertEquals(Instant.parse("2026-11-15T18:30:00Z"), periodEnd(thu, monthly = false))
         assertEquals("Mon 9 Nov – Sun 15 Nov · ranked by total steps", periodLabel(thu, monthly = false))
         assertEquals("1 Nov – 30 Nov · ranked by total steps", periodLabel(thu, monthly = true))
@@ -35,8 +36,9 @@ class ChallengesLogicTest {
         )
         val joined = Instant.parse("2026-11-11T03:00:00Z")
         val ends = Instant.parse("2026-11-18T18:29:00Z")
-        assertEquals(13000, ChallengesRepository.progress(days, joined, ends))
-        assertEquals(joined, ChallengesRepository.parseInstant("2026-11-11T03:00:00+00:00"))
+        assertEquals(13000, ChallengesRepository.progress(days, kotlin.time.Instant.parse(joined.toString()), kotlin.time.Instant.parse(ends.toString())))
+        assertEquals(joined, com.stepq.app.data.parseJavaInstant("2026-11-11T03:00:00+00:00"))
+        assertEquals(joined, com.stepq.app.data.parseJavaInstant("2026-11-11 08:30:00+05:30"))
     }
 
     @Test fun tiesSharePlaces() {

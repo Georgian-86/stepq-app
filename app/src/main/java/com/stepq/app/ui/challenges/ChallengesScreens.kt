@@ -1,5 +1,7 @@
 package com.stepq.app.ui.challenges
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import com.stepq.app.ui.components.appear
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -73,7 +75,7 @@ fun ChallengesScreen(
     onPeriod: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onOpen: (String) -> Unit,
-    today: LocalDate = LocalDate.now(com.stepq.app.data.FriendsRepository.IST),
+    today: LocalDate = LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")),
 ) {
     PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize().background(StepqColors.White)) {
         Column(
@@ -192,6 +194,36 @@ private fun PeriodCard(today: LocalDate, monthly: Boolean, scope: String?) {
         Spacer(Modifier.height(6.dp))
         Text(periodLabel(today, monthly), style = StepqType.Small, color = StepqColors.Muted)
         if (scope != null) Text(scope, style = StepqType.SmallStrong, color = StepqColors.Ink, modifier = Modifier.padding(top = 2.dp))
+        RewardLine(monthly)
+    }
+}
+
+/** Whether my plan can win this period's reward (weekly for everyone; monthly with Pro, by default). */
+@Composable
+private fun RewardLine(monthly: Boolean) {
+    val plan by com.stepq.app.data.Pro.plan.collectAsState()
+    val p = plan ?: return
+    val key = if (monthly) com.stepq.app.data.MyPlan.F.REWARD_MONTHLY else com.stepq.app.data.MyPlan.F.REWARD_WEEKLY
+    if (p.feature(key) == null) return
+    val eligible = p.has(key)
+    Row(
+        Modifier
+            .padding(top = 8.dp)
+            .clip(CircleShape)
+            .background(if (eligible) StepqColors.White else com.stepq.app.ui.theme.ProColors.Champagne2)
+            .clickable(enabled = !eligible, role = Role.Button) { com.stepq.app.ui.components.ProSheets.show(key) }
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (eligible) "🎁 You can win this ${if (monthly) "month" else "week"}'s reward" else "🎁 Monthly reward is for Pro members",
+            style = StepqType.Small,
+            color = StepqColors.Ink,
+        )
+        if (!eligible) {
+            Spacer(Modifier.width(6.dp))
+            com.stepq.app.ui.components.ProTag()
+        }
     }
 }
 
@@ -204,7 +236,7 @@ private fun Podium(top: List<Ranked>) {
             val r = top.getOrNull(i)
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (r != null) {
-                    StepqAvatar(r.person.avatar, if (i == 0) 52.dp else 44.dp)
+                    com.stepq.app.ui.components.PersonAvatar(r.person.avatar, if (i == 0) 52.dp else 44.dp, r.person.id)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         if (r.isMe) "You" else r.person.displayName.substringBefore(' '),
@@ -264,7 +296,7 @@ private fun YourRankCard(me: Ranked?, rank: Int?, ahead: Ranked?, total: Int, mo
         }
         if (me != null) {
             Column(horizontalAlignment = Alignment.End) {
-                StepqAvatar(me.person.avatar, 40.dp)
+                com.stepq.app.ui.components.PersonAvatar(me.person.avatar, 40.dp, me.person.id)
                 Text(formatSteps(me.steps), style = StepqType.SmallStrong, color = StepqColors.White, modifier = Modifier.padding(top = 4.dp))
             }
         }
@@ -283,15 +315,18 @@ private fun RankRow(rank: Int, r: Ranked, highlight: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(rank.toString(), style = StepqType.BodyStrong, color = StepqColors.Muted, modifier = Modifier.width(26.dp))
-        StepqAvatar(r.person.avatar, 32.dp)
-        Text(
-            if (r.isMe) "You" else r.person.displayName,
-            style = StepqType.BodyStrong,
-            color = StepqColors.Ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 12.dp).weight(1f),
-        )
+        com.stepq.app.ui.components.PersonAvatar(r.person.avatar, 32.dp, r.person.id)
+        Row(Modifier.padding(start = 12.dp).weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (r.isMe) "You" else r.person.displayName,
+                style = StepqType.BodyStrong,
+                color = StepqColors.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            com.stepq.app.ui.components.ProBadgeFor(r.person.id, Modifier.padding(start = 6.dp))
+        }
         Text(formatSteps(r.steps), style = StepqType.NumberM, color = StepqColors.Ink)
     }
 }
@@ -312,6 +347,7 @@ private fun ChallengeRow(c: ChallengeCard, onOpen: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) { Icon(Icons.Outlined.TrackChanges, contentDescription = null, tint = StepqColors.Ink) }
         Column(Modifier.padding(horizontal = 12.dp).weight(1f)) {
+            if (c.challenge.proOnly) com.stepq.app.ui.components.ProTag(Modifier.padding(bottom = 4.dp))
             Text(c.challenge.title, style = StepqType.BodyStrong, color = StepqColors.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(challengeSubtitle(c), style = StepqType.Small, color = StepqColors.Muted)
         }
@@ -326,8 +362,8 @@ private fun ChallengeRow(c: ChallengeCard, onOpen: () -> Unit) {
 }
 
 fun challengeSubtitle(c: ChallengeCard): String {
-    val goal = c.challenge.targetSteps?.let { "Walk ${formatSteps(it)} steps by ${shortDate(ChallengesRepository.parseInstant(c.challenge.endsAt))}" }
-        ?: "Ends ${shortDate(ChallengesRepository.parseInstant(c.challenge.endsAt))}"
+    val goal = c.challenge.targetSteps?.let { "Walk ${formatSteps(it)} steps by ${shortDate(com.stepq.app.data.parseJavaInstant(c.challenge.endsAt))}" }
+        ?: "Ends ${shortDate(com.stepq.app.data.parseJavaInstant(c.challenge.endsAt))}"
     val who = if (c.joined > 0) " · ${formatSteps(c.joined.toInt())} joined" else ""
     return goal + who
 }
@@ -337,7 +373,7 @@ fun challengeSubtitle(c: ChallengeCard): String {
 fun ChallengeDetailScreen(card: ChallengeCard, joining: Boolean, onJoin: () -> Unit, onLeave: () -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val c = card.challenge
-    val end = ChallengesRepository.parseInstant(c.endsAt)
+    val end = com.stepq.app.data.parseJavaInstant(c.endsAt)
     Column(Modifier.fillMaxSize().background(StepqColors.White).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(4.dp))
@@ -348,6 +384,10 @@ fun ChallengeDetailScreen(card: ChallengeCard, joining: Boolean, onJoin: () -> U
                 c.partnerName?.let {
                     Text(it, style = StepqType.SmallStrong, color = StepqColors.Ink, modifier = Modifier.clip(CircleShape).background(StepqColors.White).padding(horizontal = 12.dp, vertical = 6.dp))
                     Spacer(Modifier.height(12.dp))
+                }
+                if (c.proOnly) {
+                    com.stepq.app.ui.components.ProTag()
+                    Spacer(Modifier.height(8.dp))
                 }
                 Text(c.title, style = StepqType.Title, color = StepqColors.Ink)
                 c.targetSteps?.let {
@@ -374,7 +414,13 @@ fun ChallengeDetailScreen(card: ChallengeCard, joining: Boolean, onJoin: () -> U
             }
         }
         if (card.myJoinedAt == null) {
-            StepqButton("Join challenge", onJoin, Modifier.padding(horizontal = 20.dp, vertical = 16.dp), loading = joining)
+            val plan by com.stepq.app.data.Pro.plan.collectAsState()
+            val locked = c.proOnly && plan != null && plan?.has(com.stepq.app.data.MyPlan.F.ALL_CHALLENGES) != true
+            if (locked) {
+                com.stepq.app.ui.components.GoldButton("Join with StepQ Pro", onJoin, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
+            } else {
+                StepqButton("Join challenge", onJoin, Modifier.padding(horizontal = 20.dp, vertical = 16.dp), loading = joining)
+            }
         }
     }
 }
@@ -405,7 +451,7 @@ private fun Progress(card: ChallengeCard) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(StepqDimens.RadiusM)).background(StepqColors.White).border(BorderStroke(1.dp, StepqColors.Line), RoundedCornerShape(StepqDimens.RadiusM)).padding(16.dp)) {
         Row {
             Text("${formatSteps(card.myProgress.coerceAtMost(target))} of ${formatSteps(target)} steps", style = StepqType.BodyStrong, color = StepqColors.Ink, modifier = Modifier.weight(1f))
-            Text(daysLeft(ChallengesRepository.parseInstant(card.challenge.endsAt)), style = StepqType.Small, color = StepqColors.Muted)
+            Text(daysLeft(com.stepq.app.data.parseJavaInstant(card.challenge.endsAt)), style = StepqType.Small, color = StepqColors.Muted)
         }
         Spacer(Modifier.height(10.dp))
         LinearProgressIndicator(
@@ -432,7 +478,7 @@ fun ChallengeJoinedScreen(card: ChallengeCard, onDone: () -> Unit, onShare: () -
         Spacer(Modifier.height(20.dp))
         Text("You're in!", style = StepqType.Title, color = StepqColors.Ink)
         Spacer(Modifier.height(10.dp))
-        val end = shortDate(ChallengesRepository.parseInstant(c.endsAt))
+        val end = shortDate(com.stepq.app.data.parseJavaInstant(c.endsAt))
         Text(
             listOfNotNull(
                 c.targetSteps?.let { "Walk ${formatSteps(it)} steps by $end. Steps from today count." }

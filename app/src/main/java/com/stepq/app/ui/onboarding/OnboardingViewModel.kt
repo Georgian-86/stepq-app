@@ -9,6 +9,7 @@ import com.stepq.app.data.AvatarConfig
 import com.stepq.app.data.Gender
 import com.stepq.app.data.NewProfile
 import com.stepq.app.data.ProfileRepository
+import com.stepq.app.ui.components.Legal
 import java.time.LocalDate
 
 /**
@@ -22,11 +23,14 @@ class OnboardingViewModel : ViewModel() {
     var birthdate by mutableStateOf<LocalDate?>(null)
     var avatar by mutableStateOf(AvatarConfig())
     var dailyGoal by mutableIntStateOf(8000)
+    /** A07: ticked "I'm 18+ and agree to the Terms and Privacy policy". Never pre-ticked. */
+    var agreed by mutableStateOf(false)
 
     val firstName: String get() = fullName.trim().substringBefore(' ').ifEmpty { "there" }
 
     suspend fun save(profiles: ProfileRepository): Result<Unit> {
         val id = profiles.currentUserId() ?: return Result.failure(IllegalStateException("Not signed in"))
+        if (!agreed) return Result.failure(IllegalStateException("Agree to the Terms and Privacy policy first"))
         return profiles.create(
             NewProfile(
                 id = id,
@@ -37,6 +41,10 @@ class OnboardingViewModel : ViewModel() {
                 avatar = avatar,
                 dailyGoal = dailyGoal,
             ),
-        )
+        ).onSuccess {
+            // Evidence of consent (DPDP s.6): what was agreed to and when. Best effort: the
+            // profile is already made, and a failure here must not block sign-up.
+            profiles.recordConsent("terms_privacy", Legal.POLICY_VERSION)
+        }
     }
 }

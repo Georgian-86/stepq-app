@@ -1,0 +1,79 @@
+name: iOS
+
+# Builds the shared Kotlin framework and the SwiftUI app for the iOS Simulator, and runs the
+# shared tests natively. No signing: that needs the Apple Developer account (iosApp/README.md).
+# macOS minutes cost more than Linux ones, so this only runs when iOS or shared code changes.
+on:
+  pull_request:
+    paths:
+      - 'iosApp/**'
+      - 'shared/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/ios.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'iosApp/**'
+      - 'shared/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+      - name: Shared tests on the iOS Simulator
+        run: ./gradlew :shared:iosSimulatorArm64Test --console=plain
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          cd iosApp && xcodegen generate
+      - name: Supabase key (public anon key), when the secret is set
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_ANON_KEY" ]; then
+            printf 'SUPABASE_ANON_KEY = %s\n' "$SUPABASE_ANON_KEY" > iosApp/Config/Secrets.xcconfig
+          fi
+      - name: Build for the iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project iosApp/StepQ.xcodeproj -scheme StepQ -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath iosApp/build CODE_SIGNING_ALLOWED=NO SWIFT_COMPILATION_MODE=wholemodule build | tee iosApp/build.log | grep -E "error:|warning: .*StepQ/|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" iosApp/build.log
+      - name: Screenshots on a simulator
+        run: ./iosApp/scripts/screenshots.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-build
+          path: |
+            iosApp/build.log
+            iosApp/screenshots/
+          retention-days: 14
+      # The simulator build as a zip, for trying the app in a browser (e.g. appetize.io) without a Mac.
+      - name: Zip the simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent iosApp/build/Build/Products/Debug-iphonesimulator/StepQ.app iosApp/StepQ-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StepQ-simulator-app
+          path: iosApp/StepQ-simulator.zip
+          retention-days: 14

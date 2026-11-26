@@ -32,11 +32,12 @@ Application id: `in.stepq.app` (permanent once on Play). Code package: `com.step
 | A11 | All set | done (PR 1) |
 | A11a, A11b | First 10K progress and milestones; 10K unlocked | PR 3 |
 | A12, A12b, A12c | Home: ring, streak, StepQ score, week bars, friends today; goal reached; evening | done (PR 2) |
-| A13–A14 | Friends leaderboard, water reminder (5 a day on free) | PR 4 |
+| A13–A14 | Friends leaderboard, water reminder (3 a day on Free, unlimited on Pro; admin can change) | PR 4 |
 | A15–A17 | Groups, create group, group leaderboard | PR 4 |
 | A18–A21 | QRun list, post a QRun, join disclaimer, event planner | PR 5 |
 | A22–A25 | Challenges weekly/monthly, challenge detail, joined | PR 6 |
 | A26–A27 | Profile and settings, StepQ Pro waitlist | PR 7 |
+| P1–P9 | StepQ Pro: Pro profile, membership, Free vs Pro, limit sheet, BFF + streak restore, Insights, themes, Pro badges | Pro tier PR (see `docs/superpowers/specs/2026-11-25-pro-tier-design.md`) |
 
 Tab shell (Home, Friends, Challenges, Profile) is in PR 1 with placeholders.
 

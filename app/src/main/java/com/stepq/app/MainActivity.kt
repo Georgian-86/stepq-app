@@ -19,9 +19,25 @@ import com.stepq.app.ui.theme.StepqTheme
 import io.github.jan.supabase.auth.handleDeeplinks
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Health Connect (and Android's permission manager) open the app with these actions to ask
+     * why it wants health data. Google Play requires the answer to be the privacy policy, so
+     * open its health-data section and close.
+     */
+    private fun showsPrivacyPolicyOnly(intent: Intent?): Boolean {
+        val action = intent?.action ?: return false
+        if (action != "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" && action != "android.intent.action.VIEW_PERMISSION_USAGE") return false
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(com.stepq.app.ui.components.Legal.HEALTH_DATA_URL)))
+        }
+        finish()
+        return true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (showsPrivacyPolicyOnly(intent)) return
         enableEdgeToEdge()
         handleAuthLink(intent)
         handlePushTap(intent)

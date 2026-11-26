@@ -4,31 +4,29 @@ import com.stepq.app.data.DailySteps
 import com.stepq.app.ui.profile.profileStats
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.LocalDate
 
 class ProfileStatsTest {
-    @Test fun streakBestDayAndKm() {
-        val today = LocalDate.of(2026, 11, 12)
+    @Test fun scoreBestDayAndKm() {
         val days = listOf(
             DailySteps("u", "2026-11-12", 3000, distanceM = 2300),
             DailySteps("u", "2026-11-11", 9000, distanceM = 6900),
             DailySteps("u", "2026-11-10", 11830, distanceM = 9000),
             DailySteps("u", "2026-11-08", 8500, distanceM = 6500),
         )
-        val s = profileStats(days, goal = 8000, today = today, streak = 5, score = 40)
-        assertEquals(5, s.streak)
+        val s = profileStats(days, goal = 8000, score = 40)
         assertEquals(40, s.score)
         assertEquals(11830, s.bestDay)
         assertEquals(24, s.kmSoFar)
-        // Before the migration: no streak, and the score counts days at the goal.
-        val old = profileStats(days, goal = 8000, today = today)
-        assertEquals(0, old.streak)
+        // Before the migration: the score counts days at the goal.
+        val old = profileStats(days, goal = 8000)
         assertEquals(3, old.score)
     }
 
     @Test fun shareToasts() {
         assertEquals("Shared 6,240 steps with Arjun. Streak started!", com.stepq.app.ui.home.shareToast(listOf("Arjun"), 6240, 1, firstToday = true))
-        assertEquals("Shared 6,240 steps with Arjun and Meera. 4-day streak!", com.stepq.app.ui.home.shareToast(listOf("Arjun", "Meera"), 6240, 4, firstToday = true))
+        assertEquals("Shared 6,240 steps with Arjun. 4-day streak!", com.stepq.app.ui.home.shareToast(listOf("Arjun"), 6240, 4, firstToday = true))
+        // Streaks are per friend: sharing with several names no single streak.
+        assertEquals("Shared 6,240 steps with Arjun and Meera.", com.stepq.app.ui.home.shareToast(listOf("Arjun", "Meera"), 6240, 4, firstToday = true))
         assertEquals("Shared 100 steps with Arjun and 2 friends.", com.stepq.app.ui.home.shareToast(listOf("Arjun", "Meera", "Kabir"), 100, 4, firstToday = false))
     }
 

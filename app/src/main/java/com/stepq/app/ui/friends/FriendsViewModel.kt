@@ -62,7 +62,7 @@ class FriendsViewModel(private val repo: FriendsRepository) : ViewModel() {
         val data = _state.value.data ?: return
         if (friend.id in data.remindedToday || friend.id in _state.value.sending) return
         if (data.remindersLeft == 0) {
-            _state.update { it.copy(toast = "You've sent all 5 water reminders for today. More with StepQ Pro.") }
+            com.stepq.app.ui.components.ProSheets.show(com.stepq.app.data.MyPlan.F.WATER_REMINDERS)
             return
         }
         _state.update { it.copy(sending = it.sending + friend.id) }
@@ -75,7 +75,7 @@ class FriendsViewModel(private val repo: FriendsRepository) : ViewModel() {
                         s.copy(
                             sending = s.sending - friend.id,
                             data = d.copy(remindedToday = d.remindedToday + friend.id, remindersLeft = left),
-                            toast = reminderSentMessage(friend.displayName, left),
+                            toast = reminderSentMessage(friend.displayName, left, d.reminderLimit),
                         )
                     }
                 }
@@ -83,8 +83,8 @@ class FriendsViewModel(private val repo: FriendsRepository) : ViewModel() {
                     _state.update {
                         it.copy(
                             sending = it.sending - friend.id,
-                            toast = if (e.message?.contains("5 water reminders") == true) {
-                                "You've sent all 5 water reminders for today."
+                            toast = if (com.stepq.app.ui.components.ProSheets.showFor(e)) {
+                                null
                             } else {
                                 "Couldn't send the reminder. Try again."
                             },
@@ -201,17 +201,17 @@ fun relationTo(id: String, data: FriendsData): Relation = when {
     else -> Relation.None
 }
 
-fun reminderSentMessage(name: String, left: Int?): String {
+fun reminderSentMessage(name: String, left: Int?, limit: Int? = FriendsRepository.FREE_REMINDERS_PER_DAY): String {
     val first = name.firstName()
     return when (left) {
         null -> "Water reminder sent to $first."
-        0 -> "Water reminder sent to $first. That's all 5 for today."
+        0 -> if (limit != null) "Water reminder sent to $first. That's all $limit for today." else "Water reminder sent to $first."
         else -> "Water reminder sent to $first. $left left today."
     }
 }
 
-fun remindersBanner(left: Int?): String =
-    if (left == null) "Water reminders: unlimited · StepQ Pro"
-    else "Water reminders left today: $left of ${FriendsRepository.FREE_REMINDERS_PER_DAY} · Free plan"
+fun remindersBanner(left: Int?, limit: Int? = FriendsRepository.FREE_REMINDERS_PER_DAY, pro: Boolean = false): String =
+    if (left == null) "Water reminders: unlimited${if (pro) " · StepQ Pro" else ""}"
+    else "Water reminders left today: $left of ${limit ?: left} · ${if (pro) "StepQ Pro" else "Free plan"}"
 
 internal fun String.firstName() = trim().substringBefore(' ')

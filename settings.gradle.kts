@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "stepq-app"
 include(":app")
+include(":shared")
