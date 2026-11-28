@@ -12,15 +12,14 @@ final class OnboardingDraft {
     var birthDigits = ""
     var birthdate: String?
     var gender: String?
-    var skin = 2
-    var hair = 0
-    var outfit = 0
-    var headband = 0
-    var style = 0
+    var look = AvatarLook()
     var goal = 8000
     var agreed = false
 
-    var avatar: AvatarConfig { makeAvatar(skin: skin, hair: hair, outfit: outfit, headband: headband, style: style) }
+    var avatar: AvatarConfig { look.config }
+
+    /// Copies every avatar choice from a saved avatar.
+    func load(_ a: AvatarConfig) { look = AvatarLook(a) }
 }
 
 enum OnboardingStep: Hashable { case about, avatar, goal, health, done }
@@ -143,7 +142,8 @@ private struct AboutYouStep: View {
             ForEach(genders, id: \.0) { g in
                 Button {
                     draft.gender = g.0
-                    draft.style = Int(model.api.defaultHairStyle(gender: g.0))
+                    draft.look.style = Int(model.api.defaultHairStyle(gender: g.0))
+                    draft.look.body = Int(model.api.defaultBody(gender: g.0))
                 } label: {
                     HStack {
                         Text(g.1).font(Typo.body).foregroundStyle(Palette.ink)
@@ -174,35 +174,96 @@ private struct AvatarStep: View {
     }
 }
 
+/// The avatar builder's tabs: figure, hair, skin, outfit, headwear, face and extras.
+enum AvatarTab: String, CaseIterable, Identifiable {
+    case body = "Body", hair = "Hair", skin = "Skin", outfit = "Outfit", headwear = "Headwear", face = "Face", extras = "Extras"
+    var id: String { rawValue }
+}
+
+/// A08 avatar builder: part tabs, then shapes shown as small avatars and colours as swatches.
+/// Same choices as Android's AvatarPicker; the options come from the shared AvatarArt.
 struct AvatarPicker: View {
     @Bindable var draft: OnboardingDraft
+    @State private var tab: AvatarTab = .body
+    private let art = AvatarArt.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Picker("Style", selection: $draft.style) {
-                ForEach(AvatarPalette.styles.indices, id: \.self) { Text(AvatarPalette.styles[$0]).tag($0) }
+        VStack(alignment: .leading, spacing: 16) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(AvatarTab.allCases) { t in
+                        Button(t.rawValue) { tab = t }
+                            .font(Typo.bodyStrong)
+                            .padding(.horizontal, 16).frame(minHeight: 40)
+                            .background(tab == t ? Palette.ink : Palette.mint, in: Capsule())
+                            .foregroundStyle(tab == t ? .white : Palette.ink)
+                            .accessibilityAddTraits(tab == t ? .isSelected : [])
+                    }
+                }
             }
-            .pickerStyle(.segmented)
-            swatches("Skin", AvatarPalette.skin, $draft.skin)
-            swatches("Hair", AvatarPalette.hair, $draft.hair)
-            swatches("Outfit", AvatarPalette.outfit, $draft.outfit)
-            swatches("Headband", AvatarPalette.headband, $draft.headband)
+            switch tab {
+            case .body:
+                shapes("Body", art.bodies, \.body, selected: draft.avatar.isFemale ? 1 : 0)
+            case .hair:
+                shapes("Style", art.hairStyles, \.style)
+                swatches("Colour", art.hair, \.hair)
+            case .skin:
+                swatches("Skin tone", art.skin, \.skin)
+            case .outfit:
+                shapes("Top", art.tops, \.top)
+                swatches("Colour", art.outfit, \.outfit)
+            case .headwear:
+                shapes("Headwear", art.headwear, \.headwear)
+                swatches("Colour", art.headband, \.headband)
+            case .face:
+                shapes("Glasses", art.eyewear, \.eyewear)
+                shapes("Facial hair", art.facialHair, \.facialHair)
+            case .extras:
+                shapes("Extras", art.extras, \.extra)
+            }
         }
     }
 
-    private func swatches(_ label: String, _ colors: [Color], _ value: Binding<Int>) -> some View {
+    /// Each option drawn as a small avatar wearing it.
+    private func shapes(_ label: String, _ names: [String], _ key: WritableKeyPath<AvatarLook, Int>, selected: Int? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(Typo.smallStrong).foregroundStyle(Palette.muted)
-            HStack(spacing: 12) {
-                ForEach(colors.indices, id: \.self) { i in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(names.indices, id: \.self) { i in
+                        let isOn = (selected ?? draft.look[keyPath: key]) == i
+                        Button {
+                            draft.look[keyPath: key] = i
+                        } label: {
+                            VStack(spacing: 2) {
+                                AvatarView(config: draft.look.with(key, i).config, size: 52)
+                                Text(names[i]).font(Typo.small).foregroundStyle(Palette.ink)
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 6)
+                            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(isOn ? Palette.ink : Palette.line, lineWidth: isOn ? 2 : 1))
+                        }
+                        .accessibilityLabel("\(label): \(names[i])")
+                        .accessibilityAddTraits(isOn ? .isSelected : [])
+                    }
+                }
+                .padding(2)
+            }
+        }
+    }
+
+    private func swatches(_ label: String, _ argb: [KotlinLong], _ key: WritableKeyPath<AvatarLook, Int>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(Typo.smallStrong).foregroundStyle(Palette.muted)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 10)], alignment: .leading, spacing: 10) {
+                ForEach(argb.indices, id: \.self) { i in
                     Button {
-                        value.wrappedValue = i
+                        draft.look[keyPath: key] = i
                     } label: {
-                        Circle().fill(colors[i]).frame(width: 36, height: 36)
-                            .overlay(Circle().strokeBorder(value.wrappedValue == i ? Palette.ink : Palette.line, lineWidth: value.wrappedValue == i ? 3 : 1))
+                        Circle().fill(Color(argb: argb[i].int64Value)).frame(width: 36, height: 36)
+                            .overlay(Circle().strokeBorder(draft.look[keyPath: key] == i ? Palette.ink : Palette.line, lineWidth: draft.look[keyPath: key] == i ? 3 : 1))
                     }
                     .accessibilityLabel("\(label) \(i + 1)")
-                    .accessibilityAddTraits(value.wrappedValue == i ? .isSelected : [])
+                    .accessibilityAddTraits(draft.look[keyPath: key] == i ? .isSelected : [])
                 }
             }
         }

@@ -72,7 +72,7 @@ fun AboutYouScreen(state: OnboardingViewModel, onBack: () -> Unit, onContinue: (
             Gender.entries.forEach { g ->
                 StepqChip(g.label, selected = state.gender == g, onClick = {
                     state.gender = g
-                    state.avatar = state.avatar.copy(style = com.stepq.app.data.defaultHairStyle(g.value))
+                    state.avatar = state.avatar.forGender(g.value)
                 })
             }
         }

@@ -172,7 +172,7 @@ fun EditProfileScreen(
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Gender.entries.forEach { g -> StepqChip(g.label, selected = gender == g.value, onClick = {
                 gender = g.value
-                avatar = avatar.copy(style = com.stepq.app.data.defaultHairStyle(g.value))
+                avatar = avatar.forGender(g.value)
             }) }
         }
         if (profile.birthdate != null) {
@@ -183,8 +183,13 @@ fun EditProfileScreen(
 }
 
 private val AvatarSaver = androidx.compose.runtime.saveable.Saver<AvatarConfig, List<Int>>(
-    save = { listOf(it.skin, it.hair, it.outfit, it.headband, it.style) },
-    restore = { AvatarConfig(it[0], it[1], it[2], it[3], it.getOrElse(4) { 0 }) },
+    save = { listOf(it.skin, it.hair, it.outfit, it.headband, it.style, it.body, it.top, it.headwear, it.eyewear, it.facialHair, it.extra) },
+    restore = {
+        AvatarConfig(
+            skin = it[0], hair = it[1], outfit = it[2], headband = it[3], style = it[4], body = it[5],
+            top = it[6], headwear = it[7], eyewear = it[8], facialHair = it[9], extra = it[10],
+        )
+    },
 )
 
 /** A26 Account and security: email, password and deleting the account. */

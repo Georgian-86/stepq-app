@@ -1,6 +1,7 @@
 package com.stepq.app.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
@@ -73,7 +74,7 @@ class ScreenshotTest {
         gender = Gender.Female
         birthdate = LocalDate.of(2001, 3, 14)
         agreed = true
-        avatar = AvatarConfig(skin = 2, hair = 0, outfit = 0, headband = 0)
+        avatar = com.stepq.app.data.defaultAvatar("female").copy(skin = 2)
     }
 
     @Test fun a05SignUp() = snap("A05-sign-up-account") { SignUpAccountScreen(null, {}, {}, {}) }
@@ -100,6 +101,50 @@ class ScreenshotTest {
         )
     }
     @Test fun a08Avatar() = snap("A08-avatar") { AvatarScreen(riya, {}, {}) }
+    private fun snapAvatarTab(name: String, tab: String, avatar: AvatarConfig) {
+        val vm = OnboardingViewModel().apply { gender = Gender.Female; this.avatar = avatar }
+        compose.setContent {
+            StepqTheme {
+                androidx.compose.runtime.CompositionLocalProvider(com.stepq.app.ui.components.LocalMotionEnabled provides false) {
+                    AvatarScreen(vm, {}, {})
+                }
+            }
+        }
+        compose.onNode(androidx.compose.ui.test.hasText(tab) and androidx.compose.ui.test.hasClickAction()).performClick()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
+    }
+    @Test fun a08AvatarHair() = snapAvatarTab("A08b-avatar-hair", "Hair", com.stepq.app.data.defaultAvatar("female").copy(style = 3, hair = 5, outfit = 5))
+    @Test fun a08AvatarOutfit() = snapAvatarTab("A08c-avatar-outfit", "Outfit", com.stepq.app.data.defaultAvatar("female").copy(top = 3, outfit = 6, headwear = 2, extra = 3))
+    @Test fun a08AvatarFace() = snapAvatarTab("A08d-avatar-face", "Face", com.stepq.app.data.defaultAvatar("male").copy(skin = 3, eyewear = 1, facialHair = 2, headwear = 1, headband = 3, top = 1))
+    @Test fun a08AvatarGallery() = snap("A08e-avatar-gallery") {
+        val f = com.stepq.app.data.defaultAvatar("female")
+        val m = com.stepq.app.data.defaultAvatar("male")
+        val looks = listOf(
+            f.copy(skin = 1, hair = 0, outfit = 2),
+            f.copy(skin = 3, style = 3, hair = 5, top = 2, outfit = 3, headwear = 2, extra = 1),
+            f.copy(skin = 4, style = 4, hair = 0, top = 3, outfit = 6, headwear = 2, extra = 3),
+            f.copy(skin = 0, style = 0, hair = 4, eyewear = 1, top = 1, outfit = 5, headband = 6),
+            f.copy(skin = 2, style = 2, hair = 7, eyewear = 2, outfit = 7, headwear = 1, headband = 4),
+            f.copy(skin = 5, style = 1, hair = 1, top = 3, outfit = 0, headwear = 2, extra = 2),
+            m.copy(skin = 2),
+            m.copy(skin = 3, facialHair = 2, top = 1, outfit = 4, headwear = 1, headband = 0),
+            m.copy(skin = 1, style = 4, hair = 2, eyewear = 1, top = 2, outfit = 3, headwear = 2),
+            m.copy(skin = 4, style = 5, facialHair = 3, top = 3, outfit = 7, headwear = 2),
+            m.copy(skin = 0, hair = 4, eyewear = 2, facialHair = 1, outfit = 5, headwear = 1, headband = 7),
+            m.copy(skin = 5, style = 3, hair = 6, top = 2, outfit = 2, headband = 4, extra = 1),
+        )
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxSize().background(com.stepq.app.ui.theme.StepqColors.White).padding(16.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+        ) {
+            looks.chunked(3).forEach { row ->
+                androidx.compose.foundation.layout.Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                ) { row.forEach { com.stepq.app.ui.components.StepqAvatar(it, 104.dp) } }
+            }
+        }
+    }
     @Test fun a09Goal() = snap("A09-daily-goal") { GoalScreen(riya, null, {}, {}) }
     @Test fun a10Connect() = snap("A10-connect-steps") { ConnectStepsScreen(onBack = {}) {} }
     @Test fun a26ConnectedApps() = snap("A26-connected-apps") { ConnectStepsScreen(onBack = {}, fromSettings = true) {} }
