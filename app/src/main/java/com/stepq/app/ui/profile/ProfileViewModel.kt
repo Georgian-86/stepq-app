@@ -29,6 +29,8 @@ data class ProfileUiState(
     val exporting: Boolean = false,
     /** Privacy and data: people I've blocked; null until loaded. */
     val blocks: List<com.stepq.app.data.BlockedUser>? = null,
+    /** A goal change just saved: shows the "Step goal updated" popup. */
+    val goalSaved: com.stepq.app.data.GoalChange? = null,
 )
 
 /** [score] comes from Postgres; before the Nov 20 migration it falls back to goal days. */
@@ -69,17 +71,16 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
         viewModelScope.launch {
             val current = _state.value.profile?.dailyGoal ?: goal
             repo.updateGoal(goal, current)
-                .onSuccess {
-                    val tomorrow = java.time.LocalDate.now().plusDays(1).toString()
+                .onSuccess { change ->
                     _state.update { s ->
                         s.copy(
                             saving = false,
                             profile = s.profile?.copy(
-                                nextDailyGoal = goal.takeIf { it != current },
-                                nextGoalFrom = tomorrow.takeIf { goal != current },
+                                dailyGoal = change.dailyGoal,
+                                nextDailyGoal = change.nextDailyGoal,
+                                nextGoalFrom = change.nextGoalFrom,
                             ),
-                            toast = if (goal == current) "Your goal stays at ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps."
-                            else "From tomorrow your goal is ${com.stepq.app.ui.onboarding.formatSteps(goal)} steps.",
+                            goalSaved = change,
                         )
                     }
                     onSaved()
@@ -87,6 +88,8 @@ class ProfileViewModel(private val repo: ProfileRepository) : ViewModel() {
                 .onFailure { _state.update { it.copy(saving = false, toast = "Couldn't save your goal. Try again.") } }
         }
     }
+
+    fun goalSavedSeen() = _state.update { it.copy(goalSaved = null) }
 
     fun joinWaitlist(onDone: () -> Unit) {
         viewModelScope.launch {

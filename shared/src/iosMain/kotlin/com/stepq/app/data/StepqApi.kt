@@ -179,8 +179,12 @@ class StepqApi(private val supabaseUrl: String, anonKey: String) {
     suspend fun updateProfile(displayName: String, username: String, avatar: AvatarConfig, gender: String?) =
         call { profiles.updateProfile(displayName, username, avatar, gender) }
 
+    /** Saves a new daily goal. Postgres starts it tomorrow; the result is what it saved. */
     @Throws(Throwable::class)
-    suspend fun updateGoal(goal: Int, current: Int) = call { profiles.updateGoal(goal, current) }
+    suspend fun updateGoal(goal: Int, current: Int): GoalChange = call { profiles.updateGoal(goal, current) }
+
+    /** The "Step goal updated" popup's words for [change], on today's date. */
+    fun goalUpdatedCopy(change: GoalChange): GoalUpdatedCopy = com.stepq.app.data.goalUpdatedCopy(change)
 
     @Throws(Throwable::class)
     suspend fun recordConsent(purpose: String, version: String, granted: Boolean) =

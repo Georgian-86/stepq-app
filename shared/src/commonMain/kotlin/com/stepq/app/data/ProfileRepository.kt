@@ -22,6 +22,19 @@ fun pendingGoalDue(p: Profile, today: LocalDate): Int? {
     return next.takeIf { from <= today }
 }
 
+/** What a goal change saved: today's goal, and the new one with the day it starts (or none). */
+@kotlinx.serialization.Serializable
+data class GoalChange(
+    @kotlinx.serialization.SerialName("daily_goal") val dailyGoal: Int,
+    @kotlinx.serialization.SerialName("next_daily_goal") val nextDailyGoal: Int? = null,
+    @kotlinx.serialization.SerialName("next_goal_from") val nextGoalFrom: String? = null,
+)
+
+/** The change the app saves itself when Postgres can't decide: from tomorrow on the phone. */
+fun goalChange(goal: Int, current: Int, today: LocalDate): GoalChange =
+    if (goal == current) GoalChange(current)
+    else GoalChange(current, goal, today.plusDays(1).toString())
+
 /** The signed-in user's row in app.profiles. RLS limits writes to their own row. */
 class ProfileRepository(private val client: SupabaseClient?) {
 
@@ -43,19 +56,20 @@ class ProfileRepository(private val client: SupabaseClient?) {
         val id = currentUserId() ?: return@runCatching null
         val p = c.postgrest["profiles"].select { filter { eq("id", id) } }.decodeSingleOrNull<Profile>()
             ?: return@runCatching null
-        // A goal set yesterday (or earlier) takes over from today.
-        val due = pendingGoalDue(p, Dates.today())
-        if (due != null) {
-            runCatching {
-                c.postgrest["profiles"].update({
-                    set("daily_goal", due)
-                    set("next_daily_goal", null as Int?)
-                    set("next_goal_from", null as String?)
-                }) { filter { eq("id", id) } }
-            }.fold(onSuccess = { p.copy(dailyGoal = due, nextDailyGoal = null, nextGoalFrom = null) }, onFailure = { p })
-        } else {
-            p
+        // A goal change that has started takes over from today. Postgres moves it into
+        // daily_goal (sync_my_goal); before that migration, the app writes it itself.
+        val today = Dates.today()
+        val due = pendingGoalDue(p, today) ?: return@runCatching p
+        runCatching {
+            c.postgrest.rpc("sync_my_goal", buildJsonObject { put("p_today", today.toString()) })
+        }.recoverCatching {
+            c.postgrest["profiles"].update({
+                set("daily_goal", due)
+                set("next_daily_goal", null as Int?)
+                set("next_goal_from", null as String?)
+            }) { filter { eq("id", id) } }
         }
+        p.copy(dailyGoal = due, nextDailyGoal = null, nextGoalFrom = null)
     }
 
     suspend fun usernameAvailable(username: String): Result<Boolean> = runCatching {
@@ -138,7 +152,6 @@ class ProfileRepository(private val client: SupabaseClient?) {
         requireClient().postgrest["user_blocks"].delete { filter { eq("blocker", me); eq("blocked", userId) } }
     }
 
-    /** A26: change the daily goal. The check constraint keeps it between 1,000 and 100,000. */
     /** A26 Edit profile. Birthdate isn't here: it's locked once set. */
     suspend fun updateProfile(displayName: String, username: String, avatar: AvatarConfig, gender: String?): Result<Unit> = runCatching {
         val id = currentUserId() ?: throw NotConfiguredException()
@@ -153,19 +166,31 @@ class ProfileRepository(private val client: SupabaseClient?) {
     /**
      * A26: change the daily goal from tomorrow, so today's score and streak are judged on the
      * goal the day started with. Picking today's goal again cancels a pending change.
+     * Postgres decides the start day (set_daily_goal) and never lets it be today; the result
+     * is what it saved.
      */
-    suspend fun updateGoal(goal: Int, current: Int): Result<Unit> = runCatching {
+    suspend fun updateGoal(goal: Int, current: Int): Result<GoalChange> = runCatching {
         val id = currentUserId() ?: throw NotConfiguredException()
-        val tomorrow = Dates.today().plusDays(1).toString()
-        requireClient().postgrest["profiles"].update({
-            if (goal == current) {
-                set("next_daily_goal", null as Int?)
-                set("next_goal_from", null as String?)
-            } else {
-                set("next_daily_goal", goal)
-                set("next_goal_from", tomorrow)
-            }
-        }) { filter { eq("id", id) } }
+        val c = requireClient()
+        val today = Dates.today()
+        runCatching {
+            c.postgrest.rpc("set_daily_goal", buildJsonObject {
+                put("p_goal", goal)
+                put("p_today", today.toString())
+            }).decodeList<GoalChange>().single()
+        }.getOrElse {
+            // Before the Nov 28 migration: save tomorrow's goal on the profile.
+            c.postgrest["profiles"].update({
+                if (goal == current) {
+                    set("next_daily_goal", null as Int?)
+                    set("next_goal_from", null as String?)
+                } else {
+                    set("next_daily_goal", goal)
+                    set("next_goal_from", today.plusDays(1).toString())
+                }
+            }) { filter { eq("id", id) } }
+            goalChange(goal, current, today)
+        }
     }
 
     /** All my saved days, newest first, for the best day and total distance. */

@@ -201,6 +201,9 @@ fun ProfileRoute(repo: ProfileRepository, auth: AuthRepository?) {
             com.stepq.app.ui.components.PlanLimitSheet(key, plan, onSeePro = { limitSheet = null; page = "pro" }, onDismiss = { limitSheet = null })
         }
     }
+    state.goalSaved?.let { change ->
+        GoalUpdatedDialog(change, onDismiss = { vm.goalSavedSeen() })
+    }
     if (confirmLogOut) {
         AlertDialog(
             onDismissRequest = { confirmLogOut = false },
