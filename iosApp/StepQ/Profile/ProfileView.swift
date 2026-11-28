@@ -152,8 +152,7 @@ struct EditProfileView: View {
         draft.fullName = me.displayName
         draft.username = me.username
         draft.gender = me.gender
-        draft.skin = Int(me.avatar.skin); draft.hair = Int(me.avatar.hair); draft.outfit = Int(me.avatar.outfit)
-        draft.headband = Int(me.avatar.headband); draft.style = Int(me.avatar.style)
+        draft.load(me.avatar)
     }
 
     private func save() async {
