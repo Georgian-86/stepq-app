@@ -703,6 +703,25 @@ class ScreenshotTest {
         com.stepq.app.ui.profile.EditGoalScreen(8000, saving = false, onSave = {}, onBack = {}, pending = 10000)
     }
 
+    private val goalDay = kotlinx.datetime.LocalDate(2026, 11, 28)
+
+    @Test fun a26GoalUpdatedPopup() = snap("A26-goal-updated-popup") {
+        val change = com.stepq.app.data.GoalChange(dailyGoal = 8000, nextDailyGoal = 10000, nextGoalFrom = "2026-11-29")
+        com.stepq.app.ui.profile.GoalUpdatedPreview(change, goalDay) {
+            com.stepq.app.ui.profile.ProfileScreen(
+                profileState.copy(profile = profileState.profile?.copy(dailyGoal = 8000, nextDailyGoal = 10000, nextGoalFrom = "2026-11-29")),
+                "Phone step counter",
+            ) {}
+        }
+    }
+
+    @Test fun a26GoalKeptPopup() = snap("A26-goal-kept-popup") {
+        val change = com.stepq.app.data.GoalChange(dailyGoal = 8000)
+        com.stepq.app.ui.profile.GoalUpdatedPreview(change, goalDay) {
+            com.stepq.app.ui.profile.ProfileScreen(profileState.copy(profile = profileState.profile?.copy(dailyGoal = 8000)), "Phone step counter") {}
+        }
+    }
+
     // Frame-by-frame recordings of the new animations, turned into GIFs for review.
     private fun recordFrames(dir: String, content: @Composable () -> Unit): (Long) -> Unit {
         compose.mainClock.autoAdvance = false

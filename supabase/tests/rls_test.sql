@@ -249,6 +249,45 @@ with u as (update app.profiles set next_daily_goal = 9000 where id = '00000000-0
 select pg_temp.expect((select count(*) from u) = 0, 'setting a friend''s goal');
 reset role;
 
+-- Nov 28: Postgres keeps today's goal whatever the app sends. The stranger has no saved day
+-- yet, which is when a lower goal could otherwise have judged today.
+create or replace function pg_temp.utc_today() returns date language sql as $$ select (now() at time zone 'utc')::date $$;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+update app.profiles set daily_goal = 3000 where id = auth.uid();
+select pg_temp.expect((select daily_goal from app.profiles where id = auth.uid()) = 8000, 'goal: writing daily_goal keeps today''s goal');
+select pg_temp.expect((select next_daily_goal = 3000 and next_goal_from = pg_temp.utc_today() + 1 from app.profiles where id = auth.uid()), 'goal: writing daily_goal becomes tomorrow''s goal');
+update app.profiles set next_daily_goal = 2000, next_goal_from = pg_temp.utc_today() - 1 where id = auth.uid();
+select pg_temp.expect((select next_goal_from > pg_temp.utc_today() - 1 from app.profiles where id = auth.uid()), 'goal: a change can''t start in the past');
+select pg_temp.expect((select daily_goal = 8000 and next_daily_goal = 5000 and next_goal_from = pg_temp.utc_today() + 1 from app.set_daily_goal(5000, pg_temp.utc_today())), 'goal: set_daily_goal starts tomorrow');
+select pg_temp.expect((select next_goal_from = pg_temp.utc_today() + 1 from app.set_daily_goal(4000, date '2000-01-01')), 'goal: a made-up date is ignored');
+select pg_temp.expect((select daily_goal = 8000 and next_daily_goal = 4000 from app.sync_my_goal(pg_temp.utc_today())), 'goal: sync keeps today''s goal');
+select pg_temp.expect_error($$select app.set_daily_goal(500, current_date)$$, 'goal: set_daily_goal below 1,000');
+select pg_temp.expect_error($$insert into app.goal_schedule (user_id, effective_from, goal) values (auth.uid(), current_date, 1000)$$, 'goal: writing the schedule directly');
+select pg_temp.expect_error($$delete from app.goal_schedule where user_id = auth.uid()$$, 'goal: deleting the schedule');
+select pg_temp.expect_error($$select app.goal_on(auth.uid(), current_date)$$, 'goal: calling goal_on');
+insert into app.daily_steps (user_id, day, steps) values (auth.uid(), pg_temp.utc_today(), 4500);
+select pg_temp.expect((select goal from app.daily_steps where user_id = auth.uid() and day = pg_temp.utc_today()) = 8000, 'goal: today is judged on the goal it started with');
+-- With today saved, even an old app's "from today" can only mean tomorrow.
+update app.profiles set next_daily_goal = 6000, next_goal_from = pg_temp.utc_today() where id = auth.uid();
+select pg_temp.expect((select next_goal_from = pg_temp.utc_today() + 1 from app.profiles where id = auth.uid()), 'goal: change after today''s first save starts tomorrow');
+-- Picking today's goal again cancels the change.
+select pg_temp.expect((select daily_goal = 8000 and next_daily_goal is null from app.set_daily_goal(8000, pg_temp.utc_today())), 'goal: picking today''s goal cancels');
+select pg_temp.expect((select count(*) from app.goal_schedule where user_id = auth.uid()) = 1, 'goal: reads own schedule');
+select pg_temp.expect((select count(*) from app.goal_schedule) = 1, 'goal: can''t read others'' schedules');
+select app.set_daily_goal(6000, pg_temp.utc_today());
+reset role;
+-- Tomorrow arrives: the change takes over on the next sync, and today's row keeps 8,000.
+update app.goal_schedule set effective_from = pg_temp.utc_today() where user_id = '00000000-0000-0000-0000-00000000000c' and goal = 6000;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select daily_goal = 6000 and next_daily_goal is null from app.sync_my_goal(pg_temp.utc_today())), 'goal: a started change becomes daily_goal');
+select pg_temp.expect((select daily_goal from app.profiles where id = auth.uid()) = 6000, 'goal: sync saves daily_goal');
+select pg_temp.expect((select goal from app.daily_steps where user_id = auth.uid() and day = pg_temp.utc_today()) = 8000, 'goal: a saved day keeps its goal');
+reset role;
+-- Put the stranger back as they were for the checks below.
+delete from app.daily_steps where user_id = '00000000-0000-0000-0000-00000000000c';
+delete from app.goal_schedule where user_id = '00000000-0000-0000-0000-00000000000c' and effective_from > date '2000-01-01';
+update app.profiles set daily_goal = 8000, next_daily_goal = null, next_goal_from = null where id = '00000000-0000-0000-0000-00000000000c';
+
 -- Paid QRuns: only StepQ admins can post one or set a price.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
 select pg_temp.expect_error($$insert into app.qruns (created_by, title, place_name, starts_at, price_inr) values (auth.uid(), 'Paid', 'X', now() + interval '1 day', 299)$$, 'member posting a paid QRun');

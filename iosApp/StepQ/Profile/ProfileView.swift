@@ -8,6 +8,7 @@ struct ProfileView: View {
     @State private var score: Int?
     @State private var editing = false
     @State private var goalSheet = false
+    @State private var goalSaved: GoalChange?
     @State private var confirmLogOut = false
 
     var body: some View {
@@ -58,7 +59,7 @@ struct ProfileView: View {
             }
             .navigationTitle("Profile")
             .sheet(isPresented: $editing, onDismiss: { Task { await model.refreshProfile() } }) { EditProfileView() }
-            .sheet(isPresented: $goalSheet, onDismiss: { Task { await model.refreshProfile() } }) { GoalSheet() }
+            .sheet(isPresented: $goalSheet, onDismiss: { Task { await model.refreshProfile() } }) { GoalSheet(saved: $goalSaved) }
             .confirmationDialog("Log out of StepQ?", isPresented: $confirmLogOut) {
                 Button("Log out", role: .destructive) { Task { await model.logOut() } }
             }
@@ -67,6 +68,15 @@ struct ProfileView: View {
                 score = (try? await model.api.myScore())?.intValue
             }
         }
+        .overlay {
+            if let change = goalSaved, !goalSheet {
+                GoalUpdatedPopup(copy: model.api.goalUpdatedCopy(change: change), change: change) {
+                    withAnimation(.easeOut(duration: 0.2)) { goalSaved = nil }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: goalSaved == nil)
     }
 
     private func row(_ icon: String, _ title: String, value: String? = nil) -> some View {
@@ -82,15 +92,23 @@ struct ProfileView: View {
 struct GoalSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    /// Set to what was saved, so Profile can show the "Step goal updated" popup.
+    @Binding var saved: GoalChange?
     @State private var goal = 8000
     @State private var error: String?
+    @State private var busy = false
+
+    private var today: Int { Int(model.profile?.dailyGoal ?? 8000) }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
                 Text("\(formatSteps(goal)) steps").font(Typo.display(40)).foregroundStyle(Palette.deep)
                 Stepper("Daily goal", value: $goal, in: 1000...100000, step: 500)
-                Text("Your new goal starts tomorrow. Today's goal stays the same.").font(Typo.small).foregroundStyle(Palette.muted)
+                Text(goal == today
+                     ? "Today's goal is \(formatSteps(today)) steps."
+                     : "Starts tomorrow. Today you're still aiming for \(formatSteps(today)) steps, so today counts at that goal.")
+                    .font(Typo.small).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
                 if let error { NoticeText(text: error) }
                 Spacer()
             }
@@ -101,17 +119,84 @@ struct GoalSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        busy = true
                         Task {
                             do {
-                                try await model.api.updateGoal(goal: Int32(goal), current: model.profile?.dailyGoal ?? 8000)
+                                let change = try await model.api.updateGoal(goal: Int32(goal), current: Int32(today))
+                                saved = change
                                 dismiss()
                             } catch { self.error = error.localizedDescription }
+                            busy = false
                         }
                     }
+                    .disabled(busy || goal == Int(model.profile?.nextDailyGoal?.int32Value ?? Int32(today)))
                 }
             }
-            .onAppear { goal = Int(model.profile?.nextDailyGoal?.int32Value ?? model.profile?.dailyGoal ?? 8000) }
+            .onAppear { goal = Int(model.profile?.nextDailyGoal?.int32Value ?? Int32(today)) }
         }
+    }
+}
+
+/// Shown after a goal change is saved: the new goal starts tomorrow, today's stays.
+struct GoalUpdatedPopup: View {
+    let copy: GoalUpdatedCopy
+    let change: GoalChange
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea().onTapGesture(perform: onDismiss)
+            VStack(spacing: 0) {
+                ZStack {
+                    Circle().fill(Palette.mint).frame(width: 72, height: 72)
+                    Circle().fill(Palette.leafSoft).frame(width: 52, height: 52)
+                    Image(systemName: change.nextDailyGoal != nil ? "calendar.badge.checkmark" : "target")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Palette.deep)
+                }
+                .accessibilityHidden(true)
+                Text(copy.title)
+                    .font(Typo.title(22)).foregroundStyle(Palette.ink)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 16)
+                    .accessibilityAddTraits(.isHeader)
+                Text(copy.body)
+                    .font(Typo.body).foregroundStyle(Palette.muted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+                if let next = change.nextDailyGoal {
+                    HStack(spacing: 8) {
+                        tile("TODAY", Int(change.dailyGoal), highlighted: false)
+                        Image(systemName: "arrow.right").font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
+                            .accessibilityHidden(true)
+                        tile((copy.startsLabel ?? "Tomorrow").uppercased(), Int(next.int32Value), highlighted: true)
+                    }
+                    .padding(.top, 20)
+                }
+                Button("Got it", action: onDismiss)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.top, 24)
+            }
+            .padding(EdgeInsets(top: 28, leading: 24, bottom: 20, trailing: 24))
+            .frame(maxWidth: 360)
+            .background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .shadow(color: .black.opacity(0.12), radius: 24, y: 8)
+            .padding(24)
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(.isModal)
+        }
+    }
+
+    private func tile(_ label: String, _ steps: Int, highlighted: Bool) -> some View {
+        VStack(spacing: 2) {
+            Text(label).font(Typo.smallStrong).foregroundStyle(highlighted ? Palette.deep : Palette.muted)
+            Text(formatSteps(steps)).font(Typo.heading(20)).foregroundStyle(highlighted ? Palette.deep : Palette.ink)
+            Text("steps").font(Typo.small).foregroundStyle(Palette.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(highlighted ? Palette.mint : Palette.page, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
